@@ -1,0 +1,357 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "c1a61e4a-6a2f-45a1-a5a6-c2bb5a75a5c7",
+    "workspace": "pilot-eval",
+    "issue": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "The library delivery trial covers Maple End and West Quay. During the trial, the pickup window is Tuesday from 2 to 5 p.m. Residents report a missed library delivery by leaving a message on the trial voicemail line. Staff review messages the following morning. The office keeps a separate log for day-to-day questions. Each entry contains the date received and a brief description, followed by the initials of the person who filed it.",
+          "snippet_ids": [
+            "S10",
+            "S19",
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "The library delivery trial covers Maple End and West Quay. "
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. "
+            },
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Residents report a missed library delivery by leaving a message on the trial\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "voicemail line. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Staff review messages the following morning.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "05353d05-6a69-531b-a45f-84ba947c0760",
+        "revision_id": "4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+        "relative_path": "sources/cedar_c.md",
+        "updated_at": "2026-10-30T14:54:57.153798+00:00",
+        "chunk_id": "8d200547-e43c-5e07-90e3-29c411e48746",
+        "anchor": "cedar-working-note-3",
+        "heading": "Cedar working note 3",
+        "content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+        "presented_content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      },
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "22dc4f59-380b-5be4-90df-b9d8266a1294",
+        "revision_id": "5b58c05d-9adb-508d-82f5-29e5a760264b",
+        "relative_path": "sources/cedar_a.md",
+        "updated_at": "2026-10-30T14:54:57.152402+00:00",
+        "chunk_id": "10b68380-d112-5da4-b2fd-3586a7e2a430",
+        "anchor": "cedar-working-note-1",
+        "heading": "Cedar working note 1",
+        "content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+        "presented_content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "74633d73-7683-5a4d-a3bf-c210c41db5a2",
+        "revision_id": "2c936802-b269-531c-a7d1-2d3e714adaf8",
+        "relative_path": "sources/cedar_b.md",
+        "updated_at": "2026-10-30T14:54:57.153246+00:00",
+        "chunk_id": "7643a49d-d35d-5fa0-97e1-fd3860ccefb1",
+        "anchor": "cedar-working-note-2",
+        "heading": "Cedar working note 2",
+        "content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+        "presented_content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T14:55:39.035387+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 41868,
+      "created_at": "2026-10-30T14:55:39.035387+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "Residents report a missed library delivery by leaving a message on the trial\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "voicemail line. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "Staff review messages the following morning.\n\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "The office keeps a separate log for day-to-day questions. "
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "Each entry contains the\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "date received and a brief description, followed by the initials of the person\n"
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "who filed it. "
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+          "quote": "as drafts until someone supplies a verified replacement."
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "The library delivery trial covers Maple End and West Quay. "
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "Other\n"
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "neighborhoods remain outside this trial even if a rider passes through them.\n\n"
+        },
+        {
+          "snippet_id": "S13",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+        },
+        {
+          "snippet_id": "S14",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "sheet and retain the previous copy in the archive. "
+        },
+        {
+          "snippet_id": "S15",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "A coordinator checks the file\n"
+        },
+        {
+          "snippet_id": "S16",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "name and the date before the next handoff. "
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "If a document is missing, the team\n"
+        },
+        {
+          "snippet_id": "S18",
+          "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+          "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. "
+        },
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "The library\n"
+        },
+        {
+          "snippet_id": "S21",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "desk keeps any uncollected parcels until the next working day.\n\n"
+        },
+        {
+          "snippet_id": "S22",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+        },
+        {
+          "snippet_id": "S23",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "leave the remainder for the next shift. "
+        },
+        {
+          "snippet_id": "S24",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "The checklist is a record of work in\n"
+        },
+        {
+          "snippet_id": "S25",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "progress, not an authorization to change the underlying arrangement. "
+        },
+        {
+          "snippet_id": "S26",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "Staff can\n"
+        },
+        {
+          "snippet_id": "S27",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "source_text": "2 to 5 p.m. ",
+          "start": 52,
+          "end": 64,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+          "source_text": "5 p.m. ",
+          "start": 57,
+          "end": 64,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "ca38d861-24f0-4f63-b486-e777f3e4e216"
+    ]
+  },
+  "latency_seconds": 41.88114166725427,
+  "setup_seconds": 0.027450665831565857,
+  "attempt_total_seconds": 41.908592333085835,
+  "finished_at": "2026-10-30T14:55:39.041830+00:00"
+}

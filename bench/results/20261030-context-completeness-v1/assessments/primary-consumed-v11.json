@@ -1,0 +1,64 @@
+{
+  "reviewer": "primary",
+  "purpose": "Consumed real-source candidate-only diagnostic; not fresh holdout or same-prompt paired comparison. Frozen curated excerpts predate actual owner review.",
+  "rubric_pass_count": 0,
+  "case_count": 2,
+  "saved_drafts": 1,
+  "cases": {
+    "pilot-readiness": {
+      "status": "success",
+      "latency_seconds": 148.92461599968374,
+      "rubric_pass": false,
+      "text_complete": false,
+      "required_facets": [
+        {
+          "facet": "actual local owner workflow, review and outcome",
+          "text": false,
+          "attached_support": false,
+          "reason": "First part answers what is ready with before-pilot work; local source/investigation/review/outcome workflow omitted."
+        },
+        {
+          "facet": "v9 experimental qualification 1/4 original and4/4 scripted",
+          "text": false,
+          "attached_support": false,
+          "reason": "Results and distinction from owner acceptance omitted."
+        },
+        {
+          "facet": "all named pilot gates",
+          "text": true,
+          "attached_support": true,
+          "reason": "S15 guide-gates quote includes independent checks, effort, lifecycle UI, authenticated organizational access, larger-corpus performance and backup/recovery."
+        },
+        {
+          "facet": "shared authorization and operational work remains",
+          "text": false,
+          "attached_support": false,
+          "reason": "Authenticated organizational access is named as remaining, but shared deployment authorization/local-owner boundary is not clearly explained."
+        },
+        {
+          "facet": "curated source scope and no measured owner acceptance in frozen sources",
+          "text": false,
+          "attached_support": false,
+          "reason": "Neither limitation is stated."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": [
+        "All three valid request spans are present, but semantic coverage remains incomplete; syntactic span coverage is insufficient.",
+        "Repeated pilot-gates prose under supported status does not answer actual readiness or give evaluation evidence.",
+        "Exact S15 source binding is valid; it does not establish a complete answer."
+      ]
+    },
+    "core-company": {
+      "status": "error",
+      "latency_seconds": 0.01139962486922741,
+      "failure_stage": "pre_inference",
+      "error": "snippets do not match source context",
+      "rubric_pass": false,
+      "text_complete": false,
+      "attached_support": false,
+      "reason": "No model generation or saved answer. Frozen packaging rubric cannot be satisfied.",
+      "diagnosis": "Deterministic replay finds one omitted whitespace-only newline before a list in First offer to validate; quotes individually exact, but concatenation is not a prefix as required by v3 quantity parser."
+    }
+  }
+}

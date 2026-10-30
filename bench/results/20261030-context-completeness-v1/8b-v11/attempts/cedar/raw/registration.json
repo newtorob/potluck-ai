@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "4ce9d7ec-246d-4779-b237-8db110fb7bc3",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/cedar/raw/allowed",
+  "files": {
+    "sources/cedar_a.md": "f8efd4e6b60d0934a002f7de2a4ceba9706c8651eef2745bbadb34fa9ea105b9",
+    "sources/cedar_b.md": "51b887644294aba559a12b83644de394b2426a6d0c0381d574aa67b6691d18cd",
+    "sources/cedar_c.md": "6c3419b42edea04eba7a0b99cdb169013e81f743796d0e715089b6968eb10ce1"
+  },
+  "scan": {
+    "collection_id": "4ce9d7ec-246d-4779-b237-8db110fb7bc3",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "4ce9d7ec-246d-4779-b237-8db110fb7bc3"
+  ],
+  "excluded_canary": {
+    "collection_id": "2086b7aa-2943-408e-9a89-8c3d1727368a",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/cedar/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "7c9c6d1d77d1e1c2f1090281578529b58aabb3273e661e742ff36c0f0760ada7",
+    "scan": {
+      "collection_id": "2086b7aa-2943-408e-9a89-8c3d1727368a",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

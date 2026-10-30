@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ad06dc9e-6bff-4486-b8d1-ec0e20bfc8a6",
+  "object": "chat.completion",
+  "created": 1793372317,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S3\"], \"text\": \"The Tide pilot was moved back because the shore sensors produced inconsistent readings after salt spray. The team chose to retest the instruments before inviting the first vessels.\", \"status\": \"supported\", \"request_span\": \"why was the Tide pilot delayed\"}, {\"snippet_ids\": [\"S1\"], \"text\": \"Mara Venn owns the revised Tide pilot schedule. She coordinates dates with the harbor crew but does not control the instrument test itself.\", \"status\": \"supported\", \"request_span\": \"who owns its revised schedule\"}, {\"snippet_ids\": [\"S5\"], \"text\": \"The Tide pilot can start once three consecutive salt-spray trials pass calibration. A calendar date has not yet been committed.\", \"status\": \"supported\", \"request_span\": \"what condition must be met before it starts\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1195,
+    "completion_tokens": 185,
+    "total_tokens": 1380
+  }
+}

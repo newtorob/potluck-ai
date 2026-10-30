@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "3049d387-15ea-478c-93d3-6ac12767a776",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/birch/raw/allowed",
+  "files": {
+    "sources/birch_a.md": "fc6264d3cde401c860f15e3f15f20acbe7c7e8e179f6630e0d62f4cc344fe5d2",
+    "sources/birch_b.md": "3e42326674de79d6e891632e705be28d33068288079644c015f1c51c17ed8968",
+    "sources/birch_c.md": "ef041c460560337e6647c897ef9dc20d141553da702c990040d0173d530e1629"
+  },
+  "scan": {
+    "collection_id": "3049d387-15ea-478c-93d3-6ac12767a776",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "3049d387-15ea-478c-93d3-6ac12767a776"
+  ],
+  "excluded_canary": {
+    "collection_id": "d6527d92-007e-46a0-ac78-682d3629cb6b",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/birch/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "7c9c6d1d77d1e1c2f1090281578529b58aabb3273e661e742ff36c0f0760ada7",
+    "scan": {
+      "collection_id": "d6527d92-007e-46a0-ac78-682d3629cb6b",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

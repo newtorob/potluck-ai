@@ -1,0 +1,312 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "d1644b8a-cea4-4448-aae0-8fb05e5a1fd3",
+    "workspace": "pilot-eval",
+    "issue": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "The frost alert is triggered when the orchard probe records two readings below 1°C at least ten minutes apart. A single low reading alone does not trigger it.\nThe service sends a frost alert to the grower’s registered phone by text message. The dashboard stores a copy but does not substitute for the text.\nAfter receiving an alert, the grower is expected to inspect the irrigation valves before deciding whether to run sprinklers. The service does not turn the valves on.",
+          "snippet_ids": [
+            "S5",
+            "S1",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+              "quote": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n"
+            },
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f",
+              "quote": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d",
+              "quote": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n"
+            }
+          ],
+          "parts": [
+            {
+              "request_span": "what triggers an alert",
+              "status": "supported",
+              "text": "The frost alert is triggered when the orchard probe records two readings below 1°C at least ten minutes apart. A single low reading alone does not trigger it.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+                  "quote": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n"
+                }
+              ]
+            },
+            {
+              "request_span": "where is it sent",
+              "status": "supported",
+              "text": "The service sends a frost alert to the grower’s registered phone by text message. The dashboard stores a copy but does not substitute for the text.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f",
+                  "quote": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n"
+                }
+              ]
+            },
+            {
+              "request_span": "what action is the grower expected to take",
+              "status": "supported",
+              "text": "After receiving an alert, the grower is expected to inspect the irrigation valves before deciding whether to run sprinklers. The service does not turn the valves on.",
+              "snippet_ids": [
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d",
+                  "quote": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "0f099cac-65e7-5117-aced-c15c0ba7e0e1",
+        "revision_id": "7c866858-2c62-5234-b129-98f0e336645f",
+        "relative_path": "sources/mosaic_b.md",
+        "updated_at": "2026-10-30T15:00:17.894601+00:00",
+        "chunk_id": "6d716d03-bdd8-5249-819f-680ee80a331b",
+        "anchor": "mosaic-working-note-2",
+        "heading": "Mosaic working note 2",
+        "content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f",
+        "presented_content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "652dad64-61e1-5cc0-916b-5e71b607114f",
+        "revision_id": "336e3174-b6ab-51d6-881f-fbe82d62925d",
+        "relative_path": "sources/mosaic_c.md",
+        "updated_at": "2026-10-30T15:00:17.895158+00:00",
+        "chunk_id": "82365ed2-f4c5-556e-b3ef-670d90a8108a",
+        "anchor": "mosaic-working-note-3",
+        "heading": "Mosaic working note 3",
+        "content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d",
+        "presented_content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      },
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "6c02c2a2-37fb-5133-9dfc-5730fa42bc50",
+        "revision_id": "aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+        "relative_path": "sources/mosaic_a.md",
+        "updated_at": "2026-10-30T15:00:17.893807+00:00",
+        "chunk_id": "4a262fe4-3d82-5639-be37-3cff54065e9c",
+        "anchor": "mosaic-working-note-1",
+        "heading": "Mosaic working note 1",
+        "content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+        "presented_content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T15:01:05.569665+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v11",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 47663,
+      "created_at": "2026-10-30T15:01:05.569665+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v1",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified.",
+        "unmatched_request_text": {
+          "R1": [
+            "For Mosaic Orchard’s frost alert service, ",
+            ", ",
+            ", and ",
+            "?"
+          ]
+        }
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f",
+          "quote": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f",
+          "quote": "\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d",
+          "quote": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d",
+          "quote": "\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+          "quote": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+          "quote": "\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S5",
+          "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+          "source_text": "two readings",
+          "snippet_text": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n",
+          "start": 60,
+          "end": 72,
+          "value": "2",
+          "unit": "readings",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S5",
+          "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+          "source_text": "ten minutes",
+          "snippet_text": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n",
+          "start": 92,
+          "end": 103,
+          "value": "10",
+          "unit": "min",
+          "dimension": "time"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+          "source_text": "1°C at least ten minutes apart. A single ",
+          "start": 79,
+          "end": 120,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "07353c9f-7fdc-43ab-8e06-bd63573da465"
+    ]
+  },
+  "latency_seconds": 47.67732754163444,
+  "setup_seconds": 0.024118165485560894,
+  "attempt_total_seconds": 47.70144570712,
+  "finished_at": "2026-10-30T15:01:05.577858+00:00"
+}

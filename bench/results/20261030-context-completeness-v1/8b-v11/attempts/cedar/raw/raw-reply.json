@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-148179dc-328f-44c2-95d0-b3900da26c39",
+  "object": "chat.completion",
+  "created": 1793372373,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S3\"], \"text\": \"The library delivery trial covers Maple End and West Quay. Other neighborhoods remain outside this trial even if a rider passes through them.\", \"status\": \"supported\", \"request_span\": \"which neighborhoods are included\"}, {\"snippet_ids\": [\"S5\"], \"text\": \"During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library desk keeps any uncollected parcels until the next working day.\", \"status\": \"supported\", \"request_span\": \"what is the pickup window\"}, {\"snippet_ids\": [\"S1\"], \"text\": \"Residents report a missed library delivery by leaving a message on the trial voicemail line. Staff review messages the following morning.\", \"status\": \"supported\", \"request_span\": \"how will residents report a missed delivery\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1346,
+    "completion_tokens": 181,
+    "total_tokens": 1527
+  }
+}

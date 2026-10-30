@@ -1,0 +1,28 @@
+{
+  "kind": "deterministic post-run diagnosis, no inference or source changes",
+  "method": "Reconstruct saved retrieval through unchanged 6000/source and24000total presentation bounds, candidate paragraph builder andv3 catalog.",
+  "replayed_error": "snippets do not match source context",
+  "paragraph_trace": {
+    "version": "paragraph-v1",
+    "max_snippets": 100,
+    "max_quote_length": 500,
+    "omitted_snippets": 0,
+    "split_blocks": 15,
+    "truncated": false
+  },
+  "failures": [
+    {
+      "relative_path": "packaging.md",
+      "heading": "First offer to validate",
+      "citation_id": "source:18203cbd-b95d-5577-bcca-50c2264bade9:8705d1c0-92b7-5c86-a207-81af1f2300ac",
+      "prefix_mismatch_offset": 270,
+      "source_window": "nterprise is a valid starting customer.\n\n- One organization, one agreed workflow and supported deplo",
+      "concatenated_quotes_window": "nterprise is a valid starting customer.\n- One organization, one agreed workflow and supported deploy",
+      "every_quote_exact_substring": true,
+      "source_length": 1573,
+      "concatenated_quote_length": 1572,
+      "lost_characters": 1
+    }
+  ],
+  "inference": "Whitespace-only blocks are skipped when an empty line is immediately followed by a list boundary, breaking the quantity parser requirement that ordered excerpts concatenate to a source prefix. Individual quotes remain exact. Needs a versioned fix and regression coverage before promotion."
+}

@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "3049d387-15ea-478c-93d3-6ac12767a776"
+  ],
+  "query": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "3049d387-15ea-478c-93d3-6ac12767a776"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "3049d387-15ea-478c-93d3-6ac12767a776",
+        "document_id": "d0e27389-9b20-5e0b-916b-043e0f1151b8",
+        "revision_id": "b3430316-814c-555c-a175-5f90838876b4",
+        "relative_path": "sources/birch_b.md",
+        "updated_at": "2026-10-30T15:03:46.438316+00:00",
+        "chunk_id": "78790012-4913-5b67-9cb1-c7d630be0186",
+        "anchor": "birch-working-note-2",
+        "heading": "Birch working note 2",
+        "content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:03:46.438956+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:78790012-4913-5b67-9cb1-c7d630be0186:b3430316-814c-555c-a175-5f90838876b4"
+      },
+      {
+        "collection_id": "3049d387-15ea-478c-93d3-6ac12767a776",
+        "document_id": "2a8cde2e-d1c3-5527-b6f9-39d7d2a4f0dd",
+        "revision_id": "9934c15c-875c-59fc-a675-69be9e075909",
+        "relative_path": "sources/birch_a.md",
+        "updated_at": "2026-10-30T15:03:46.437623+00:00",
+        "chunk_id": "f7025b75-953a-5154-bc83-9953b44a1298",
+        "anchor": "birch-working-note-1",
+        "heading": "Birch working note 1",
+        "content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:03:46.438956+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f7025b75-953a-5154-bc83-9953b44a1298:9934c15c-875c-59fc-a675-69be9e075909"
+      },
+      {
+        "collection_id": "3049d387-15ea-478c-93d3-6ac12767a776",
+        "document_id": "ba737953-0762-52a8-85d0-69abbdd538b9",
+        "revision_id": "b31d7a36-0bcf-590f-9ee1-2f19a8fb9938",
+        "relative_path": "sources/birch_c.md",
+        "updated_at": "2026-10-30T15:03:46.438885+00:00",
+        "chunk_id": "4f5224f5-4fdd-5fa0-bd17-a346de2b7886",
+        "anchor": "birch-working-note-3",
+        "heading": "Birch working note 3",
+        "content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:03:46.438956+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4f5224f5-4fdd-5fa0-bd17-a346de2b7886:b31d7a36-0bcf-590f-9ee1-2f19a8fb9938"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

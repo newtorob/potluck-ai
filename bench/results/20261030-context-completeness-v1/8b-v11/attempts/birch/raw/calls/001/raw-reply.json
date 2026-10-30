@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f2780a65-09a3-4175-b373-bf8fa8d6b0f7",
+  "object": "chat.completion",
+  "created": 1793372626,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The quantities for March and April deliveries are provided in the quantities list.\", \"minuend_id\": \"N1\", \"subtrahend_id\": \"N2\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1125,
+    "completion_tokens": 88,
+    "total_tokens": 1213
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "5aac9132-1458-4d80-876e-669725b231c8",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/quill/raw/allowed",
+  "files": {
+    "sources/quill_a.md": "510d57af7c242e3d6fffaeb438b8308b54ddfee6f2e896fa0f6310898ffda18d",
+    "sources/quill_b.md": "e4752b00e8ccf0fd2a167f5099006faa247b117ad1549144a170d8143b92f391",
+    "sources/quill_c.md": "e803d31f469cd73cb4c257e5f8627403297d3214a48c53b782afebc039228544"
+  },
+  "scan": {
+    "collection_id": "5aac9132-1458-4d80-876e-669725b231c8",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "5aac9132-1458-4d80-876e-669725b231c8"
+  ],
+  "excluded_canary": {
+    "collection_id": "29af5623-bcc4-4801-8a9c-cdc367bbedba",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/8b-v11/attempts/quill/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "7c9c6d1d77d1e1c2f1090281578529b58aabb3273e661e742ff36c0f0760ada7",
+    "scan": {
+      "collection_id": "29af5623-bcc4-4801-8a9c-cdc367bbedba",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

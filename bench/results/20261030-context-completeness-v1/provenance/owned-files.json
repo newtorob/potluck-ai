@@ -1,0 +1,10 @@
+[
+  "apps/desktop/python/potluck_local/services/evidence_lookup.py",
+  "apps/desktop/python/potluck_local/services/investigation_context.py",
+  "apps/desktop/python/potluck_local/services/investigation_complete_answers.py",
+  "apps/desktop/python/potluck_local/services/investigations.py",
+  "apps/desktop/python/tests/test_evidence_lookup.py",
+  "apps/desktop/python/tests/test_investigation_context.py",
+  "apps/desktop/python/tests/test_investigation_complete_answers.py",
+  "apps/desktop/python/COMPANY_BRAIN.md"
+]

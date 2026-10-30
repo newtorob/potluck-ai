@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "daed2f11-81e7-4788-b077-78906a3ed3d8"
+  ],
+  "query": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "daed2f11-81e7-4788-b077-78906a3ed3d8"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "daed2f11-81e7-4788-b077-78906a3ed3d8",
+        "document_id": "bdcb9bb5-2698-53bd-bbc1-c4da4a770036",
+        "revision_id": "71745386-2993-51fd-858e-405aa2c26f8c",
+        "relative_path": "sources/harbor_b.md",
+        "updated_at": "2026-10-30T14:58:37.590281+00:00",
+        "chunk_id": "da48f41c-2478-5170-892f-3b49073f7be3",
+        "anchor": "harbor-working-note-2",
+        "heading": "Harbor working note 2",
+        "content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:58:37.591033+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:da48f41c-2478-5170-892f-3b49073f7be3:71745386-2993-51fd-858e-405aa2c26f8c"
+      },
+      {
+        "collection_id": "daed2f11-81e7-4788-b077-78906a3ed3d8",
+        "document_id": "2eb2fa16-43b3-5bfe-b23a-dc288776cca8",
+        "revision_id": "95d02d52-b6eb-5d20-b2b5-7355147a1225",
+        "relative_path": "sources/harbor_a.md",
+        "updated_at": "2026-10-30T14:58:37.589507+00:00",
+        "chunk_id": "5dac923e-028f-5850-accf-1e46b3fa5262",
+        "anchor": "harbor-working-note-1",
+        "heading": "Harbor working note 1",
+        "content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:58:37.591033+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:5dac923e-028f-5850-accf-1e46b3fa5262:95d02d52-b6eb-5d20-b2b5-7355147a1225"
+      },
+      {
+        "collection_id": "daed2f11-81e7-4788-b077-78906a3ed3d8",
+        "document_id": "a3bb8222-1c02-5170-8419-5c9c61f6fbee",
+        "revision_id": "8090a8aa-ac23-5db1-ae65-e6ccd7d784d0",
+        "relative_path": "sources/harbor_c.md",
+        "updated_at": "2026-10-30T14:58:37.590939+00:00",
+        "chunk_id": "d941b868-c883-51db-bea5-f0aabb63ce37",
+        "anchor": "harbor-working-note-3",
+        "heading": "Harbor working note 3",
+        "content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:58:37.591033+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d941b868-c883-51db-bea5-f0aabb63ce37:8090a8aa-ac23-5db1-ae65-e6ccd7d784d0"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

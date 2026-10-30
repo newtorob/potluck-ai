@@ -1,0 +1,82 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "62a22b60-d868-43ba-b849-fdb52a532864"
+  ],
+  "query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+  "limit": 10,
+  "kwargs": {},
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "62a22b60-d868-43ba-b849-fdb52a532864"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "6f481463-a5a5-5756-8419-93d6c1bfcfd3",
+        "revision_id": "fd7529a3-f78a-564d-9145-e6bb284fb01a",
+        "relative_path": "sources/quill_b.md",
+        "updated_at": "2026-10-30T14:56:50.329922+00:00",
+        "chunk_id": "4e4c2231-e8d1-584f-863f-b50e31d5c711",
+        "anchor": "quill-working-note-2",
+        "heading": "Quill working note 2",
+        "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a"
+      },
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "0479b1c9-2f37-58ac-b71a-7e67e7c91130",
+        "revision_id": "e02a8187-bd70-55c7-b3ba-7883963c7189",
+        "relative_path": "sources/quill_a.md",
+        "updated_at": "2026-10-30T14:56:50.329201+00:00",
+        "chunk_id": "c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08",
+        "anchor": "quill-working-note-1",
+        "heading": "Quill working note 1",
+        "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189"
+      },
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "ec98c096-4592-5b2e-9ae5-2c4513ed48c5",
+        "revision_id": "cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+        "relative_path": "sources/quill_c.md",
+        "updated_at": "2026-10-30T14:56:50.330559+00:00",
+        "chunk_id": "1ea3551c-ec77-5aa6-a24b-2a8e826170b4",
+        "anchor": "quill-working-note-3",
+        "heading": "Quill working note 3",
+        "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

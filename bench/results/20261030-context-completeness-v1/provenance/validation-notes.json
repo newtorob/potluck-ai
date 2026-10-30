@@ -1,0 +1,21 @@
+{
+  "audit_harness_initial_attempt": {
+    "outcome": "failed before report creation",
+    "reason": "system Python lacked pydantic",
+    "resolution": "Used existing project venv; complete mechanical report then succeeded. No inference repeated."
+  },
+  "optional_targeted_ruff": {
+    "outcome": "not available",
+    "command": "apps/desktop/python/.venv/bin/ruff check --select F <owned Python paths>",
+    "exit_code": 127,
+    "reason": "ruff is not installed in the project venv or shell PATH; no dependency download attempted."
+  },
+  "diff_check": "passed on tracked owned diff",
+  "platform": "macOS Apple M2 Pro; no Linux or Windows verification in this batch",
+  "staged_diff_check": {
+    "owned_source_and_docs_exit_code": 0,
+    "all_staged_exit_code": 2,
+    "notices": 93,
+    "reason": "New blank line at EOF in frozen input/evidence copies; retained byte-for-byte to preserve checksums. No source-code whitespace errors."
+  }
+}

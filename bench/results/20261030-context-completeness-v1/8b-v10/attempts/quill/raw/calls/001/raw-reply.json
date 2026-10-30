@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a490a302-eea7-40f0-a946-1824e65423f9",
+  "object": "chat.completion",
+  "created": 1793372210,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S11\", \"S12\", \"S22\"], \"text\": \"The first departure time for Quill Ferry’s winter timetable is 07:10 or 06:40, but the approver is not identified in the provided text. There is no signed approval record mentioned, and the approval field is left blank in the draft.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1735,
+    "completion_tokens": 102,
+    "total_tokens": 1837
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0203f3d8-79e1-44b9-aedb-4959a74134f8",
+  "object": "chat.completion",
+  "created": 1793372260,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The difference between the number of completed deliveries in April and March is calculated using the quantities provided.\", \"minuend_id\": \"N1\", \"subtrahend_id\": \"N2\", \"known_input_snippet_ids\": [\"S1\", \"S10\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1158,
+    "completion_tokens": 94,
+    "total_tokens": 1252
+  }
+}

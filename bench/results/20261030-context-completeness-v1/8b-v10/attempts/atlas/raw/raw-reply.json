@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-358a634a-c4b0-400f-a5ab-d0ce46b805a0",
+  "object": "chat.completion",
+  "created": 1793372180,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S10\", \"S18\", \"S19\"], \"text\": \"Atlas Loom pays the return postage for sample swatches in the program by supplying a prepaid label. Customers do not need to purchase postage. Each sample return must include the printed order slip inside the parcel. A credit is issued after the returned swatches are checked in at the depot. Sending a parcel alone does not immediately create a credit.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1049,
+    "completion_tokens": 115,
+    "total_tokens": 1164
+  }
+}

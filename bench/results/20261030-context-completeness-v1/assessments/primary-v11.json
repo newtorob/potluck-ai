@@ -1,0 +1,151 @@
+{
+  "reviewer": "primary",
+  "method": "Manual reading of each saved brief, attached source_excerpts and frozen required/forbidden rubric; exact quote binding is audited separately. Extra uncited claims and status concerns recorded separately rather than added to frozen rubric.",
+  "scope": "fresh synthetic six cases, v11 candidate",
+  "text_complete_count": 5,
+  "rubric_pass_count": 5,
+  "cases": {
+    "harbor": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "delay",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 contains complete cause and retesting context."
+        },
+        {
+          "facet": "schedule owner",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 names Mara and distinguishes testing ownership."
+        },
+        {
+          "facet": "start condition",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 includes calibration and no committed date."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "cedar": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "neighborhoods",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 names both neighborhoods and exclusions."
+        },
+        {
+          "facet": "pickup window",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 states Tuesday2-5p.m."
+        },
+        {
+          "facet": "missed delivery report",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 includes voicemail and following-morning review."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "mosaic": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "trigger",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 retains complete threshold and interval."
+        },
+        {
+          "facet": "destination",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 includes phone text and dashboard-copy distinction."
+        },
+        {
+          "facet": "grower action",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 retains inspect-before-sprinklers and no automatic valve operation."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "atlas": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "postage",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 includes company-paid prepaid label."
+        },
+        {
+          "facet": "enclosure",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 includes required printed slip and optional sleeve."
+        },
+        {
+          "facet": "credit timing",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 retains after-check-in and no immediate shipment credit."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "quill": {
+      "text_complete": false,
+      "rubric_pass": false,
+      "status": "error",
+      "error": "Invalid model format",
+      "required_facets": [
+        {
+          "facet": "approver unknown",
+          "text": false,
+          "attached_support": false,
+          "reason": "No validated draft."
+        },
+        {
+          "facet": "unresolved times",
+          "text": false,
+          "attached_support": false,
+          "reason": "No validated draft."
+        }
+      ],
+      "forbidden_claims": null,
+      "additional_concerns": [
+        "Raw JSON repeats the full original request span six times; repeated overlapping spans violate the v11 contract. Generated conflict text exists but is not a usable saved answer. Some approval parts incorrectly use supported status. Raw response also omits the no-signed-record citation. No retry or production tuning performed."
+      ]
+    },
+    "birch": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "increase 30 deliveries",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 April110 and S3 March80; correct explicit110-80=30 deliveries."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    }
+  }
+}

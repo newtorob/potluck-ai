@@ -124,13 +124,16 @@ def _score(item: dict[str, Any], terms: set[str]) -> int:
 
 
 async def lookup_evidence(
-    scope: EvidenceScope, query: str, max_results: int = 10,
+    scope: EvidenceScope, query: str, max_results: int = 10, *,
+    retrieval_version: str = 'legacy',
 ) -> dict[str, Any]:
     if not isinstance(query, str) or not query.strip() or len(query) > MAX_QUERY_LENGTH:
         raise ValueError('A non-empty query of at most 1000 characters is required')
     if (isinstance(max_results, bool) or not isinstance(max_results, int)
             or not 1 <= max_results <= 100):
         raise ValueError('max_results must be between 1 and 100')
+    if retrieval_version not in ('legacy', 'v2'):
+        raise ValueError('Unsupported retrieval version')
     terms = _terms(query)
     candidates: list[dict[str, Any]] = []
     capped = False
@@ -139,6 +142,11 @@ async def lookup_evidence(
         await db.create_function('unicode_casefold', 1, str.casefold, deterministic=True)
         await db.execute('BEGIN')
         ready, stale = await _ready(db, scope)
+        collection_names: dict[str, str] = {}
+        if retrieval_version == 'v2' and ready:
+            ph = ','.join('?' for _ in ready)
+            cur = await db.execute(f'SELECT id,name FROM source_collections WHERE id IN ({ph})', tuple(ready))
+            collection_names = {row['id']: row['name'] for row in await cur.fetchall()}
         if ready and terms:
             ph = ','.join('?' for _ in ready)
             ordered = sorted(terms)
@@ -148,7 +156,8 @@ async def lookup_evidence(
             source_match = ' OR '.join(f"instr({source_field},?)>0" for _ in ordered)
             cur = await db.execute(
                 _SOURCE_SELECT + f'WHERE c.workspace=? AND c.id IN ({ph}) AND ({source_match}) '
-                'ORDER BY c.id,d.relative_path,k.ordinal LIMIT ?',
+                + ('ORDER BY c.name,d.relative_path,k.ordinal,k.content LIMIT ?'
+                   if retrieval_version == 'v2' else 'ORDER BY c.id,d.relative_path,k.ordinal LIMIT ?'),
                 (scope.workspace, *ready, *ordered, MAX_CANDIDATES + 1))
             rows = await cur.fetchall()
             capped |= len(rows) > MAX_CANDIDATES
@@ -161,18 +170,49 @@ async def lookup_evidence(
                 'WHERE r.claim_id=reviewed_claims.id) '
                 f'AND NOT EXISTS (SELECT 1 FROM reviewed_claim_sources r '
                 f'WHERE r.claim_id=reviewed_claims.id AND r.collection_id NOT IN ({ph})) '
-                'ORDER BY claim_key,id LIMIT ?',
+                + ('ORDER BY claim_key LIMIT ?' if retrieval_version == 'v2'
+                   else 'ORDER BY claim_key,id LIMIT ?'),
                 (scope.workspace, *ordered, *ready, MAX_CANDIDATES + 1))
             rows = await cur.fetchall()
             capped |= len(rows) > MAX_CANDIDATES
             for row in rows[:MAX_CANDIDATES]:
                 claim = await _claim(db, row, ready, scope.workspace)
                 if claim is not None:
+                    if retrieval_version == 'v2':
+                        claim['sources'].sort(key=lambda source: (
+                            collection_names[source['collection_id']], source['relative_path'],
+                            source['heading'], source['content']))
                     candidates.append(claim)
     ranked = [(item, _score(item, terms)) for item in candidates]
     ranked = [(item, score) for item, score in ranked if score]
-    ranked.sort(key=lambda pair: (-pair[1], pair[0]['kind'], pair[0]['citation_id']))
-    selected = [item for item, _ in ranked[:max_results]]
+    deprioritized = 0
+    if retrieval_version == 'v2':
+        def semantic_key(pair: tuple[dict[str, Any], int]) -> tuple[Any, ...]:
+            item, score = pair
+            source_keys = tuple((collection_names[s['collection_id']], s['relative_path'],
+                                 s['heading'], s['content']) for s in item.get('sources', []))
+            return (-score, item['kind'], collection_names.get(item.get('collection_id'), ''),
+                    str(item.get('relative_path', '')), str(item.get('heading', '')),
+                    str(item.get('claim_key', '')), str(item.get('content', '')), source_keys)
+        ranked.sort(key=semantic_key)
+        counts: dict[tuple[str, str], int] = {}
+        preferred = []
+        deferred = []
+        for pair in ranked:
+            item, _ = pair
+            if item['kind'] == 'source_chunk':
+                doc = (item['collection_id'], item['document_id'])
+                counts[doc] = counts.get(doc, 0) + 1
+                if counts[doc] > 2:
+                    deferred.append(pair)
+                    continue
+            preferred.append(pair)
+        deprioritized = len(deferred)
+        eligible = preferred + deferred
+    else:
+        ranked.sort(key=lambda pair: (-pair[1], pair[0]['kind'], pair[0]['citation_id']))
+        eligible = ranked
+    selected = [item for item, _ in eligible[:max_results]]
     missing = []
     if len(ready) + stale < len(scope.collection_ids):
         missing.append('Some collections are unavailable or not ready; results are partial.')
@@ -182,7 +222,9 @@ async def lookup_evidence(
         missing.append('No matching evidence terms were found; this does not establish an answer.')
     if capped:
         missing.append('Candidate limit reached; matching evidence may be omitted.')
-    return {'workspace': scope.workspace, 'scope': {'collection_ids': list(scope.collection_ids)},
+    if retrieval_version == 'v2' and len(eligible) > max_results:
+        missing.append('Result limit reached; matching evidence was omitted.')
+    result = {'workspace': scope.workspace, 'scope': {'collection_ids': list(scope.collection_ids)},
             'source_chunks': [x for x in selected if x['kind'] == 'source_chunk'],
             'reviewed_claims': [x for x in selected if x['kind'] == 'reviewed_claim'],
             'missing_evidence': missing,
@@ -193,7 +235,16 @@ async def lookup_evidence(
                              'unavailable': len(scope.collection_ids) - len(ready) - stale,
                              'needs_rescan': stale},
             'matching': 'case-insensitive whole-word overlap ranked by distinct shared terms',
-            'truncated': capped or len(ranked) > max_results}
+            'truncated': capped or len(eligible) > max_results}
+    if retrieval_version == 'v2':
+        result['limitations'].append('The first two ranked chunks per document are preferred; additional chunks backfill remaining slots.')
+        result['retrieval_version'] = 'v2'
+        result['retrieval_trace'] = {'candidate_limit_reached': capped,
+                                     'preferred_chunks_per_document': 2,
+                                     'deprioritized_chunks': deprioritized,
+                                     'result_omitted': max(0, len(eligible) - max_results),
+                                     'result_limit_reached': len(eligible) > max_results}
+    return result
 
 
 async def resolve_citation(scope: EvidenceScope, citation_id: str) -> dict[str, Any] | None:

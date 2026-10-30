@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-222b6d9a-8201-446d-82d5-d9f585bfd784",
+  "object": "chat.completion",
+  "created": 1793372506,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The first departure time is either 06:40 or 07:10, but the exact time is not confirmed. The approval field is blank in the first draft and not identified in the second note.\", \"status\": \"conflicting\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}, {\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The approval field is blank in the first draft and not identified in the second note, indicating that the approval is not established.\", \"status\": \"supported\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}, {\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The first departure time is either 06:40 or 07:10, but the exact time is not confirmed.\", \"status\": \"conflicting\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}, {\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The approval field is blank in the first draft and not identified in the second note, indicating that the approval is not established.\", \"status\": \"supported\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}, {\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The first departure time is either 06:40 or 07:10, but the exact time is not confirmed.\", \"status\": \"conflicting\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}, {\"snippet_ids\": [\"S1\", \"S3\"], \"text\": \"The approval field is blank in the first draft and not identified in the second note, indicating that the approval is not established.\", \"status\": \"supported\", \"request_span\": \"Who approved Quill Ferry’s winter timetable, and what is the first departure time?\"}]} }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1726,
+    "completion_tokens": 489,
+    "total_tokens": 2215
+  }
+}

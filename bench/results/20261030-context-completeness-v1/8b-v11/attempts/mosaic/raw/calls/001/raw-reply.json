@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-10cbf950-a3c1-41b5-a7fd-d7f43fac8203",
+  "object": "chat.completion",
+  "created": 1793372417,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S5\"], \"text\": \"The frost alert is triggered when the orchard probe records two readings below 1°C at least ten minutes apart. A single low reading alone does not trigger it.\",\"status\": \"supported\", \"request_span\": \"what triggers an alert\"}, {\"snippet_ids\": [\"S1\"], \"text\": \"The service sends a frost alert to the grower’s registered phone by text message. The dashboard stores a copy but does not substitute for the text.\",\"status\": \"supported\", \"request_span\": \"where is it sent\"}, {\"snippet_ids\": [\"S3\"], \"text\": \"After receiving an alert, the grower is expected to inspect the irrigation valves before deciding whether to run sprinklers. The service does not turn the valves on.\",\"status\": \"supported\", \"request_span\": \"what action is the grower expected to take\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1281,
+    "completion_tokens": 192,
+    "total_tokens": 1473
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+    "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/context-completeness/run_consumed.py",
+    "--snapshot",
+    "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/context-completeness/candidate-frozen/apps/desktop/python",
+    "--model",
+    "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+    "--sha256",
+    "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "--version",
+    "v11",
+    "--output",
+    "/Users/rob/Documents/potluck/bench/results/20261030-context-completeness-v1/consumed-real-v11"
+  ],
+  "exit_code": 0
+}

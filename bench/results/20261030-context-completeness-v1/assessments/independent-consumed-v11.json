@@ -1,0 +1,89 @@
+{
+  "run": "consumed-real-v11",
+  "scope": "Two consumed real-source cases, separately assessed from fresh synthetic set; original frozen rubric and frozen source corpus. No newer history inferred.",
+  "independence": "No implementation, prompts, or root scores inspected.",
+  "case_denominator": 2,
+  "rubric_pass_cases": 0,
+  "text_complete_cases": 0,
+  "cases": {
+    "pilot-readiness": {
+      "attempt_status": "success",
+      "answer_status": "supported",
+      "facets": [
+        {
+          "name": "local-owner scoped sources, cited investigation, review/correction and recorded outcome",
+          "text": false,
+          "attached_support": false,
+          "reason": "None of these workflow facets appears in answer or S15."
+        },
+        {
+          "name": "v9 local experimental qualification 1/4 originals and 4/4 scripted corrections, not owner acceptance or improvement",
+          "text": false,
+          "attached_support": false,
+          "reason": "No qualification or progress excerpt attached; no experiment results stated."
+        },
+        {
+          "name": "independent quality checks, review effort, lifecycle UI, organizational access, performance and backup/recovery before pilot",
+          "text": true,
+          "attached_support": true,
+          "reason": "S15 guide-gates explicitly supports all listed gates."
+        },
+        {
+          "name": "shared deployment authorization and operational gates remain",
+          "text": true,
+          "attached_support": true,
+          "reason": "S15 states authenticated organizational access and operational work remain; answer repeats these prerequisites without claiming enterprise authorization exists."
+        },
+        {
+          "name": "curated excerpt limitation and no measured owner acceptance/review time established",
+          "text": false,
+          "attached_support": false,
+          "reason": "Neither limitation nor absence of measured owner acceptance/time is stated or attached."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "status_coherence": "Supported applies to the narrow text but the answer leaves most of the requested rubric unanswered; repetition obscures incompleteness.",
+      "extra_claim_concerns": []
+    },
+    "core-company": {
+      "attempt_status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "snippets do not match source context",
+        "failure_stage": "pre_inference"
+      },
+      "answer_status": null,
+      "facets": [
+        {
+          "name": "MIT free commercial core and first Company Brain workflow",
+          "text": false,
+          "attached_support": false,
+          "reason": "No answer returned."
+        },
+        {
+          "name": "planned company administration/support, Core $0 and plans by discussion; distinguish policy from availability",
+          "text": false,
+          "attached_support": false,
+          "reason": "No answer returned."
+        },
+        {
+          "name": "actual local-owner status, remaining shared authorization, historical packaging status and progress",
+          "text": false,
+          "attached_support": false,
+          "reason": "No answer returned."
+        },
+        {
+          "name": "no paid numerical price, checkout, signed pilot or paid adoption evidence",
+          "text": false,
+          "attached_support": false,
+          "reason": "No answer returned; absence of claims alone does not establish required absence of evidence."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "status_coherence": "No answer or status returned.",
+      "extra_claim_concerns": []
+    }
+  }
+}

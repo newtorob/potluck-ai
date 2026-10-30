@@ -1,0 +1,2231 @@
+{
+  "case_ids": [
+    "harbor",
+    "cedar",
+    "mosaic",
+    "atlas",
+    "quill",
+    "birch"
+  ],
+  "assessment": null,
+  "outputs": {
+    "harbor": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "5b9bdaec-aeb7-4b04-9193-c68b2fd3ad8b",
+        "workspace": "pilot-eval",
+        "issue": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Mara Venn owns the revised Tide pilot schedule. The Tide pilot was moved back because the shore sensors produced inconsistent readings after salt spray. The Tide pilot can start once three consecutive salt-spray trials pass calibration.",
+              "snippet_ids": [
+                "S1",
+                "S10",
+                "S20"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+                  "quote": "Mara Venn owns the revised Tide pilot schedule. "
+                },
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+                  "quote": "The Tide pilot was moved back because the shore sensors produced\n"
+                },
+                {
+                  "snippet_id": "S20",
+                  "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+                  "quote": "The Tide pilot can start once three consecutive salt-spray trials pass\n"
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+            "document_id": "afbba040-1b1a-5f1a-9927-715b23fe64c9",
+            "revision_id": "b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+            "relative_path": "sources/harbor_b.md",
+            "updated_at": "2026-10-30T14:54:11.091737+00:00",
+            "chunk_id": "55630c59-076c-5af3-a1fd-fa3776ff1ca6",
+            "anchor": "harbor-working-note-2",
+            "heading": "Harbor working note 2",
+            "content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+            "presented_content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          },
+          {
+            "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+            "document_id": "92641571-5b6c-5336-9100-6abb997bd574",
+            "revision_id": "0f912335-5cab-58b8-be86-00f9c730d781",
+            "relative_path": "sources/harbor_a.md",
+            "updated_at": "2026-10-30T14:54:11.091028+00:00",
+            "chunk_id": "de89fd31-e3b4-539e-ae4d-42f75c6cd8fa",
+            "anchor": "harbor-working-note-1",
+            "heading": "Harbor working note 1",
+            "content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+            "presented_content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          },
+          {
+            "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+            "document_id": "4d439a06-196f-5cd9-a8db-427a5a3b4bec",
+            "revision_id": "c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+            "relative_path": "sources/harbor_c.md",
+            "updated_at": "2026-10-30T14:54:11.092328+00:00",
+            "chunk_id": "3bacc9b1-d93c-57e3-8f92-314476e365cc",
+            "anchor": "harbor-working-note-3",
+            "heading": "Harbor working note 3",
+            "content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+            "presented_content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:54:57.124571+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 46022,
+          "created_at": "2026-10-30T14:54:57.124571+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "Mara Venn owns the revised Tide pilot schedule. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "She coordinates dates with\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "the harbor crew but does not control the instrument test itself.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "The Tide pilot was moved back because the shore sensors produced\n"
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "inconsistent readings after salt spray. "
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "The team chose to retest the\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "instruments before inviting the first vessels.\n\n"
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "The Tide pilot can start once three consecutive salt-spray trials pass\n"
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "calibration. "
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "A calendar date has not yet been committed.\n\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S26",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S27",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S28",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "as drafts until someone supplies a verified replacement."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "source_text": "three consecutive salt-spray trials pass\n",
+              "start": 30,
+              "end": 71,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "25228903-5239-482e-a60c-83d9e108d66b"
+        ]
+      },
+      "latency_seconds": 46.03377249930054,
+      "setup_seconds": 0.023947459645569324,
+      "attempt_total_seconds": 46.05771995894611,
+      "finished_at": "2026-10-30T14:54:57.132164+00:00"
+    },
+    "cedar": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "c1a61e4a-6a2f-45a1-a5a6-c2bb5a75a5c7",
+        "workspace": "pilot-eval",
+        "issue": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "The library delivery trial covers Maple End and West Quay. During the trial, the pickup window is Tuesday from 2 to 5 p.m. Residents report a missed library delivery by leaving a message on the trial voicemail line. Staff review messages the following morning. The office keeps a separate log for day-to-day questions. Each entry contains the date received and a brief description, followed by the initials of the person who filed it.",
+              "snippet_ids": [
+                "S10",
+                "S19",
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+                  "quote": "The library delivery trial covers Maple End and West Quay. "
+                },
+                {
+                  "snippet_id": "S19",
+                  "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+                  "quote": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. "
+                },
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "Residents report a missed library delivery by leaving a message on the trial\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "voicemail line. "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "Staff review messages the following morning.\n\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "The office keeps a separate log for day-to-day questions. "
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "Each entry contains the\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+                  "quote": "date received and a brief description, followed by the initials of the person\n"
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+            "document_id": "05353d05-6a69-531b-a45f-84ba947c0760",
+            "revision_id": "4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+            "relative_path": "sources/cedar_c.md",
+            "updated_at": "2026-10-30T14:54:57.153798+00:00",
+            "chunk_id": "8d200547-e43c-5e07-90e3-29c411e48746",
+            "anchor": "cedar-working-note-3",
+            "heading": "Cedar working note 3",
+            "content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+            "presented_content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          },
+          {
+            "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+            "document_id": "22dc4f59-380b-5be4-90df-b9d8266a1294",
+            "revision_id": "5b58c05d-9adb-508d-82f5-29e5a760264b",
+            "relative_path": "sources/cedar_a.md",
+            "updated_at": "2026-10-30T14:54:57.152402+00:00",
+            "chunk_id": "10b68380-d112-5da4-b2fd-3586a7e2a430",
+            "anchor": "cedar-working-note-1",
+            "heading": "Cedar working note 1",
+            "content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+            "presented_content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          },
+          {
+            "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+            "document_id": "74633d73-7683-5a4d-a3bf-c210c41db5a2",
+            "revision_id": "2c936802-b269-531c-a7d1-2d3e714adaf8",
+            "relative_path": "sources/cedar_b.md",
+            "updated_at": "2026-10-30T14:54:57.153246+00:00",
+            "chunk_id": "7643a49d-d35d-5fa0-97e1-fd3860ccefb1",
+            "anchor": "cedar-working-note-2",
+            "heading": "Cedar working note 2",
+            "content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+            "presented_content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:55:39.035387+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 41868,
+          "created_at": "2026-10-30T14:55:39.035387+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Residents report a missed library delivery by leaving a message on the trial\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "voicemail line. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Staff review messages the following morning.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+              "quote": "as drafts until someone supplies a verified replacement."
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "The library delivery trial covers Maple End and West Quay. "
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "Other\n"
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "neighborhoods remain outside this trial even if a rider passes through them.\n\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. "
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "The library\n"
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "desk keeps any uncollected parcels until the next working day.\n\n"
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S26",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S27",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "source_text": "2 to 5 p.m. ",
+              "start": 52,
+              "end": 64,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8",
+              "source_text": "5 p.m. ",
+              "start": 57,
+              "end": 64,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "ca38d861-24f0-4f63-b486-e777f3e4e216"
+        ]
+      },
+      "latency_seconds": 41.88114166725427,
+      "setup_seconds": 0.027450665831565857,
+      "attempt_total_seconds": 41.908592333085835,
+      "finished_at": "2026-10-30T14:55:39.041830+00:00"
+    },
+    "mosaic": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "2af92f1f-988e-431e-8269-79c428bac5ae",
+        "workspace": "pilot-eval",
+        "issue": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "For Mosaic Orchard’s frost alert service, the alert is triggered when the orchard probe records two readings below 1°C at least ten minutes apart. The alert is sent to the grower’s registered phone by text. After receiving an alert, the grower is expected to inspect the irrigation valves before deciding whether to run sprinklers. The service does not turn the valves on.",
+              "snippet_ids": [
+                "S20",
+                "S21",
+                "S1",
+                "S10",
+                "S11"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S20",
+                  "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+                  "quote": "The frost alert is triggered when the orchard probe records two readings\n"
+                },
+                {
+                  "snippet_id": "S21",
+                  "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+                  "quote": "below 1°C at least ten minutes apart. "
+                },
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+                  "quote": "The service sends a frost alert to the grower’s registered phone by text\n"
+                },
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+                  "quote": "After receiving an alert, the grower is expected to inspect the irrigation\n"
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+                  "quote": "valves before deciding whether to run sprinklers. "
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "5ca53b68-8301-4a2c-833d-75f821e0257b",
+            "document_id": "b8623b6e-17f1-5e19-9f08-349f85f45559",
+            "revision_id": "32f66739-7e49-5efb-82db-102fa967f345",
+            "relative_path": "sources/mosaic_b.md",
+            "updated_at": "2026-10-30T14:55:39.059383+00:00",
+            "chunk_id": "52cfa931-4869-5ed2-949c-1ee20416fbec",
+            "anchor": "mosaic-working-note-2",
+            "heading": "Mosaic working note 2",
+            "content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:55:39.060181+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+            "presented_content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          },
+          {
+            "collection_id": "5ca53b68-8301-4a2c-833d-75f821e0257b",
+            "document_id": "5f3172a8-b52d-5613-824d-79f6481ca2ae",
+            "revision_id": "812af770-db88-5e75-b722-aeaa201310b0",
+            "relative_path": "sources/mosaic_c.md",
+            "updated_at": "2026-10-30T14:55:39.060097+00:00",
+            "chunk_id": "41ae098a-91bb-5677-95e5-e16c0f3e611c",
+            "anchor": "mosaic-working-note-3",
+            "heading": "Mosaic working note 3",
+            "content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:55:39.060181+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+            "presented_content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          },
+          {
+            "collection_id": "5ca53b68-8301-4a2c-833d-75f821e0257b",
+            "document_id": "4d2a8db2-8b95-5517-a101-fbedba508243",
+            "revision_id": "78a08088-35ee-578b-a069-50eda2700b3c",
+            "relative_path": "sources/mosaic_a.md",
+            "updated_at": "2026-10-30T14:55:39.058564+00:00",
+            "chunk_id": "1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05",
+            "anchor": "mosaic-working-note-1",
+            "heading": "Mosaic working note 1",
+            "content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:55:39.060181+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+            "presented_content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:56:20.176162+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 41104,
+          "created_at": "2026-10-30T14:56:20.176162+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "The service sends a frost alert to the grower’s registered phone by text\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "message. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "The dashboard stores a copy but does not substitute for the text.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:52cfa931-4869-5ed2-949c-1ee20416fbec:32f66739-7e49-5efb-82db-102fa967f345",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "After receiving an alert, the grower is expected to inspect the irrigation\n"
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "valves before deciding whether to run sprinklers. "
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "The service does not turn\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "the valves on.\n\n"
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:41ae098a-91bb-5677-95e5-e16c0f3e611c:812af770-db88-5e75-b722-aeaa201310b0",
+              "quote": "as drafts until someone supplies a verified replacement."
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "The frost alert is triggered when the orchard probe records two readings\n"
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "below 1°C at least ten minutes apart. "
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "A single low reading alone does not\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "trigger it.\n\n"
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S26",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S27",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S28",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S29",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S20",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "source_text": "two readings",
+              "snippet_text": "The frost alert is triggered when the orchard probe records two readings\n",
+              "start": 60,
+              "end": 72,
+              "value": "2",
+              "unit": "readings",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S21",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "source_text": "ten minutes",
+              "snippet_text": "below 1°C at least ten minutes apart. ",
+              "start": 19,
+              "end": 30,
+              "value": "10",
+              "unit": "min",
+              "dimension": "time"
+            }
+          ],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:1af7033b-ad1d-59fb-bf6f-dd39c3aa3b05:78a08088-35ee-578b-a069-50eda2700b3c",
+              "source_text": "1°C at least ten minutes apart. ",
+              "start": 6,
+              "end": 38,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "5ca53b68-8301-4a2c-833d-75f821e0257b"
+        ]
+      },
+      "latency_seconds": 41.11531262472272,
+      "setup_seconds": 0.02556754183024168,
+      "attempt_total_seconds": 41.14088016655296,
+      "finished_at": "2026-10-30T14:56:20.183674+00:00"
+    },
+    "atlas": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "0ee36975-f8ba-4841-be9f-b4e8e4e500a4",
+        "workspace": "pilot-eval",
+        "issue": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Atlas Loom pays the return postage for sample swatches in the program by supplying a prepaid label. Customers do not need to purchase postage. Each sample return must include the printed order slip inside the parcel. A credit is issued after the returned swatches are checked in at the depot. Sending a parcel alone does not immediately create a credit.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S10",
+                "S18",
+                "S19"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+                  "quote": "Atlas Loom pays the return postage for sample swatches in the program by\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+                  "quote": "supplying a prepaid label. "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+                  "quote": "Customers do not need to purchase postage.\n\n"
+                },
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+                  "quote": "Each sample return must include the printed order slip inside the parcel.\n"
+                },
+                {
+                  "snippet_id": "S18",
+                  "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+                  "quote": "A credit is issued after the returned swatches are checked in at the depot.\n"
+                },
+                {
+                  "snippet_id": "S19",
+                  "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+                  "quote": "Sending a parcel alone does not immediately create a credit.\n\n"
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+            "document_id": "15f1e9e0-2e20-517b-821f-a2fb3437c9a9",
+            "revision_id": "89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+            "relative_path": "sources/atlas_a.md",
+            "updated_at": "2026-10-30T14:56:20.200028+00:00",
+            "chunk_id": "7919eecf-62b0-5667-a3bf-a7e88f0cbf8c",
+            "anchor": "atlas-working-note-1",
+            "heading": "Atlas working note 1",
+            "content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+            "presented_content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          },
+          {
+            "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+            "document_id": "7e082f07-c724-5239-8b31-ac098039346a",
+            "revision_id": "d5f6c93b-69e0-5a03-a278-7f140690dc18",
+            "relative_path": "sources/atlas_b.md",
+            "updated_at": "2026-10-30T14:56:20.202085+00:00",
+            "chunk_id": "9892c3ca-8344-5112-9439-5ee05be25f63",
+            "anchor": "atlas-working-note-2",
+            "heading": "Atlas working note 2",
+            "content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+            "presented_content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          },
+          {
+            "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+            "document_id": "1691265a-3411-5593-8474-8335b6457806",
+            "revision_id": "9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+            "relative_path": "sources/atlas_c.md",
+            "updated_at": "2026-10-30T14:56:20.203023+00:00",
+            "chunk_id": "8099ff81-1d2c-5c50-83c9-16548241ccb3",
+            "anchor": "atlas-working-note-3",
+            "heading": "Atlas working note 3",
+            "content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+            "presented_content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:56:50.299390+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 30086,
+          "created_at": "2026-10-30T14:56:50.299390+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "Atlas Loom pays the return postage for sample swatches in the program by\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "supplying a prepaid label. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "Customers do not need to purchase postage.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "Each sample return must include the printed order slip inside the parcel.\n"
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "The cardboard sleeve is optional and can be reused.\n\n"
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "A credit is issued after the returned swatches are checked in at the depot.\n"
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "Sending a parcel alone does not immediately create a credit.\n\n"
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+              "quote": "as drafts until someone supplies a verified replacement."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4"
+        ]
+      },
+      "latency_seconds": 30.09700420871377,
+      "setup_seconds": 0.025174916721880436,
+      "attempt_total_seconds": 30.12217912543565,
+      "finished_at": "2026-10-30T14:56:50.306797+00:00"
+    },
+    "quill": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "84af576f-51ad-455c-b13a-770355b6155c",
+        "workspace": "pilot-eval",
+        "issue": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "The first departure time for Quill Ferry’s winter timetable is 07:10 or 06:40, but the approver is not identified in the provided text. There is no signed approval record mentioned, and the approval field is left blank in the draft.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S11",
+                "S12",
+                "S22"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+                  "quote": "A separate timetable note lists the first winter departure as 07:10 and does\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+                  "quote": "not identify the approver. "
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+                  "quote": "A draft of the winter timetable names the first departure as 06:40. "
+                },
+                {
+                  "snippet_id": "S12",
+                  "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+                  "quote": "The\n"
+                },
+                {
+                  "snippet_id": "S22",
+                  "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+                  "quote": "The collection does not contain a signed approval record.\n\n"
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+            "document_id": "6f481463-a5a5-5756-8419-93d6c1bfcfd3",
+            "revision_id": "fd7529a3-f78a-564d-9145-e6bb284fb01a",
+            "relative_path": "sources/quill_b.md",
+            "updated_at": "2026-10-30T14:56:50.329922+00:00",
+            "chunk_id": "4e4c2231-e8d1-584f-863f-b50e31d5c711",
+            "anchor": "quill-working-note-2",
+            "heading": "Quill working note 2",
+            "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+            "presented_content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          },
+          {
+            "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+            "document_id": "0479b1c9-2f37-58ac-b71a-7e67e7c91130",
+            "revision_id": "e02a8187-bd70-55c7-b3ba-7883963c7189",
+            "relative_path": "sources/quill_a.md",
+            "updated_at": "2026-10-30T14:56:50.329201+00:00",
+            "chunk_id": "c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08",
+            "anchor": "quill-working-note-1",
+            "heading": "Quill working note 1",
+            "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+            "presented_content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          },
+          {
+            "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+            "document_id": "ec98c096-4592-5b2e-9ae5-2c4513ed48c5",
+            "revision_id": "cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+            "relative_path": "sources/quill_c.md",
+            "updated_at": "2026-10-30T14:56:50.330559+00:00",
+            "chunk_id": "1ea3551c-ec77-5aa6-a24b-2a8e826170b4",
+            "anchor": "quill-working-note-3",
+            "heading": "Quill working note 3",
+            "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+            "presented_content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:57:40.079556+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 49737,
+          "created_at": "2026-10-30T14:57:40.079556+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "A separate timetable note lists the first winter departure as 07:10 and does\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "not identify the approver. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "Neither note records a final decision between the\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "two times.\n\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "A draft of the winter timetable names the first departure as 06:40. "
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "The\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "draft leaves the approval field blank.\n\n"
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "Staff should keep draft timetable copies together and label them with the\n"
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "date received. "
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "The collection does not contain a signed approval record.\n\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S26",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S27",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S28",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "as drafts until someone supplies a verified replacement."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "source_text": "07:10 and does\n",
+              "start": 62,
+              "end": 77,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "source_text": "10 and does\n",
+              "start": 65,
+              "end": 77,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "source_text": "two times.\n\n",
+              "start": 0,
+              "end": 12,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "source_text": "06:40. ",
+              "start": 61,
+              "end": 68,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "source_text": "40. ",
+              "start": 64,
+              "end": 68,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "62a22b60-d868-43ba-b849-fdb52a532864"
+        ]
+      },
+      "latency_seconds": 49.748394625261426,
+      "setup_seconds": 0.029907582327723503,
+      "attempt_total_seconds": 49.77830220758915,
+      "finished_at": "2026-10-30T14:57:40.086093+00:00"
+    },
+    "birch": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "aa9cf0a9-26cd-45eb-8cee-efc33c143fab",
+        "workspace": "pilot-eval",
+        "issue": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Signed difference: 30 deliveries.",
+              "snippet_ids": [
+                "S1",
+                "S10"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+                  "quote": "Birch Kite completed 110 deliveries in April. "
+                },
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+                  "quote": "Birch Kite completed 80 deliveries in March. "
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: 30 deliveries.",
+                "formula": "after - before",
+                "result": "30",
+                "unit": "deliveries",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N2",
+                    "snippet_id": "S10",
+                    "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+                    "source_text": "80 deliveries",
+                    "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+                    "start": 21,
+                    "end": 34,
+                    "value": "80",
+                    "unit": "deliveries",
+                    "dimension": "count"
+                  },
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+                    "source_text": "110 deliveries",
+                    "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+                    "start": 21,
+                    "end": 35,
+                    "value": "110",
+                    "unit": "deliveries",
+                    "dimension": "count"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v3",
+                "normalized_inputs": [
+                  {
+                    "id": "N2",
+                    "role": "before",
+                    "value": "80",
+                    "unit": "deliveries",
+                    "original_value": "80",
+                    "original_unit": "deliveries",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N1",
+                    "role": "after",
+                    "value": "110",
+                    "unit": "deliveries",
+                    "original_value": "110",
+                    "original_unit": "deliveries",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "110 deliveries - 80 deliveries = 30 deliveries (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+                "operand_roles": {
+                  "minuend_id": "N1",
+                  "subtrahend_id": "N2"
+                },
+                "known_input_snippet_ids": [
+                  "S1",
+                  "S10"
+                ],
+                "competing_snippet_ids": [],
+                "limitation_snippet_ids": [],
+                "limitation_basis": null,
+                "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+            "document_id": "57a0b248-b7b2-5041-a81c-d0e9969757e7",
+            "revision_id": "476d0912-09fd-5906-a3ab-efbe3215df60",
+            "relative_path": "sources/birch_b.md",
+            "updated_at": "2026-10-30T14:57:40.102352+00:00",
+            "chunk_id": "3db91a5f-18b3-5127-b80f-a8488bebd592",
+            "anchor": "birch-working-note-2",
+            "heading": "Birch working note 2",
+            "content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+            "presented_content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+          },
+          {
+            "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+            "document_id": "ee0dc143-b451-5235-a836-6035156ec2da",
+            "revision_id": "36624e33-edce-54f3-bf53-13710b138f77",
+            "relative_path": "sources/birch_a.md",
+            "updated_at": "2026-10-30T14:57:40.101632+00:00",
+            "chunk_id": "2374aba0-df47-5541-9aee-ce73a6670ccf",
+            "anchor": "birch-working-note-1",
+            "heading": "Birch working note 1",
+            "content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+            "presented_content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+          },
+          {
+            "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+            "document_id": "f0b74e48-9d23-592f-8f91-e50c5d1dd2e7",
+            "revision_id": "629884e3-e3be-593c-b728-aeef436642fd",
+            "relative_path": "sources/birch_c.md",
+            "updated_at": "2026-10-30T14:57:40.102901+00:00",
+            "chunk_id": "8082b57a-9ce6-592e-a9df-efd2c871973b",
+            "anchor": "birch-working-note-3",
+            "heading": "Birch working note 3",
+            "content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+            "presented_content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T14:58:13.133163+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v10",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 33021,
+          "created_at": "2026-10-30T14:58:13.133163+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "Birch Kite completed 110 deliveries in April. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "The count uses the same\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "completed-delivery definition as the March tally.\n\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "leave the remainder for the next shift. "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "The checklist is a record of work in\n"
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "progress, not an authorization to change the underlying arrangement. "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "Staff can\n"
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "Birch Kite completed 80 deliveries in March. "
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "This count includes only\n"
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "completed deliveries, not cancelled bookings.\n\n"
+            },
+            {
+              "snippet_id": "S13",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+            },
+            {
+              "snippet_id": "S14",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "sheet and retain the previous copy in the archive. "
+            },
+            {
+              "snippet_id": "S15",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "A coordinator checks the file\n"
+            },
+            {
+              "snippet_id": "S16",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "name and the date before the next handoff. "
+            },
+            {
+              "snippet_id": "S17",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "If a document is missing, the team\n"
+            },
+            {
+              "snippet_id": "S18",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "The operations team stores monthly delivery summaries by calendar month. "
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "Use\n"
+            },
+            {
+              "snippet_id": "S21",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "the completed count, rather than the number of bookings, when comparing\n"
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "periods.\n\n"
+            },
+            {
+              "snippet_id": "S23",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "The office keeps a separate log for day-to-day questions. "
+            },
+            {
+              "snippet_id": "S24",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "Each entry contains the\n"
+            },
+            {
+              "snippet_id": "S25",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "date received and a brief description, followed by the initials of the person\n"
+            },
+            {
+              "snippet_id": "S26",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "who filed it. "
+            },
+            {
+              "snippet_id": "S27",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+            },
+            {
+              "snippet_id": "S28",
+              "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+              "quote": "as drafts until someone supplies a verified replacement."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "source_text": "110 deliveries",
+              "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+              "start": 21,
+              "end": 35,
+              "value": "110",
+              "unit": "deliveries",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S10",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "source_text": "80 deliveries",
+              "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+              "start": 21,
+              "end": 34,
+              "value": "80",
+              "unit": "deliveries",
+              "dimension": "count"
+            }
+          ],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: 30 deliveries.",
+              "formula": "after - before",
+              "result": "30",
+              "unit": "deliveries",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N2",
+                  "snippet_id": "S10",
+                  "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+                  "source_text": "80 deliveries",
+                  "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+                  "start": 21,
+                  "end": 34,
+                  "value": "80",
+                  "unit": "deliveries",
+                  "dimension": "count"
+                },
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+                  "source_text": "110 deliveries",
+                  "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+                  "start": 21,
+                  "end": 35,
+                  "value": "110",
+                  "unit": "deliveries",
+                  "dimension": "count"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v3",
+              "normalized_inputs": [
+                {
+                  "id": "N2",
+                  "role": "before",
+                  "value": "80",
+                  "unit": "deliveries",
+                  "original_value": "80",
+                  "original_unit": "deliveries",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N1",
+                  "role": "after",
+                  "value": "110",
+                  "unit": "deliveries",
+                  "original_value": "110",
+                  "original_unit": "deliveries",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "110 deliveries - 80 deliveries = 30 deliveries (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+              "operand_roles": {
+                "minuend_id": "N1",
+                "subtrahend_id": "N2"
+              },
+              "known_input_snippet_ids": [
+                "S1",
+                "S10"
+              ],
+              "competing_snippet_ids": [],
+              "limitation_snippet_ids": [],
+              "limitation_basis": null,
+              "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "a0aed607-10ec-406b-82c3-b4bfcb97da1a"
+        ]
+      },
+      "latency_seconds": 33.03066945821047,
+      "setup_seconds": 0.02121516689658165,
+      "attempt_total_seconds": 33.05188462510705,
+      "finished_at": "2026-10-30T14:58:13.138938+00:00"
+    }
+  }
+}

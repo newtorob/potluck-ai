@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-05095022-54f9-4b8a-b11f-6a597464a425",
+  "object": "chat.completion",
+  "created": 1793372051,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\", \"S10\", \"S20\"], \"text\": \"Mara Venn owns the revised Tide pilot schedule. The Tide pilot was moved back because the shore sensors produced inconsistent readings after salt spray. The Tide pilot can start once three consecutive salt-spray trials pass calibration.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1237,
+    "completion_tokens": 79,
+    "total_tokens": 1316
+  }
+}

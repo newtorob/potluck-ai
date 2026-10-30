@@ -1,0 +1,278 @@
+{
+  "harbor": {
+    "ordered_equal": true,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+          "sources": [
+            {
+              "path": "sources/harbor_b.md",
+              "content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/harbor_a.md",
+              "content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/harbor_c.md",
+              "content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+          "sources": [
+            {
+              "path": "sources/harbor_b.md",
+              "content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/harbor_a.md",
+              "content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/harbor_c.md",
+              "content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  },
+  "cedar": {
+    "ordered_equal": true,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+          "sources": [
+            {
+              "path": "sources/cedar_c.md",
+              "content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            },
+            {
+              "path": "sources/cedar_a.md",
+              "content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/cedar_b.md",
+              "content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+          "sources": [
+            {
+              "path": "sources/cedar_c.md",
+              "content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            },
+            {
+              "path": "sources/cedar_a.md",
+              "content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/cedar_b.md",
+              "content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  },
+  "mosaic": {
+    "ordered_equal": true,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+          "sources": [
+            {
+              "path": "sources/mosaic_b.md",
+              "content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/mosaic_c.md",
+              "content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            },
+            {
+              "path": "sources/mosaic_a.md",
+              "content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+          "sources": [
+            {
+              "path": "sources/mosaic_b.md",
+              "content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/mosaic_c.md",
+              "content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            },
+            {
+              "path": "sources/mosaic_a.md",
+              "content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  },
+  "atlas": {
+    "ordered_equal": true,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+          "sources": [
+            {
+              "path": "sources/atlas_a.md",
+              "content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/atlas_b.md",
+              "content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/atlas_c.md",
+              "content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+          "sources": [
+            {
+              "path": "sources/atlas_a.md",
+              "content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/atlas_b.md",
+              "content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/atlas_c.md",
+              "content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  },
+  "quill": {
+    "ordered_equal": false,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+          "sources": [
+            {
+              "path": "sources/quill_b.md",
+              "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/quill_a.md",
+              "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/quill_c.md",
+              "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+          "sources": [
+            {
+              "path": "sources/quill_a.md",
+              "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/quill_b.md",
+              "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/quill_c.md",
+              "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  },
+  "birch": {
+    "ordered_equal": true,
+    "source_content_set_equal": true,
+    "arms": [
+      [
+        {
+          "query": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+          "sources": [
+            {
+              "path": "sources/birch_b.md",
+              "content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/birch_a.md",
+              "content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/birch_c.md",
+              "content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ],
+      [
+        {
+          "query": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+          "sources": [
+            {
+              "path": "sources/birch_b.md",
+              "content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+            },
+            {
+              "path": "sources/birch_a.md",
+              "content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+            },
+            {
+              "path": "sources/birch_c.md",
+              "content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+            }
+          ],
+          "missing_evidence": []
+        }
+      ]
+    ]
+  }
+}

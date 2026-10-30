@@ -160,3 +160,92 @@ def test_unicode_casefold_matching(tmp_path, monkeypatch):
         result = await lookup_evidence(EvidenceScope('w', (cid,)), 'CAFÉ STRASSE')
         assert len(result['source_chunks']) == 1
     asyncio.run(run())
+
+
+def test_v2_stable_order_and_document_cap(tmp_path, monkeypatch):
+    async def run():
+        outputs = []
+        for run_number in range(2):
+            monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / f'{run_number}.db'))
+            await init_memory_db()
+            folders = []
+            for name in ('alpha', 'beta'):
+                folder = tmp_path / f'{run_number}-{name}'
+                folder.mkdir()
+                (folder / 'same.md').write_text(f'# Header\nshared evidence {name}')
+                folders.append(folder)
+            order = (0, 1) if run_number == 0 else (1, 0)
+            ids = [await register_collection('w', ('alpha', 'beta')[i], folders[i]) for i in order]
+            for cid in ids:
+                await scan_collection('w', cid)
+            async with aiosqlite.connect(get_memory_db_path()) as db:
+                cur = await db.execute('SELECT document_id, anchor, heading FROM source_chunks WHERE content LIKE ? LIMIT 1', ('%alpha%',))
+                doc, anchor, heading = await cur.fetchone()
+                for i in range(4):
+                    await db.execute('INSERT INTO source_chunks (id,document_id,ordinal,anchor,heading,content) VALUES (?,?,?,?,?,?)',
+                                     (f'extra-{i}', doc, i + 10, anchor, heading, f'shared evidence extra {i}'))
+                await db.commit()
+            result = await lookup_evidence(EvidenceScope('w', tuple(ids)), 'shared evidence', retrieval_version='v2')
+            outputs.append([x['content'] for x in result['source_chunks']])
+            assert result['retrieval_trace']['deprioritized_chunks'] == 3
+            assert len(result['source_chunks']) == 6
+            assert not result['truncated']
+        assert outputs[0] == outputs[1]
+    asyncio.run(run())
+
+
+def test_v2_registration_order_candidate_and_result_limits(tmp_path, monkeypatch):
+    async def run():
+        snapshots = []
+        for n in range(2):
+            monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / f'limit-{n}.db'))
+            await init_memory_db()
+            dirs = []
+            for name in ('alpha', 'beta'):
+                directory = tmp_path / f'{n}-{name}'
+                directory.mkdir()
+                for i in range(105):
+                    (directory / f'{i:03}.md').write_text(f'# Heading\nshared {name} document {i:03}')
+                dirs.append(directory)
+            order = (0, 1) if n == 0 else (1, 0)
+            ids = [await register_collection('w', ('alpha', 'beta')[i], dirs[i]) for i in order]
+            for cid in ids:
+                await scan_collection('w', cid)
+            scope = EvidenceScope('w', tuple(ids))
+            result = await lookup_evidence(scope, 'shared', 10, retrieval_version='v2')
+            assert len(result['source_chunks']) == 10
+            assert result['retrieval_trace']['candidate_limit_reached']
+            assert result['retrieval_trace']['result_omitted'] == 190
+            assert any('Result limit' in notice for notice in result['missing_evidence'])
+            snapshots.append([(x['relative_path'], x['content']) for x in result['source_chunks']])
+        assert snapshots[0] == snapshots[1]
+    asyncio.run(run())
+
+
+def test_v2_claim_sources_use_semantic_order(tmp_path, monkeypatch):
+    async def run():
+        outputs = []
+        for n in range(2):
+            monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / f'claim-{n}.db'))
+            await init_memory_db()
+            ids = []
+            for name in (('alpha', 'beta') if n == 0 else ('beta', 'alpha')):
+                folder = tmp_path / f'{n}-claim-{name}'
+                folder.mkdir()
+                (folder / 'same.md').write_text(f'# Heading\nshared source {name}')
+                cid = await register_collection('w', name, folder)
+                await scan_collection('w', cid)
+                ids.append(cid)
+            scope = EvidenceScope('w', tuple(ids))
+            sources = (await lookup_evidence(scope, 'shared', retrieval_version='v2'))['source_chunks']
+            async with aiosqlite.connect(get_memory_db_path()) as db:
+                await db.execute('INSERT INTO reviewed_claims (id,workspace,claim_key,content,status,created_at) VALUES (?,?,?,?,?,?)',
+                                 ('claim', 'w', 'shared', 'shared claim', 'approved', 'now'))
+                for src in reversed(sources):
+                    await db.execute('INSERT INTO reviewed_claim_sources VALUES (?,?,?,?,?)',
+                                     ('claim', src['collection_id'], src['document_id'], src['revision_id'], src['chunk_id']))
+                await db.commit()
+            result = await lookup_evidence(scope, 'shared', retrieval_version='v2')
+            outputs.append([s['content'] for s in result['reviewed_claims'][0]['sources']])
+        assert outputs[0] == outputs[1]
+    asyncio.run(run())

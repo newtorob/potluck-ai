@@ -1,0 +1,141 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "bfacd9d5-36da-4fcf-99a7-247537882cf9"
+  ],
+  "query": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "bfacd9d5-36da-4fcf-99a7-247537882cf9"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "13e74a2b-ca6a-5935-bfca-9f0d8fc4b57a",
+        "revision_id": "fe337869-c540-5900-9284-783f3798084e",
+        "relative_path": "guide-review.md",
+        "updated_at": "2026-10-30T15:12:12.264846+00:00",
+        "chunk_id": "27da1b97-42a2-5b33-95c3-b2b47da67adf",
+        "anchor": "review-outcomes-and-reuse",
+        "heading": "Review, outcomes and reuse",
+        "content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:27da1b97-42a2-5b33-95c3-b2b47da67adf:fe337869-c540-5900-9284-783f3798084e"
+      },
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "fe4c56da-c8c1-51fb-8214-14caf57e4026",
+        "revision_id": "702bece5-b085-5a6c-a564-519abf9775ce",
+        "relative_path": "guide-intro.md",
+        "updated_at": "2026-10-30T15:12:12.264154+00:00",
+        "chunk_id": "8e9edb86-afce-564c-ab19-cb3addf760d7",
+        "anchor": "local-company-brain-evidence-and-review",
+        "heading": "Local Company Brain evidence and review",
+        "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8e9edb86-afce-564c-ab19-cb3addf760d7:702bece5-b085-5a6c-a564-519abf9775ce"
+      },
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "59e376f9-66fa-59b7-8b6f-d8b5530bb086",
+        "revision_id": "025be140-9bc5-5612-90e8-648f84373e55",
+        "relative_path": "guide-workflow.md",
+        "updated_at": "2026-10-30T15:12:12.265541+00:00",
+        "chunk_id": "99a7215c-1263-550a-a9a3-889c6016a944",
+        "anchor": "intro",
+        "heading": "",
+        "content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:99a7215c-1263-550a-a9a3-889c6016a944:025be140-9bc5-5612-90e8-648f84373e55"
+      },
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "0356bffa-7b4a-52fe-9213-c0b9313ff1ac",
+        "revision_id": "e98aed4a-7052-580d-b101-69a89ec06d45",
+        "relative_path": "progress.md",
+        "updated_at": "2026-10-30T15:12:12.266451+00:00",
+        "chunk_id": "94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce",
+        "anchor": "intro",
+        "heading": "",
+        "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45"
+      },
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "6cbe5bf3-a6f7-5224-b538-ccc1e3d75e3e",
+        "revision_id": "6cabf279-a476-525d-89f4-2eb4673ea904",
+        "relative_path": "guide-gates.md",
+        "updated_at": "2026-10-30T15:12:12.263290+00:00",
+        "chunk_id": "2b8b72aa-072d-5a59-9733-73718efb6f09",
+        "anchor": "intro",
+        "heading": "",
+        "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904"
+      },
+      {
+        "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+        "document_id": "0356bffa-7b4a-52fe-9213-c0b9313ff1ac",
+        "revision_id": "e98aed4a-7052-580d-b101-69a89ec06d45",
+        "relative_path": "progress.md",
+        "updated_at": "2026-10-30T15:12:12.266451+00:00",
+        "chunk_id": "9a3b66f4-bed8-5da1-b175-9202af950b0e",
+        "anchor": "october-29-checkpoint-source-input-review-local-experimental-mode-1",
+        "heading": "October 29 checkpoint — source input review, local experimental mode",
+        "content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9a3b66f4-bed8-5da1-b175-9202af950b0e:e98aed4a-7052-580d-b101-69a89ec06d45"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

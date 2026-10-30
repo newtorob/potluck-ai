@@ -1,0 +1,18 @@
+[
+  {
+    "name": "sidecar",
+    "command": [
+      "make",
+      "test-sidecar"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "fast",
+    "command": [
+      "make",
+      "test-fast"
+    ],
+    "exit_code": 0
+  }
+]

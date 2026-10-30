@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1470483b-e72d-43f7-960c-f5a8fb2de40d",
+  "object": "chat.completion",
+  "created": 1793372465,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S1\"], \"text\": \"Atlas Loom pays the return postage for sample swatches in the program by supplying a prepaid label. Customers do not need to purchase postage.\", \"status\": \"supported\", \"request_span\": \"For Atlas Loom’s sample return program, who pays postage\"}, {\"snippet_ids\": [\"S3\"], \"text\": \"Each sample return must include the printed order slip inside the parcel. The cardboard sleeve is optional and can be reused.\", \"status\": \"supported\", \"request_span\": \"what must be enclosed\"}, {\"snippet_ids\": [\"S5\"], \"text\": \"A credit is issued after the returned swatches are checked in at the depot. Sending a parcel alone does not immediately create a credit.\", \"status\": \"supported\", \"request_span\": \"when is the credit issued\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1042,
+    "completion_tokens": 189,
+    "total_tokens": 1231
+  }
+}

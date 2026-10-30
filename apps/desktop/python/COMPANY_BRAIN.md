@@ -442,3 +442,9 @@ The v9 correction form labels subtraction inputs as the amount to subtract and
 the amount to subtract from, percentage change as baseline/current, and a
 percentage as part/total. It displays the selected expression before preview;
 the server remains the authority for unit conversion and calculated results.
+
+### Internal investigation-v11 experiment
+
+Service-only v11 combines deterministic v2 retrieval with bounded `paragraph-v1` source snippets. It preserves v10 calculation semantics and adds ordered factual answer parts: each part references an exact request substring, an assessment, and source snippet IDs. The service checks substring order, bounds, IDs and excerpt provenance and renders the aggregate from the parts. It records unmatched request text and explicitly marks semantic request coverage unverified; neither citation validation nor span validation establishes entailment or completeness. Source instructions are untrusted data. Corrections edit aggregate answer text and citations while the original machine-generated parts remain in the immutable draft. V11 is opt-in and does not promote or change existing defaults. Generation and planning share the existing time limit; output and excerpt counts are bounded. This contract needs fresh evaluation before any quality or readiness claim.
+
+The owner-selected calculation preview remains available only for v9; it refuses v11 drafts. Ordinary v11 corrections reconstruct `paragraph-v1` snippets and preserve the original machine parts in the saved draft.

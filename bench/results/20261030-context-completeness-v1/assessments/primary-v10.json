@@ -1,0 +1,153 @@
+{
+  "reviewer": "primary",
+  "method": "Manual reading of each saved brief, attached source_excerpts and frozen required/forbidden rubric; exact quote binding is audited separately. Extra uncited claims and status concerns recorded separately rather than added to frozen rubric.",
+  "scope": "fresh synthetic six cases, v10 baseline",
+  "text_complete_count": 6,
+  "rubric_pass_count": 4,
+  "cases": {
+    "harbor": {
+      "text_complete": true,
+      "rubric_pass": false,
+      "required_facets": [
+        {
+          "facet": "delay",
+          "text": true,
+          "attached_support": false,
+          "reason": "S10 stops after sensors produced; inconsistent readings after salt spray is absent from attached excerpts."
+        },
+        {
+          "facet": "schedule owner",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 names Mara Venn."
+        },
+        {
+          "facet": "start condition",
+          "text": true,
+          "attached_support": false,
+          "reason": "S20 ends after trials pass; calibration is absent from attached excerpts."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "cedar": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "neighborhoods",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10 names both."
+        },
+        {
+          "facet": "pickup window",
+          "text": true,
+          "attached_support": true,
+          "reason": "S19 gives Tuesday 2 to 5 p.m."
+        },
+        {
+          "facet": "missed delivery report",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1+S2 jointly give voicemail; S3 supports following-morning review."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": [
+        "Unrequested office-log prose; selected S4-S6 stop before filed-it clause, so final extra initials statement lacks full attached support. This is outside frozen required facets."
+      ]
+    },
+    "mosaic": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "trigger",
+          "text": true,
+          "attached_support": true,
+          "reason": "S20+S21 jointly give both readings, temperature and interval."
+        },
+        {
+          "facet": "destination",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 gives registered phone by text."
+        },
+        {
+          "facet": "grower action",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10+S11 jointly give inspect valves before deciding sprinklers."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": [
+        "Extra claim that service does not turn valves on is correct in source, but its sentence is not in attached quotes."
+      ]
+    },
+    "atlas": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "postage",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1+S2+S3."
+        },
+        {
+          "facet": "enclosure",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10."
+        },
+        {
+          "facet": "credit timing",
+          "text": true,
+          "attached_support": true,
+          "reason": "S18+S19."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    },
+    "quill": {
+      "text_complete": true,
+      "rubric_pass": false,
+      "required_facets": [
+        {
+          "facet": "approver unknown",
+          "text": true,
+          "attached_support": false,
+          "reason": "S22 supports no signed approval; S12 is only The, omitting required source A blank-approval field."
+        },
+        {
+          "facet": "unresolved times",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1+S2 and S11 give 07:10 versus06:40 without choosing a settled final time."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": [
+        "Overall supported status is inappropriate for unresolved conflict and unknown approver. Frozen rubric has no explicit status requirement."
+      ]
+    },
+    "birch": {
+      "text_complete": true,
+      "rubric_pass": true,
+      "required_facets": [
+        {
+          "facet": "increase 30 deliveries",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 April110 and S10 March80; expression110-80=30."
+        }
+      ],
+      "forbidden_claims": false,
+      "additional_concerns": []
+    }
+  }
+}

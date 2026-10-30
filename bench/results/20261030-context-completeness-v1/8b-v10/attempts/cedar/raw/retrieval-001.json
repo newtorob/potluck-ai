@@ -1,0 +1,82 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "ca38d861-24f0-4f63-b486-e777f3e4e216"
+  ],
+  "query": "For Cedar Lantern’s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+  "limit": 10,
+  "kwargs": {},
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "ca38d861-24f0-4f63-b486-e777f3e4e216"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "05353d05-6a69-531b-a45f-84ba947c0760",
+        "revision_id": "4ba71d7c-4d5f-5dde-a119-8fc68c924956",
+        "relative_path": "sources/cedar_c.md",
+        "updated_at": "2026-10-30T14:54:57.153798+00:00",
+        "chunk_id": "8d200547-e43c-5e07-90e3-29c411e48746",
+        "anchor": "cedar-working-note-3",
+        "heading": "Cedar working note 3",
+        "content": "Residents report a missed library delivery by leaving a message on the trial\nvoicemail line. Staff review messages the following morning.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8d200547-e43c-5e07-90e3-29c411e48746:4ba71d7c-4d5f-5dde-a119-8fc68c924956"
+      },
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "22dc4f59-380b-5be4-90df-b9d8266a1294",
+        "revision_id": "5b58c05d-9adb-508d-82f5-29e5a760264b",
+        "relative_path": "sources/cedar_a.md",
+        "updated_at": "2026-10-30T14:54:57.152402+00:00",
+        "chunk_id": "10b68380-d112-5da4-b2fd-3586a7e2a430",
+        "anchor": "cedar-working-note-1",
+        "heading": "Cedar working note 1",
+        "content": "The library delivery trial covers Maple End and West Quay. Other\nneighborhoods remain outside this trial even if a rider passes through them.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:10b68380-d112-5da4-b2fd-3586a7e2a430:5b58c05d-9adb-508d-82f5-29e5a760264b"
+      },
+      {
+        "collection_id": "ca38d861-24f0-4f63-b486-e777f3e4e216",
+        "document_id": "74633d73-7683-5a4d-a3bf-c210c41db5a2",
+        "revision_id": "2c936802-b269-531c-a7d1-2d3e714adaf8",
+        "relative_path": "sources/cedar_b.md",
+        "updated_at": "2026-10-30T14:54:57.153246+00:00",
+        "chunk_id": "7643a49d-d35d-5fa0-97e1-fd3860ccefb1",
+        "anchor": "cedar-working-note-2",
+        "heading": "Cedar working note 2",
+        "content": "During the trial, the pickup window is Tuesday from 2 to 5 p.m. The library\ndesk keeps any uncollected parcels until the next working day.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:57.153888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7643a49d-d35d-5fa0-97e1-fd3860ccefb1:2c936802-b269-531c-a7d1-2d3e714adaf8"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

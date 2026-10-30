@@ -1,0 +1,278 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "88995391-46fc-4655-812b-b68946774193",
+    "workspace": "pilot-eval",
+    "issue": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Atlas Loom pays the return postage for sample swatches in the program by supplying a prepaid label. Customers do not need to purchase postage.\nEach sample return must include the printed order slip inside the parcel. The cardboard sleeve is optional and can be reused.\nA credit is issued after the returned swatches are checked in at the depot. Sending a parcel alone does not immediately create a credit.",
+          "snippet_ids": [
+            "S1",
+            "S3",
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b8965c4b-91da-5143-bddb-0beb1f84a974:c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+              "quote": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:5d9c20cb-3331-5b07-9ec3-657a25f4e1db:a84f8d4e-bd99-58b3-9736-dac014d0e472",
+              "quote": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:a8a2ea12-8874-5400-8320-6530a659d441:c3b9587b-6149-59b4-afca-9fcb35de7216",
+              "quote": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n"
+            }
+          ],
+          "parts": [
+            {
+              "request_span": "For Atlas Loom’s sample return program, who pays postage",
+              "status": "supported",
+              "text": "Atlas Loom pays the return postage for sample swatches in the program by supplying a prepaid label. Customers do not need to purchase postage.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:b8965c4b-91da-5143-bddb-0beb1f84a974:c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+                  "quote": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n"
+                }
+              ]
+            },
+            {
+              "request_span": "what must be enclosed",
+              "status": "supported",
+              "text": "Each sample return must include the printed order slip inside the parcel. The cardboard sleeve is optional and can be reused.",
+              "snippet_ids": [
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:5d9c20cb-3331-5b07-9ec3-657a25f4e1db:a84f8d4e-bd99-58b3-9736-dac014d0e472",
+                  "quote": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n"
+                }
+              ]
+            },
+            {
+              "request_span": "when is the credit issued",
+              "status": "supported",
+              "text": "A credit is issued after the returned swatches are checked in at the depot. Sending a parcel alone does not immediately create a credit.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:a8a2ea12-8874-5400-8320-6530a659d441:c3b9587b-6149-59b4-afca-9fcb35de7216",
+                  "quote": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "c3d25ea4-b217-4dcf-82c3-91df76bd8cb8",
+        "document_id": "09b54b16-082b-5504-871d-18940bda34c8",
+        "revision_id": "c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+        "relative_path": "sources/atlas_a.md",
+        "updated_at": "2026-10-30T15:01:05.596673+00:00",
+        "chunk_id": "b8965c4b-91da-5143-bddb-0beb1f84a974",
+        "anchor": "atlas-working-note-1",
+        "heading": "Atlas working note 1",
+        "content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:01:05.598642+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b8965c4b-91da-5143-bddb-0beb1f84a974:c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+        "presented_content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "c3d25ea4-b217-4dcf-82c3-91df76bd8cb8",
+        "document_id": "299004ad-7ee4-5484-bf86-1461663c5aec",
+        "revision_id": "a84f8d4e-bd99-58b3-9736-dac014d0e472",
+        "relative_path": "sources/atlas_b.md",
+        "updated_at": "2026-10-30T15:01:05.597594+00:00",
+        "chunk_id": "5d9c20cb-3331-5b07-9ec3-657a25f4e1db",
+        "anchor": "atlas-working-note-2",
+        "heading": "Atlas working note 2",
+        "content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:01:05.598642+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:5d9c20cb-3331-5b07-9ec3-657a25f4e1db:a84f8d4e-bd99-58b3-9736-dac014d0e472",
+        "presented_content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "c3d25ea4-b217-4dcf-82c3-91df76bd8cb8",
+        "document_id": "15c6c9b8-3323-5625-805d-0dd8138ec8fa",
+        "revision_id": "c3b9587b-6149-59b4-afca-9fcb35de7216",
+        "relative_path": "sources/atlas_c.md",
+        "updated_at": "2026-10-30T15:01:05.598486+00:00",
+        "chunk_id": "a8a2ea12-8874-5400-8320-6530a659d441",
+        "anchor": "atlas-working-note-3",
+        "heading": "Atlas working note 3",
+        "content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:01:05.598642+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a8a2ea12-8874-5400-8320-6530a659d441:c3b9587b-6149-59b4-afca-9fcb35de7216",
+        "presented_content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T15:01:46.019923+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v11",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 40410,
+      "created_at": "2026-10-30T15:01:46.019923+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v1",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified.",
+        "unmatched_request_text": {
+          "R1": [
+            "",
+            ", ",
+            ", and ",
+            "?"
+          ]
+        }
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:b8965c4b-91da-5143-bddb-0beb1f84a974:c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+          "quote": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:b8965c4b-91da-5143-bddb-0beb1f84a974:c45bc1c7-cf09-5606-b9cf-4c0f7da5f3b8",
+          "quote": "\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:5d9c20cb-3331-5b07-9ec3-657a25f4e1db:a84f8d4e-bd99-58b3-9736-dac014d0e472",
+          "quote": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:5d9c20cb-3331-5b07-9ec3-657a25f4e1db:a84f8d4e-bd99-58b3-9736-dac014d0e472",
+          "quote": "\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:a8a2ea12-8874-5400-8320-6530a659d441:c3b9587b-6149-59b4-afca-9fcb35de7216",
+          "quote": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:a8a2ea12-8874-5400-8320-6530a659d441:c3b9587b-6149-59b4-afca-9fcb35de7216",
+          "quote": "\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "c3d25ea4-b217-4dcf-82c3-91df76bd8cb8"
+    ]
+  },
+  "latency_seconds": 40.42223654128611,
+  "setup_seconds": 0.025837458670139313,
+  "attempt_total_seconds": 40.44807399995625,
+  "finished_at": "2026-10-30T15:01:46.027090+00:00"
+}

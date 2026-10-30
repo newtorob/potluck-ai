@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "name": "sidecar",
+      "command": [
+        "make",
+        "test-sidecar"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "fast",
+      "command": [
+        "make",
+        "test-fast"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "clean_snapshot_focused_passed": 58,
+  "sidecar": {
+    "passed": 5290,
+    "skipped": 5,
+    "warning": "Existing Starlette/AnyIO deprecation warning",
+    "duration_seconds": 408.62
+  },
+  "frontend_passed": 527,
+  "cli_passed": 1228,
+  "landing_passed": 44,
+  "typechecks_passed": true,
+  "privacy_lint_passed": true,
+  "ui_changes": false,
+  "platform": "macOS",
+  "full_checks_run_after_fresh_model_inference": true,
+  "consumed_real_diagnostics_run_after_full_checks": true
+}

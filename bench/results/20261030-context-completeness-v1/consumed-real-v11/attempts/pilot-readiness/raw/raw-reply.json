@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1b31545b-588c-4be4-9b94-3c53e13f31a2",
+  "object": "chat.completion",
+  "created": 1793373132,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S15\"], \"text\": \"Before a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output. Source lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.\", \"status\": \"supported\", \"request_span\": \"What is actually ready for a Company Brain pilot\"}, {\"snippet_ids\": [\"S15\"], \"text\": \"Source lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.\", \"status\": \"supported\", \"request_span\": \"what remains blocked\"}, {\"snippet_ids\": [\"S15\"], \"text\": \"Before a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output.\", \"status\": \"supported\", \"request_span\": \"what evidence supports that?\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 3792,
+    "completion_tokens": 232,
+    "total_tokens": 4024
+  }
+}

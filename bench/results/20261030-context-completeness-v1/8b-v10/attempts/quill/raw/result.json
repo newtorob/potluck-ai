@@ -1,0 +1,368 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "84af576f-51ad-455c-b13a-770355b6155c",
+    "workspace": "pilot-eval",
+    "issue": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "The first departure time for Quill Ferry’s winter timetable is 07:10 or 06:40, but the approver is not identified in the provided text. There is no signed approval record mentioned, and the approval field is left blank in the draft.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S11",
+            "S12",
+            "S22"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "A separate timetable note lists the first winter departure as 07:10 and does\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+              "quote": "not identify the approver. "
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "A draft of the winter timetable names the first departure as 06:40. "
+            },
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+              "quote": "The\n"
+            },
+            {
+              "snippet_id": "S22",
+              "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+              "quote": "The collection does not contain a signed approval record.\n\n"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "6f481463-a5a5-5756-8419-93d6c1bfcfd3",
+        "revision_id": "fd7529a3-f78a-564d-9145-e6bb284fb01a",
+        "relative_path": "sources/quill_b.md",
+        "updated_at": "2026-10-30T14:56:50.329922+00:00",
+        "chunk_id": "4e4c2231-e8d1-584f-863f-b50e31d5c711",
+        "anchor": "quill-working-note-2",
+        "heading": "Quill working note 2",
+        "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+        "presented_content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "0479b1c9-2f37-58ac-b71a-7e67e7c91130",
+        "revision_id": "e02a8187-bd70-55c7-b3ba-7883963c7189",
+        "relative_path": "sources/quill_a.md",
+        "updated_at": "2026-10-30T14:56:50.329201+00:00",
+        "chunk_id": "c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08",
+        "anchor": "quill-working-note-1",
+        "heading": "Quill working note 1",
+        "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+        "presented_content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "62a22b60-d868-43ba-b849-fdb52a532864",
+        "document_id": "ec98c096-4592-5b2e-9ae5-2c4513ed48c5",
+        "revision_id": "cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+        "relative_path": "sources/quill_c.md",
+        "updated_at": "2026-10-30T14:56:50.330559+00:00",
+        "chunk_id": "1ea3551c-ec77-5aa6-a24b-2a8e826170b4",
+        "anchor": "quill-working-note-3",
+        "heading": "Quill working note 3",
+        "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:50.330635+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+        "presented_content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T14:57:40.079556+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 49737,
+      "created_at": "2026-10-30T14:57:40.079556+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "A separate timetable note lists the first winter departure as 07:10 and does\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "not identify the approver. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "Neither note records a final decision between the\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "two times.\n\n"
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "leave the remainder for the next shift. "
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "The checklist is a record of work in\n"
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "progress, not an authorization to change the underlying arrangement. "
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "Staff can\n"
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "A draft of the winter timetable names the first departure as 06:40. "
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "The\n"
+        },
+        {
+          "snippet_id": "S13",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "draft leaves the approval field blank.\n\n"
+        },
+        {
+          "snippet_id": "S14",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+        },
+        {
+          "snippet_id": "S15",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "sheet and retain the previous copy in the archive. "
+        },
+        {
+          "snippet_id": "S16",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "A coordinator checks the file\n"
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "name and the date before the next handoff. "
+        },
+        {
+          "snippet_id": "S18",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "If a document is missing, the team\n"
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "Staff should keep draft timetable copies together and label them with the\n"
+        },
+        {
+          "snippet_id": "S21",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "date received. "
+        },
+        {
+          "snippet_id": "S22",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "The collection does not contain a signed approval record.\n\n"
+        },
+        {
+          "snippet_id": "S23",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "The office keeps a separate log for day-to-day questions. "
+        },
+        {
+          "snippet_id": "S24",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "Each entry contains the\n"
+        },
+        {
+          "snippet_id": "S25",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "date received and a brief description, followed by the initials of the person\n"
+        },
+        {
+          "snippet_id": "S26",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "who filed it. "
+        },
+        {
+          "snippet_id": "S27",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+        },
+        {
+          "snippet_id": "S28",
+          "citation_id": "source:1ea3551c-ec77-5aa6-a24b-2a8e826170b4:cdcde850-2dcc-5a30-9b9f-250a74d951ae",
+          "quote": "as drafts until someone supplies a verified replacement."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "source_text": "07:10 and does\n",
+          "start": 62,
+          "end": 77,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "source_text": "10 and does\n",
+          "start": 65,
+          "end": 77,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:4e4c2231-e8d1-584f-863f-b50e31d5c711:fd7529a3-f78a-564d-9145-e6bb284fb01a",
+          "source_text": "two times.\n\n",
+          "start": 0,
+          "end": 12,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "source_text": "06:40. ",
+          "start": 61,
+          "end": 68,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:c6c92d2f-8f0b-54a1-bc94-e4c061e5aa08:e02a8187-bd70-55c7-b3ba-7883963c7189",
+          "source_text": "40. ",
+          "start": 64,
+          "end": 68,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "62a22b60-d868-43ba-b849-fdb52a532864"
+    ]
+  },
+  "latency_seconds": 49.748394625261426,
+  "setup_seconds": 0.029907582327723503,
+  "attempt_total_seconds": 49.77830220758915,
+  "finished_at": "2026-10-30T14:57:40.086093+00:00"
+}

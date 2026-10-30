@@ -1,0 +1,160 @@
+{
+  "run": "8b-v11",
+  "independence": "Reviewed frozen rubric and answer-attached excerpts resolved through result evidence. Did not inspect implementation, prompts, or root's scores.",
+  "method": "A required facet passes only when present in answer text and supported by the attached excerpts from the rubric's specified sources. Separate excerpts may jointly support a facet. Forbidden claims are assessed independently. Status and extra-claim concerns do not create additional frozen rubric requirements.",
+  "case_denominator": 6,
+  "factual_text_complete_cases": 5,
+  "rubric_pass_cases": 5,
+  "cases": {
+    "harbor": {
+      "facets": [
+        {
+          "name": "delay cause",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 harbor_a"
+        },
+        {
+          "name": "Mara owns schedule",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 harbor_b"
+        },
+        {
+          "name": "three consecutive salt-spray calibration trials",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 harbor_c"
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached evidence.",
+      "extra_claim_concerns": []
+    },
+    "cedar": {
+      "facets": [
+        {
+          "name": "Maple End and West Quay",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 cedar_a"
+        },
+        {
+          "name": "Tuesday 2–5 p.m.",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 cedar_b"
+        },
+        {
+          "name": "missed deliveries via trial voicemail",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 cedar_c"
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached evidence.",
+      "extra_claim_concerns": []
+    },
+    "mosaic": {
+      "facets": [
+        {
+          "name": "two below 1°C readings at least ten minutes apart",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 mosaic_a"
+        },
+        {
+          "name": "text to registered phone",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 mosaic_b"
+        },
+        {
+          "name": "inspect valves before deciding on sprinklers",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 mosaic_c"
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached evidence.",
+      "extra_claim_concerns": []
+    },
+    "atlas": {
+      "facets": [
+        {
+          "name": "prepaid postage label",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 atlas_a"
+        },
+        {
+          "name": "printed order slip enclosed",
+          "text": true,
+          "attached_support": true,
+          "reason": "S3 atlas_b"
+        },
+        {
+          "name": "credit after depot check-in",
+          "text": true,
+          "attached_support": true,
+          "reason": "S5 atlas_c"
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached evidence.",
+      "extra_claim_concerns": []
+    },
+    "birch": {
+      "facets": [
+        {
+          "name": "increase 30 deliveries, 110 minus 80",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 birch_b and S3 birch_a"
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached evidence.",
+      "extra_claim_concerns": []
+    },
+    "quill": {
+      "facets": [
+        {
+          "name": "approver unidentified in available sources",
+          "text": false,
+          "attached_support": false,
+          "reason": "No validated answer or attached excerpts returned."
+        },
+        {
+          "name": "unresolved 06:40 versus 07:10 conflict",
+          "text": false,
+          "attached_support": false,
+          "reason": "No validated answer or attached excerpts returned."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "answer_status": null,
+      "status_coherence": "No answer status returned; raw generation labels departure conflict conflicting and other parts supported, repeats parts, and was rejected as invalid model format.",
+      "extra_claim_concerns": [],
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format",
+        "stage": "inference_or_validation"
+      },
+      "raw_generation_note": "Raw generated content mentions both times and says approval is not established, but it is not an accepted answer and has no result-attached excerpts; do not score it as an answer."
+    }
+  }
+}

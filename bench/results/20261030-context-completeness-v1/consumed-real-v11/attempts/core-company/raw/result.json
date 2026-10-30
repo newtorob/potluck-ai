@@ -1,0 +1,17 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "snippets do not match source context"
+  },
+  "failure_stage": "pre_inference",
+  "latency_seconds": 0.01139962486922741,
+  "setup_seconds": 0.026784375309944153,
+  "attempt_total_seconds": 0.03818400017917156,
+  "finished_at": "2026-10-30T15:14:41.232922+00:00"
+}

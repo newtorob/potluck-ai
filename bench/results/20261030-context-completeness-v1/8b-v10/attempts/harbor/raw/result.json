@@ -1,0 +1,324 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "5b9bdaec-aeb7-4b04-9193-c68b2fd3ad8b",
+    "workspace": "pilot-eval",
+    "issue": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Mara Venn owns the revised Tide pilot schedule. The Tide pilot was moved back because the shore sensors produced inconsistent readings after salt spray. The Tide pilot can start once three consecutive salt-spray trials pass calibration.",
+          "snippet_ids": [
+            "S1",
+            "S10",
+            "S20"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+              "quote": "Mara Venn owns the revised Tide pilot schedule. "
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+              "quote": "The Tide pilot was moved back because the shore sensors produced\n"
+            },
+            {
+              "snippet_id": "S20",
+              "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+              "quote": "The Tide pilot can start once three consecutive salt-spray trials pass\n"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+        "document_id": "afbba040-1b1a-5f1a-9927-715b23fe64c9",
+        "revision_id": "b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+        "relative_path": "sources/harbor_b.md",
+        "updated_at": "2026-10-30T14:54:11.091737+00:00",
+        "chunk_id": "55630c59-076c-5af3-a1fd-fa3776ff1ca6",
+        "anchor": "harbor-working-note-2",
+        "heading": "Harbor working note 2",
+        "content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+        "presented_content": "Mara Venn owns the revised Tide pilot schedule. She coordinates dates with\nthe harbor crew but does not control the instrument test itself.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+        "document_id": "92641571-5b6c-5336-9100-6abb997bd574",
+        "revision_id": "0f912335-5cab-58b8-be86-00f9c730d781",
+        "relative_path": "sources/harbor_a.md",
+        "updated_at": "2026-10-30T14:54:11.091028+00:00",
+        "chunk_id": "de89fd31-e3b4-539e-ae4d-42f75c6cd8fa",
+        "anchor": "harbor-working-note-1",
+        "heading": "Harbor working note 1",
+        "content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+        "presented_content": "The Tide pilot was moved back because the shore sensors produced\ninconsistent readings after salt spray. The team chose to retest the\ninstruments before inviting the first vessels.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "25228903-5239-482e-a60c-83d9e108d66b",
+        "document_id": "4d439a06-196f-5cd9-a8db-427a5a3b4bec",
+        "revision_id": "c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+        "relative_path": "sources/harbor_c.md",
+        "updated_at": "2026-10-30T14:54:11.092328+00:00",
+        "chunk_id": "3bacc9b1-d93c-57e3-8f92-314476e365cc",
+        "anchor": "harbor-working-note-3",
+        "heading": "Harbor working note 3",
+        "content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:54:11.092405+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+        "presented_content": "The Tide pilot can start once three consecutive salt-spray trials pass\ncalibration. A calendar date has not yet been committed.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T14:54:57.124571+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 46022,
+      "created_at": "2026-10-30T14:54:57.124571+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "Mara Venn owns the revised Tide pilot schedule. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "She coordinates dates with\n"
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "the harbor crew but does not control the instrument test itself.\n\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "leave the remainder for the next shift. "
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "The checklist is a record of work in\n"
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "progress, not an authorization to change the underlying arrangement. "
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "Staff can\n"
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:55630c59-076c-5af3-a1fd-fa3776ff1ca6:b405f0ea-c36d-5069-ac25-2112bc5e80ce",
+          "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "The Tide pilot was moved back because the shore sensors produced\n"
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "inconsistent readings after salt spray. "
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "The team chose to retest the\n"
+        },
+        {
+          "snippet_id": "S13",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "instruments before inviting the first vessels.\n\n"
+        },
+        {
+          "snippet_id": "S14",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+        },
+        {
+          "snippet_id": "S15",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "sheet and retain the previous copy in the archive. "
+        },
+        {
+          "snippet_id": "S16",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "A coordinator checks the file\n"
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "name and the date before the next handoff. "
+        },
+        {
+          "snippet_id": "S18",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "If a document is missing, the team\n"
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:de89fd31-e3b4-539e-ae4d-42f75c6cd8fa:0f912335-5cab-58b8-be86-00f9c730d781",
+          "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "The Tide pilot can start once three consecutive salt-spray trials pass\n"
+        },
+        {
+          "snippet_id": "S21",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "calibration. "
+        },
+        {
+          "snippet_id": "S22",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "A calendar date has not yet been committed.\n\n"
+        },
+        {
+          "snippet_id": "S23",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "The office keeps a separate log for day-to-day questions. "
+        },
+        {
+          "snippet_id": "S24",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "Each entry contains the\n"
+        },
+        {
+          "snippet_id": "S25",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "date received and a brief description, followed by the initials of the person\n"
+        },
+        {
+          "snippet_id": "S26",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "who filed it. "
+        },
+        {
+          "snippet_id": "S27",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+        },
+        {
+          "snippet_id": "S28",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "quote": "as drafts until someone supplies a verified replacement."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:3bacc9b1-d93c-57e3-8f92-314476e365cc:c6e3ebf1-96a3-581e-ad03-5d99455fbeae",
+          "source_text": "three consecutive salt-spray trials pass\n",
+          "start": 30,
+          "end": 71,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "25228903-5239-482e-a60c-83d9e108d66b"
+    ]
+  },
+  "latency_seconds": 46.03377249930054,
+  "setup_seconds": 0.023947459645569324,
+  "attempt_total_seconds": 46.05771995894611,
+  "finished_at": "2026-10-30T14:54:57.132164+00:00"
+}

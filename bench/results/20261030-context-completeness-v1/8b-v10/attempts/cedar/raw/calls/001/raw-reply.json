@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e642dff6-fd2c-4dae-be54-b5e33e91256a",
+  "object": "chat.completion",
+  "created": 1793372097,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S10\", \"S19\", \"S1\", \"S2\", \"S3\", \"S4\", \"S5\", \"S6\"], \"text\": \"The library delivery trial covers Maple End and West Quay. During the trial, the pickup window is Tuesday from 2 to 5 p.m. Residents report a missed library delivery by leaving a message on the trial voicemail line. Staff review messages the following morning. The office keeps a separate log for day-to-day questions. Each entry contains the date received and a brief description, followed by the initials of the person who filed it.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1347,
+    "completion_tokens": 141,
+    "total_tokens": 1488
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "run": "8b-v10",
+  "independence": "Reviewed frozen rubric and answer-attached excerpts resolved through result evidence. Did not inspect implementation, prompts, or root's scores.",
+  "method": "A required facet passes only when present in answer text and supported by the attached excerpts from the rubric's specified sources. Separate excerpts may jointly support a facet. Forbidden claims are assessed independently. Status and extra-claim concerns do not create additional frozen rubric requirements.",
+  "case_denominator": 6,
+  "factual_text_complete_cases": 6,
+  "rubric_pass_cases": 4,
+  "cases": {
+    "harbor": {
+      "facets": [
+        {
+          "name": "delay cause",
+          "text": true,
+          "attached_support": false,
+          "reason": "S10 stops before inconsistent readings after salt spray."
+        },
+        {
+          "name": "Mara owns schedule",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 from harbor_b."
+        },
+        {
+          "name": "three consecutive salt-spray calibration trials",
+          "text": true,
+          "attached_support": false,
+          "reason": "S20 stops before calibration."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "answer_status": "supported",
+      "status_coherence": "Overstates attached support for two facets.",
+      "extra_claim_concerns": []
+    },
+    "cedar": {
+      "facets": [
+        {
+          "name": "Maple End and West Quay",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10 from cedar_a."
+        },
+        {
+          "name": "Tuesday 2–5 p.m.",
+          "text": true,
+          "attached_support": true,
+          "reason": "S19 from cedar_b."
+        },
+        {
+          "name": "missed deliveries via trial voicemail",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 and S2 from cedar_c jointly support it."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Required facets supported; extra claim has incomplete excerpt support.",
+      "extra_claim_concerns": [
+        "S5 and S6 stop before the phrase identifying the person as the one who filed the entry; the extra log-entry detail is not fully supported by attached excerpts."
+      ]
+    },
+    "mosaic": {
+      "facets": [
+        {
+          "name": "two below 1°C readings at least ten minutes apart",
+          "text": true,
+          "attached_support": true,
+          "reason": "S20 and S21 from mosaic_a jointly support it."
+        },
+        {
+          "name": "text to registered phone",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 from mosaic_b."
+        },
+        {
+          "name": "inspect valves before deciding on sprinklers",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10 and S11 from mosaic_c jointly support it."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Required facets supported; extra claim lacks attached support.",
+      "extra_claim_concerns": [
+        "The service does not turn the valves on is not established by the attached excerpts."
+      ]
+    },
+    "atlas": {
+      "facets": [
+        {
+          "name": "prepaid postage label",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 and S2 from atlas_a jointly support it."
+        },
+        {
+          "name": "printed order slip enclosed",
+          "text": true,
+          "attached_support": true,
+          "reason": "S10 from atlas_b."
+        },
+        {
+          "name": "credit after depot check-in",
+          "text": true,
+          "attached_support": true,
+          "reason": "S18 from atlas_c."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached excerpts.",
+      "extra_claim_concerns": []
+    },
+    "quill": {
+      "facets": [
+        {
+          "name": "approver unidentified in available sources",
+          "text": true,
+          "attached_support": false,
+          "reason": "S2 from quill_b says its note does not identify an approver, and S22 from quill_c says no signed approval record; attached quill_a S12 is only 'The', so the rubric's required support from both quill_a and quill_c is incomplete."
+        },
+        {
+          "name": "unresolved 06:40 versus 07:10 conflict",
+          "text": true,
+          "attached_support": true,
+          "reason": "S11 from quill_a and S1 from quill_b jointly show the conflicting times; answer offers both without choosing one."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "answer_status": "supported",
+      "status_coherence": "Supported status obscures uncertainty about the conflicting times and incomplete support for the approver facet.",
+      "extra_claim_concerns": [
+        "The claim that the approval field is blank in the draft is not supported by the attached quill_a excerpt S12."
+      ]
+    },
+    "birch": {
+      "facets": [
+        {
+          "name": "increase 30 deliveries, 110 minus 80",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 and S10 attach April 110 and March 80; subtraction yields 30."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "answer_status": "supported",
+      "status_coherence": "Coherent with attached inputs and arithmetic.",
+      "extra_claim_concerns": []
+    }
+  }
+}

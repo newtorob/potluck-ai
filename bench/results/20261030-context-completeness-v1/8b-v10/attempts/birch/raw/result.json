@@ -1,0 +1,485 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "aa9cf0a9-26cd-45eb-8cee-efc33c143fab",
+    "workspace": "pilot-eval",
+    "issue": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 30 deliveries.",
+          "snippet_ids": [
+            "S1",
+            "S10"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "quote": "Birch Kite completed 110 deliveries in April. "
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "quote": "Birch Kite completed 80 deliveries in March. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 30 deliveries.",
+            "formula": "after - before",
+            "result": "30",
+            "unit": "deliveries",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N2",
+                "snippet_id": "S10",
+                "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+                "source_text": "80 deliveries",
+                "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+                "start": 21,
+                "end": 34,
+                "value": "80",
+                "unit": "deliveries",
+                "dimension": "count"
+              },
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+                "source_text": "110 deliveries",
+                "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+                "start": 21,
+                "end": 35,
+                "value": "110",
+                "unit": "deliveries",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N2",
+                "role": "before",
+                "value": "80",
+                "unit": "deliveries",
+                "original_value": "80",
+                "original_unit": "deliveries",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N1",
+                "role": "after",
+                "value": "110",
+                "unit": "deliveries",
+                "original_value": "110",
+                "original_unit": "deliveries",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "110 deliveries - 80 deliveries = 30 deliveries (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "minuend_id": "N1",
+              "subtrahend_id": "N2"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S10"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+        "document_id": "57a0b248-b7b2-5041-a81c-d0e9969757e7",
+        "revision_id": "476d0912-09fd-5906-a3ab-efbe3215df60",
+        "relative_path": "sources/birch_b.md",
+        "updated_at": "2026-10-30T14:57:40.102352+00:00",
+        "chunk_id": "3db91a5f-18b3-5127-b80f-a8488bebd592",
+        "anchor": "birch-working-note-2",
+        "heading": "Birch working note 2",
+        "content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+        "presented_content": "Birch Kite completed 110 deliveries in April. The count uses the same\ncompleted-delivery definition as the March tally.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+        "document_id": "ee0dc143-b451-5235-a836-6035156ec2da",
+        "revision_id": "36624e33-edce-54f3-bf53-13710b138f77",
+        "relative_path": "sources/birch_a.md",
+        "updated_at": "2026-10-30T14:57:40.101632+00:00",
+        "chunk_id": "2374aba0-df47-5541-9aee-ce73a6670ccf",
+        "anchor": "birch-working-note-1",
+        "heading": "Birch working note 1",
+        "content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+        "presented_content": "Birch Kite completed 80 deliveries in March. This count includes only\ncompleted deliveries, not cancelled bookings.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "a0aed607-10ec-406b-82c3-b4bfcb97da1a",
+        "document_id": "f0b74e48-9d23-592f-8f91-e50c5d1dd2e7",
+        "revision_id": "629884e3-e3be-593c-b728-aeef436642fd",
+        "relative_path": "sources/birch_c.md",
+        "updated_at": "2026-10-30T14:57:40.102901+00:00",
+        "chunk_id": "8082b57a-9ce6-592e-a9df-efd2c871973b",
+        "anchor": "birch-working-note-3",
+        "heading": "Birch working note 3",
+        "content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:57:40.102985+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+        "presented_content": "The operations team stores monthly delivery summaries by calendar month. Use\nthe completed count, rather than the number of bookings, when comparing\nperiods.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T14:58:13.133163+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 33021,
+      "created_at": "2026-10-30T14:58:13.133163+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "By how many deliveries did Birch Kite’s completed deliveries increase from March to April?",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "Birch Kite completed 110 deliveries in April. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "The count uses the same\n"
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "completed-delivery definition as the March tally.\n\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "For routine handoffs, open the checklist, mark the items already reviewed, and\n"
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "leave the remainder for the next shift. "
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "The checklist is a record of work in\n"
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "progress, not an authorization to change the underlying arrangement. "
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "Staff can\n"
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "quote": "add a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "Birch Kite completed 80 deliveries in March. "
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "This count includes only\n"
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "completed deliveries, not cancelled bookings.\n\n"
+        },
+        {
+          "snippet_id": "S13",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "To prepare the shared working folder, staff place the latest notes beside the intake\n"
+        },
+        {
+          "snippet_id": "S14",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "sheet and retain the previous copy in the archive. "
+        },
+        {
+          "snippet_id": "S15",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "A coordinator checks the file\n"
+        },
+        {
+          "snippet_id": "S16",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "name and the date before the next handoff. "
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "If a document is missing, the team\n"
+        },
+        {
+          "snippet_id": "S18",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "quote": "records that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "The operations team stores monthly delivery summaries by calendar month. "
+        },
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "Use\n"
+        },
+        {
+          "snippet_id": "S21",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "the completed count, rather than the number of bookings, when comparing\n"
+        },
+        {
+          "snippet_id": "S22",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "periods.\n\n"
+        },
+        {
+          "snippet_id": "S23",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "The office keeps a separate log for day-to-day questions. "
+        },
+        {
+          "snippet_id": "S24",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "Each entry contains the\n"
+        },
+        {
+          "snippet_id": "S25",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "date received and a brief description, followed by the initials of the person\n"
+        },
+        {
+          "snippet_id": "S26",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "who filed it. "
+        },
+        {
+          "snippet_id": "S27",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "Entries are reviewed in batches, and outdated drafts stay labeled\n"
+        },
+        {
+          "snippet_id": "S28",
+          "citation_id": "source:8082b57a-9ce6-592e-a9df-efd2c871973b:629884e3-e3be-593c-b728-aeef436642fd",
+          "quote": "as drafts until someone supplies a verified replacement."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+          "source_text": "110 deliveries",
+          "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+          "start": 21,
+          "end": 35,
+          "value": "110",
+          "unit": "deliveries",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S10",
+          "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+          "source_text": "80 deliveries",
+          "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+          "start": 21,
+          "end": 34,
+          "value": "80",
+          "unit": "deliveries",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 30 deliveries.",
+          "formula": "after - before",
+          "result": "30",
+          "unit": "deliveries",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N2",
+              "snippet_id": "S10",
+              "citation_id": "source:2374aba0-df47-5541-9aee-ce73a6670ccf:36624e33-edce-54f3-bf53-13710b138f77",
+              "source_text": "80 deliveries",
+              "snippet_text": "Birch Kite completed 80 deliveries in March. ",
+              "start": 21,
+              "end": 34,
+              "value": "80",
+              "unit": "deliveries",
+              "dimension": "count"
+            },
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:3db91a5f-18b3-5127-b80f-a8488bebd592:476d0912-09fd-5906-a3ab-efbe3215df60",
+              "source_text": "110 deliveries",
+              "snippet_text": "Birch Kite completed 110 deliveries in April. ",
+              "start": 21,
+              "end": 35,
+              "value": "110",
+              "unit": "deliveries",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N2",
+              "role": "before",
+              "value": "80",
+              "unit": "deliveries",
+              "original_value": "80",
+              "original_unit": "deliveries",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N1",
+              "role": "after",
+              "value": "110",
+              "unit": "deliveries",
+              "original_value": "110",
+              "original_unit": "deliveries",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "110 deliveries - 80 deliveries = 30 deliveries (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "minuend_id": "N1",
+            "subtrahend_id": "N2"
+          },
+          "known_input_snippet_ids": [
+            "S1",
+            "S10"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "a0aed607-10ec-406b-82c3-b4bfcb97da1a"
+    ]
+  },
+  "latency_seconds": 33.03066945821047,
+  "setup_seconds": 0.02121516689658165,
+  "attempt_total_seconds": 33.05188462510705,
+  "finished_at": "2026-10-30T14:58:13.138938+00:00"
+}

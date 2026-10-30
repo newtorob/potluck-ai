@@ -1,0 +1,100 @@
+{
+  "cases": [
+    {
+      "id": "harbor",
+      "question": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+      "sources": [
+        "sources/harbor_a.md",
+        "sources/harbor_b.md",
+        "sources/harbor_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "At Lumen Wharf, why was the Tide pilot delayed, who owns its revised schedule, and what condition must be met before it starts?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "cedar",
+      "question": "For Cedar Lantern\u2019s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+      "sources": [
+        "sources/cedar_a.md",
+        "sources/cedar_b.md",
+        "sources/cedar_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "For Cedar Lantern\u2019s library delivery trial, which neighborhoods are included, what is the pickup window, and how will residents report a missed delivery?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "mosaic",
+      "question": "For Mosaic Orchard\u2019s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+      "sources": [
+        "sources/mosaic_a.md",
+        "sources/mosaic_b.md",
+        "sources/mosaic_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "For Mosaic Orchard\u2019s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "atlas",
+      "question": "For Atlas Loom\u2019s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+      "sources": [
+        "sources/atlas_a.md",
+        "sources/atlas_b.md",
+        "sources/atlas_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "For Atlas Loom\u2019s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "quill",
+      "question": "Who approved Quill Ferry\u2019s winter timetable, and what is the first departure time?",
+      "sources": [
+        "sources/quill_a.md",
+        "sources/quill_b.md",
+        "sources/quill_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "Who approved Quill Ferry\u2019s winter timetable, and what is the first departure time?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "birch",
+      "question": "By how many deliveries did Birch Kite\u2019s completed deliveries increase from March to April?",
+      "sources": [
+        "sources/birch_a.md",
+        "sources/birch_b.md",
+        "sources/birch_c.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "By how many deliveries did Birch Kite\u2019s completed deliveries increase from March to April?",
+          "operation": "difference"
+        }
+      ]
+    }
+  ]
+}

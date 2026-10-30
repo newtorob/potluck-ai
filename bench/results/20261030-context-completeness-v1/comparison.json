@@ -1,0 +1,62 @@
+{
+  "fresh_fixture_cases": 6,
+  "baseline": {
+    "saved_drafts": 6,
+    "required_factual_text_complete": 6,
+    "required_answer_and_attached_evidence_pass": 4,
+    "median_generation_and_validation_seconds": 41.498227145988494,
+    "total_generation_and_validation_seconds": 241.9062950834632
+  },
+  "candidate": {
+    "saved_drafts": 5,
+    "required_factual_text_complete": 5,
+    "required_answer_and_attached_evidence_pass": 5,
+    "median_generation_and_validation_seconds": 45.83496702089906,
+    "total_generation_and_validation_seconds": 337.8846867065877
+  },
+  "reviewers_agree_on_all_frozen_rubric_results": true,
+  "cases": {
+    "harbor": {
+      "v10": false,
+      "v11": true,
+      "reason": "Paragraph excerpts now retain complete cause and calibration condition."
+    },
+    "cedar": {
+      "v10": true,
+      "v11": true
+    },
+    "mosaic": {
+      "v10": true,
+      "v11": true
+    },
+    "atlas": {
+      "v10": true,
+      "v11": true
+    },
+    "quill": {
+      "v10": false,
+      "v11": false,
+      "reason": "Baseline misses approval support and mislabels status; candidate repeats overlapping request spans and saves no draft."
+    },
+    "birch": {
+      "v10": true,
+      "v11": true
+    }
+  },
+  "mechanical": {
+    "displayed_excerpts_exact": 43,
+    "source_sets_equal": 6,
+    "source_order_equal": 5,
+    "computed_traces_replayed": 2,
+    "saved_catalogs_rebuilt": 11,
+    "canary_leaks": 0
+  },
+  "decision": "Keep internal v11, no default/preview promotion. Improved attached support is offset by an availability regression on the conflict case. Real diagnostic remains separate.",
+  "limitations": [
+    "Six small synthetic cases and one seed; not a general benchmark.",
+    "Three relevant source documents per case do not stress retrieval caps.",
+    "Fixture-supplied plans, not autonomous planning or owner confirmation.",
+    "Multiple mechanisms changed together; no isolated causal attribution.",
+    "Required/forbidden rubric does not include every extra claim or status concern; those are retained in assessments."
+  ]
+}

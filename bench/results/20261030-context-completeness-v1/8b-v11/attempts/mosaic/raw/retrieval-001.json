@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "07353c9f-7fdc-43ab-8e06-bd63573da465"
+  ],
+  "query": "For Mosaic Orchard’s frost alert service, what triggers an alert, where is it sent, and what action is the grower expected to take?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "07353c9f-7fdc-43ab-8e06-bd63573da465"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "0f099cac-65e7-5117-aced-c15c0ba7e0e1",
+        "revision_id": "7c866858-2c62-5234-b129-98f0e336645f",
+        "relative_path": "sources/mosaic_b.md",
+        "updated_at": "2026-10-30T15:00:17.894601+00:00",
+        "chunk_id": "6d716d03-bdd8-5249-819f-680ee80a331b",
+        "anchor": "mosaic-working-note-2",
+        "heading": "Mosaic working note 2",
+        "content": "The service sends a frost alert to the grower’s registered phone by text\nmessage. The dashboard stores a copy but does not substitute for the text.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6d716d03-bdd8-5249-819f-680ee80a331b:7c866858-2c62-5234-b129-98f0e336645f"
+      },
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "652dad64-61e1-5cc0-916b-5e71b607114f",
+        "revision_id": "336e3174-b6ab-51d6-881f-fbe82d62925d",
+        "relative_path": "sources/mosaic_c.md",
+        "updated_at": "2026-10-30T15:00:17.895158+00:00",
+        "chunk_id": "82365ed2-f4c5-556e-b3ef-670d90a8108a",
+        "anchor": "mosaic-working-note-3",
+        "heading": "Mosaic working note 3",
+        "content": "After receiving an alert, the grower is expected to inspect the irrigation\nvalves before deciding whether to run sprinklers. The service does not turn\nthe valves on.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:82365ed2-f4c5-556e-b3ef-670d90a8108a:336e3174-b6ab-51d6-881f-fbe82d62925d"
+      },
+      {
+        "collection_id": "07353c9f-7fdc-43ab-8e06-bd63573da465",
+        "document_id": "6c02c2a2-37fb-5133-9dfc-5730fa42bc50",
+        "revision_id": "aec4cbe8-7dd2-5d01-8530-bf866ad8a247",
+        "relative_path": "sources/mosaic_a.md",
+        "updated_at": "2026-10-30T15:00:17.893807+00:00",
+        "chunk_id": "4a262fe4-3d82-5639-be37-3cff54065e9c",
+        "anchor": "mosaic-working-note-1",
+        "heading": "Mosaic working note 1",
+        "content": "The frost alert is triggered when the orchard probe records two readings\nbelow 1°C at least ten minutes apart. A single low reading alone does not\ntrigger it.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:00:17.895240+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4a262fe4-3d82-5639-be37-3cff54065e9c:aec4cbe8-7dd2-5d01-8530-bf866ad8a247"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

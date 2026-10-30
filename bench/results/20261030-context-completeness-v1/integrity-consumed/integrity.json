@@ -1,0 +1,1065 @@
+{
+  "purpose": "consumed real-source diagnostic, not a fresh holdout or controlled comparison",
+  "semantic_assessment": false,
+  "notes": [
+    "Exact source and citation bindings do not establish semantic support.",
+    "Both declared cases remain in the denominator, including failed attempts."
+  ],
+  "fixture_sums_sha256": "2663630bd7e60f84f98ee879ac2b4069b566347a3b55937d63530d9aca786372",
+  "fixture_sha256s": {
+    "manifest.json": "e721049f681da37a132e411ed1de261bc8284ce5bfb82254b7dc81ef02faadf4",
+    "rubric.json": "2b7b689480d02b64e97ba3f658757abc59038b491e572be6c57c68247742334d",
+    "sources/authority.md": "6eb5dd7567d68bc98b7c3f265298b54ec7d50bb744255df23c431cac004f6b05",
+    "sources/direction.md": "9b9498254a0717c714a150fc980e6488d65d0c52f5460a3bfd9497c8da54edce",
+    "sources/guide-gates.md": "19201559a79ef85fc1b8fac00a0a4f482db252c59104acad7a96e21f251fa514",
+    "sources/guide-intro.md": "600f3924a14e1e0828102772bb4e5e9a44d33104eabbb07c1c577a9b044b48da",
+    "sources/guide-pilot.md": "424bd7f0300321a0731b875cdab6fd1f34099ccb9bc779dc7a08d86c80a19543",
+    "sources/guide-review.md": "699bc009318dd85a3ed4672ac4de9f2915e89e297a8103770398c991042b07a8",
+    "sources/guide-workflow.md": "bc928d7d9f5fb965a06ffce34ba62e8ef5484cb837f1db24ed645b15f795358d",
+    "sources/missing.md": "e14223954cb66261cec3f3ce7b2eae9da5303ceeb2306a489aa7f2b7d943128e",
+    "sources/packaging.md": "598a1a7f106ce2b6aac093173a25769d460229bcc83584b86a1e2f8b843e1129",
+    "sources/progress.md": "d6af4a178457687cb54a63ee82f575b5abb3a377dab5e35484870974956d8be8",
+    "sources/qualification.md": "ffca1a45eb0e2f449770467537805ffdc9a13293ebee27a699ccb940ef3f5be9",
+    "sources/temporal.md": "0664cbe0e7df34e6cc01f922ec5ba311e64d0fe0996876c06e2b817a1e9a84b1",
+    "sources.json": "5ed26a995675e38d7015e9072389d74a8ff820bacfaba33479bec04e9daea8ed"
+  },
+  "recorded_metadata": {
+    "started_at": "2026-10-30T15:11:47.975057+00:00",
+    "template_version": "investigation-v11",
+    "plan_origin": "fixture_supplied",
+    "seed": 7,
+    "generation_profile": {
+      "name": "qwen3-non-thinking",
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0.0,
+      "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+      "backend": "llama-cpp-python",
+      "enable_thinking": false,
+      "repeat_penalty": 1.0
+    },
+    "model_path": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+    "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "settings": {
+      "n_ctx": 8192,
+      "n_threads": 8,
+      "n_gpu_layers": 0,
+      "cpu_only": true,
+      "rpc_servers": null
+    },
+    "backend": "python",
+    "native_bundle": null,
+    "mode": "cases",
+    "snapshot": "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/context-completeness/candidate-frozen/apps/desktop/python",
+    "code_identity": {
+      "git_head": null,
+      "python_source_sha256": {
+        "potluck_local/__init__.py": "3ebfd300083e6d726a100c7e76418a84ee94dd77908f8b03fae3108625c095cf",
+        "potluck_local/agent_bridge.py": "e729a4c6a976785e7edfae006281e87976c0bcdbb0b288d6a14bc0eca773ba70",
+        "potluck_local/app.py": "844d5cddf88c29a233c712a3c75eb049add2a1060c8dd26fcf39c8ff6d16c5d4",
+        "potluck_local/config.py": "ae3b711d30d4f9187a3c51657df65783492cbc5ad1216eccadf98bcb42bad2cc",
+        "potluck_local/contributor/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/contributor/__main__.py": "fe4a9445a475dc02d24cd64a9e515ab96d006d4c587e29bf95fed58bdfe3cf6c",
+        "potluck_local/contributor/client.py": "00f10346cb9f97522ef4837d9eeaddcecccadf685c1be5aeb3c2c2ca1e603aab",
+        "potluck_local/contributor/config.py": "905aac16e276ba807bd4f77cc3bbcda68d217f02728e04e8e7fbb5a080b7cb9b",
+        "potluck_local/contributor/inference.py": "7b6ad2e05445117a6737001202263f589708084421396a567c6bc0c06da1832a",
+        "potluck_local/contributor/keys.py": "63689501ff7cc3c4d3037867d6429044bfc13e566b13eeafa81ab4042492eb7a",
+        "potluck_local/contributor/release.py": "068fd58fa8b9227e17b28588fb3fbd690c8a560c563c6036a502dcbfb3f83e99",
+        "potluck_local/contributor/schemas.py": "14c5e129e1dadd2d91060ab4a895e61426eaf82a80162a5a5ccf7889e38cd104",
+        "potluck_local/contributor/telemetry.py": "99bd3d4a48046d6d5810f0b83935081b053ced7853807aaea433c911a57f45d8",
+        "potluck_local/data/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/mcp/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/mcp/__main__.py": "8fad7678fd00fe812711ff6ca12bccaa8e85c47db7c0061b649ca35c7a3afdb6",
+        "potluck_local/mcp/schemas.py": "559b03cf1a401328f0825b406591fad9c05fe482431a92e8764d012c0fe0e6ba",
+        "potluck_local/mcp/server.py": "2005a8e8d7bcd24e473d9a1b2276a2f9dace66a32b39ae3ce6d8c5fcce9bca16",
+        "potluck_local/mcp/sniffers.py": "5a74202a78726b265fe97630c46a64b0865c184f3961e0516f34c8d2edaa8b04",
+        "potluck_local/mcp/tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/mcp/tools/evidence.py": "8e9300479101aafed8dbf2b166c634a6e5d9a5feef20b7669cfba33672a4b75f",
+        "potluck_local/mcp/tools/memory.py": "a1e7c8222da58c33cc9cd9502724442ad0515f0339ee15a5ec1224827f261753",
+        "potluck_local/mcp/tools/session.py": "195620923735167394d7c24c342fd1ea7600e7d17fac9507707f1687f48a04d4",
+        "potluck_local/mcp/tools/task.py": "47f216dfa66753a043ebecc05b27b02a276760aea2661d095e29976810cfcef2",
+        "potluck_local/routers/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/routers/account.py": "ff22ab6a065849d7026477516246f023f974020643d09ee532dbe3a10f6f7594",
+        "potluck_local/routers/agents.py": "6a83dc894550b7022bf1849590a6964f615dab9dd1cfac8aa929848f470989b8",
+        "potluck_local/routers/anthropic.py": "f751c33e09076d9e46c9995815946267287e9543e4d52fecc1b467a9e5403cbd",
+        "potluck_local/routers/batches.py": "352db0c956d23a68bdf258989da641e546aa977c3b2b8a82cbd638b03167a288",
+        "potluck_local/routers/chat.py": "a6b13196b1f0aa3c9a89a3347bff2085ac7631df6b50f70b1793579c8b9a5c7b",
+        "potluck_local/routers/chat_circle.py": "dc667362e18640fd7c82b255fc17cfff377a49905825c6f2bc954431e380a206",
+        "potluck_local/routers/circle_link.py": "86fc842bc3ae494bd58259e92bbc43dbeaed8a3ffa56770db6e3a7f7e21b5150",
+        "potluck_local/routers/circles.py": "e6e61dd8d9770515d11c6dde061b19d78b37fd5b54b54b58e4fdeb0af41d356b",
+        "potluck_local/routers/contributor.py": "385e88cfe621b2db51eff22d658e3b94c005111cf32f870953f626f475f6f5c1",
+        "potluck_local/routers/gateway.py": "9c254a95f95cfc7d88f5a4acf9cf368d148b44a4359feb4392c8ff5037d5824b",
+        "potluck_local/routers/hardware.py": "346a3cbda26dc35661926920407740feece93617286f6a80a2f1a412728bcbb7",
+        "potluck_local/routers/health.py": "818bf624bec5bd2201ad3e3811364385ba3920b9b3bf63d89e153ed733bdb64e",
+        "potluck_local/routers/investigations.py": "bbe0ff971e5eb1496bc71138281d0eb657d73987f2abe2672d93d00af81860f0",
+        "potluck_local/routers/memory.py": "ba68b0c25aeb9fff73759caf7e257fce4dea1d84a95b84a68ce49074ad7c8b5d",
+        "potluck_local/routers/models.py": "2b5c96ab4f85ca71d2ce8878d319628579cf95653bae4823f962cbde508fffa4",
+        "potluck_local/routers/ollama.py": "93808f02f5c5493a75aaadafe93b3ff5e32abc6a6a76d1557c03b408c779cc97",
+        "potluck_local/routers/peer.py": "e2ee25f4ebdc39a273a3eb6441d1c2f158491f63e1dbb2ef748b042c0fc929a8",
+        "potluck_local/routers/readiness.py": "6a7aeb1803f81a087219f2949ae6ce6fcd5c83da25a6a742e3c44f095afb8325",
+        "potluck_local/routers/responses.py": "94f3383fa1c88d87167c79756423cf9de6a46811fd563ea82bfd3c9dda5f1512",
+        "potluck_local/routers/settings.py": "8cde35ec9d0bb3aaa5699dd46ccc3e50c8761b1e9b7dd514ac7c86e3b0bb0669",
+        "potluck_local/routers/split.py": "2fd635b9f2f2b99ca78aa757cca41631f31a8f760a5ee26422f8a23c12833003",
+        "potluck_local/routers/tasks.py": "c69f213c0110ab3878c21b3abd3162ac6f23f79b4e7ae069e7b3021e02f30030",
+        "potluck_local/routers/usage.py": "74abd331821f563dcad7880db3f02d0eb5b84816fa09679894863f93f9e8c716",
+        "potluck_local/routers/vault.py": "c87ed2d07f40a1c8374920c7b106006ae9002bf4fc0bbab7810695d9f73a01d8",
+        "potluck_local/routers/verify.py": "219261be9327c9d39a7e0cd57c9d2995f4295a4f195a949931e09d011cf4f2c7",
+        "potluck_local/runtime_control.py": "a5058bd12360a707a570d661ab18a4864c98eb66b36213180bbb6537dff7be9d",
+        "potluck_local/services/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/services/acceptance.py": "c94ea580515986fc23769b09f7d7a6bf9d6a3173af67f67be7f019660ae0213a",
+        "potluck_local/services/acceptance_gates.py": "adf7ebcc96f35c125c47db6b905913f0d20a9124bda046759b99e7307ad0dad2",
+        "potluck_local/services/agent_connectors.py": "c7c0faf6d94b135ab29408735cfd6e0cc2641fda4a1fc449863f3c5b0edf17f0",
+        "potluck_local/services/agent_observability.py": "6811b9259223dfa4b790f1518296d2c15310bf805a8b2e42fa1ba5a7fc0a5654",
+        "potluck_local/services/ai_contracts.py": "65e487ec49f9a67b06117cd29037d9edb0226b23cf9de752211739427c68c045",
+        "potluck_local/services/anthropic_messages.py": "5b0cdc0eebe5125dc82e828b0bc0fd4c6ba1862320b5ee54873c73d8d8b28bd5",
+        "potluck_local/services/batch_jobs.py": "8c3804edbaf3952059383ea9eee58488f63f09aebb83ff2e4db656eb59ec1171",
+        "potluck_local/services/catalog_feed.py": "275a54391ece588d4e0f0fd936e64754bcc7930d975c5a0150ffec8c10779b2a",
+        "potluck_local/services/circle_gate.py": "56c3bc474eac2db06b5a87c52ed344f9a6f8bb2171ce4b085272df8874ad318c",
+        "potluck_local/services/circle_link.py": "0e9b21f70f9c721f624919b5eaee3806253e8b4a1ba27d5cf240bad5038a7d57",
+        "potluck_local/services/circle_listener.py": "0c0d81af055ea77af752dfab22312571324d107a8cf664a64448842dec4fce08",
+        "potluck_local/services/circle_mesh.py": "60aecaaea61ae61fbfa4944e7fafe75a46622d66688b68eb237e8299b27a1df8",
+        "potluck_local/services/company_brain_eval_runner.py": "f942e4437141043fbc9f39d81996c309b46d4b5e90d8d1374a0a0c3a67acc542",
+        "potluck_local/services/company_brain_grounding_runner.py": "96f6a4c1758ebe179a0bc68281b505fda229561169033096abaf3cb432661738",
+        "potluck_local/services/context_manager.py": "6d8132fe299f080cc87fb01e399eb0e65ab83facb7b55b9bb097e488642dc5dd",
+        "potluck_local/services/context_relevance.py": "1e0c6d83885ab3c3185f9da51e66e2a94c177507f12c555beca4559fd9a86c79",
+        "potluck_local/services/context_tuning.py": "077a46e6ff517c8949f75ab0d890fbe833ebdba2a5866934de98498f9e4fe8f4",
+        "potluck_local/services/continuous_batch.py": "39affc916a0018a756b8e14834f8235749339a65c685da8aeba91c7ae0969b40",
+        "potluck_local/services/contribution_policy.py": "91f6df4b75f2bcad25b0eab94e96614f16959922ee1b392f1ad8393912cf69ab",
+        "potluck_local/services/contributor_service.py": "7734254c5a1bb3f5d1c4be0b4788025b7cf3dcebf56f669706136487addf8251",
+        "potluck_local/services/driver_fingerprint.py": "616bf069dc48e12d1f240d061515e31ef911e0dbd2270fc1f4b8ee1444a8aad2",
+        "potluck_local/services/embedding_backfill.py": "63611dff0b30e6699ac1ecb1af114f758f765e10e9641d73b676357ae1f08406",
+        "potluck_local/services/embeddings.py": "00b365fe866b84ab5e23dcd4bbc95c9629ecf05e6eed35a9ef9d16665ab2527f",
+        "potluck_local/services/evidence_lookup.py": "4f70135b7e49ddb78ea6becf54e152306810ba9bd8495fc3d145ebeea890eac4",
+        "potluck_local/services/gateway_reply.py": "64ab789dd4058e97101a12a325ddaef1558986d4cbc295f9eb80ec6da4462f11",
+        "potluck_local/services/gateway_request.py": "2fc27995aba90b7d724f7e026742a1dc28abeaf3e0a744288e38d52fe1f94d57",
+        "potluck_local/services/gateway_routing.py": "e5d4cfcaaad8c30b7c620f73440bc6408a26f0c43c7021befff5ad4b34b3a6e7",
+        "potluck_local/services/gpu_probe.py": "47e911689cd952df52200f815e2ebdb4dd9522f48928274fe7af267d9709ca8d",
+        "potluck_local/services/hardware_detect.py": "a35bfaa14fc63c157466dc06220d800788c067e23b1dd55affe94ce54e45e8ed",
+        "potluck_local/services/inference_errors.py": "03e0cd971171b914719bfeda11223b7920b46c753f27a37f306f0f31bb8514a9",
+        "potluck_local/services/investigation_answers.py": "721ab39c08152fdb0de6e63805b4dc1de47c95674996da4a875edfbada3a1ce6",
+        "potluck_local/services/investigation_calculation_review.py": "8e4281d4bf7a6f0081202a8cd755b1017d66192d4040b7e80be714882eab07db",
+        "potluck_local/services/investigation_calculations.py": "08c72d013716fc71c2e62050f0baf880008b3f7cddaf47b430a51c7e49a0865d",
+        "potluck_local/services/investigation_complete_answers.py": "07145a964592a6ee21ffe2a465fb35f79e27ec646e3ef761641c84ff71514c1f",
+        "potluck_local/services/investigation_context.py": "6cb92556a22e1605dc1e49d08171d7ae2c17c9ccbdd410497f1ba5f631f8dfc5",
+        "potluck_local/services/investigation_evaluation.py": "416776959a09c1fdfa6fcbc743b7331d59cddd3f05dd5c135b9fdff789c9a969",
+        "potluck_local/services/investigation_explicit_operations.py": "a29d99312b7ea9f011771ca38c63694e40313539544f89558667fb6d14ce6172",
+        "potluck_local/services/investigation_operations.py": "00434ba77898de3a42648bc54065e5963a3538056b3fd95014aece8ae5ad7719",
+        "potluck_local/services/investigation_profiles.py": "3026262b454b602ef7316d44ebd665d2fa2a8ac6c73f6fb1b4d629b17a820760",
+        "potluck_local/services/investigation_quantities.py": "d85db7ab8f0d44576ba92090f3567b39d4d204045f6ccd9c80c984c0dd2805a9",
+        "potluck_local/services/investigation_quantities_v3.py": "25acb4c0aa354f4a3dbccc49c4847f8293ab7bf9758cad528bfcbf82d5f39b79",
+        "potluck_local/services/investigation_reviewed_operations.py": "79d1c75b7e188b4c637b6cdbe355f3e86ba4e0f08171b0e8280e4daf8b1b6004",
+        "potluck_local/services/investigations.py": "8f972c809b1284c8d1ad1f24cc9b120db4bbffa98c4725045709c9fe71d433cb",
+        "potluck_local/services/link_detect.py": "b10b2ba787864022473f9b14e34e65d3fc8d7ddd5d44034b22722b8775572c32",
+        "potluck_local/services/llama_backend.py": "bc0f246e0685858d93dba299ff7958c3260a03918afb71510a534959656442af",
+        "potluck_local/services/local_server.py": "9b3fc06280b6135689a3b31e7d10cf320f2e1055c9d5dbf2cc0751880568f402",
+        "potluck_local/services/managed_agents.py": "168a174b658d515d779a4698f3d5741ce30f754a145733f5f75c2232dd713f02",
+        "potluck_local/services/member_account.py": "b55e6dfae07bfdd36bb3834af1170f62350669071cf68cd726215fa00be61ceb",
+        "potluck_local/services/memory_clustering.py": "731b2083de06358a529bb28eb00d3f7be39aa8e1397fcafdc0906dc5dccff356",
+        "potluck_local/services/memory_db.py": "c625f0e2c1b3ae9a019280d276e06379e5c0e9738c49675e7f3fbe87fb3acfff",
+        "potluck_local/services/memory_extraction.py": "16b71eb4f9dfa80a5fbc678c79ba183064a51d284ed184fe91c9ceb4e41ec32d",
+        "potluck_local/services/memory_probe.py": "c06f902f7ebe7f1526bfc9b05e95ebe83aaae72a96ba856c28479c850f1f6623",
+        "potluck_local/services/memory_retrieval.py": "057eadc667574851a2823d68f654e65cb86670e327fc741089b2bf2ba9e278d2",
+        "potluck_local/services/memory_safety.py": "a99f033c3ea501c6435e1d5d261286ff5b23094869fb41200f0da91f5aa4ad45",
+        "potluck_local/services/mesh_ipc.py": "efc9d43009403e9ceac10b9a3453b8e4dd92bf21f3c436115c7c9f6b61379200",
+        "potluck_local/services/mesh_pipe.py": "a435f5ac154e1dc4a24b59197e4c385fa82c76cd109844c27427e5b5d6332b14",
+        "potluck_local/services/model_availability.py": "302b0f68ffdb76d36a6bbdac52361e970633364ddc0e61cc70234e8e4b477a19",
+        "potluck_local/services/model_downloader.py": "fee6a007e2a4facc97d934061b2872b1ff84283b74a17826bd6111598f87ef52",
+        "potluck_local/services/model_evidence.py": "e73a30dac56fe10469d98274d6c3f0ced38f6b9ce7de14c7f4b2a72a3c17429b",
+        "potluck_local/services/model_identity.py": "09983b0a5219d3a0a95b57a59734690917ae4bf2ea8fa7dfebfc330bb67378b1",
+        "potluck_local/services/model_lifecycle.py": "766b68d3818e8005b0dd6ac008f433624e4e7ea005c17421e6e5b0bc90c6e405",
+        "potluck_local/services/model_recipes.py": "3385a6e57762e8c3759e9eeaef71708849a2914d4989c5f8d87270866de6bf86",
+        "potluck_local/services/model_registry.py": "39a5472d6ddeeba6fb486cdad523e18fcf73723ca830fc74e80fa1805f29ea65",
+        "potluck_local/services/model_setup.py": "e1fe6c2f03de43ab3164e3afd004603208cb84d481e6569250a3b9fffafc54ec",
+        "potluck_local/services/model_traits.py": "d3fd8836d33f844f16e7e9564be7beab417af2fcbbfd5a6b866666deb786edbf",
+        "potluck_local/services/native_supervisor.py": "02b203a5b3f4bde59b4b394e37f7b9bbfdc29a7770d8b3b2386fc62e15a97706",
+        "potluck_local/services/peer_liveness.py": "fcc44540db2ebfd2beb3455d2d019db09b731eb8a494eba36a873d6a018152e0",
+        "potluck_local/services/peer_trust.py": "ea9655bd4df26c04fea5c5d6cb04b59623a65949174b73938421899ac49cb9e5",
+        "potluck_local/services/performance_status.py": "6643fdabdb9049a47834f52fd6286a0740ba9d8a9c433582d6ec9ad6ade3357b",
+        "potluck_local/services/pipeline_parallel.py": "1f0875146338da0d1910a3d6a8e330cb22d2bfd7c529c3fecd3f3540430659a9",
+        "potluck_local/services/pipeline_wire.py": "8cb0df316fd90d826c397b88023b224253d9c3ccf0b6f630cd461b81f7bbeb36",
+        "potluck_local/services/pool_routing.py": "42aa044afd17fe5dd631cb7292bd08ee095037b60451dfd0202f7a92eabd8099",
+        "potluck_local/services/prompt_cache.py": "f72d4e19cbb68e3662a74ba673eb31e9174e86ed0efe92b18abf6a879624c50c",
+        "potluck_local/services/prompt_guard.py": "bdce8ac7d22c9854e644d2a1f1cb0595b4e677639e365fb813cb837e277d7f09",
+        "potluck_local/services/reasoning_split.py": "59a82c239f40b8dc030b3e5bd62792e67a488ec6342a4be4f72c697fd35928af",
+        "potluck_local/services/remote_stream.py": "86e30e0d2930217eac98eabfe154fdf2b778acf884f9663342890ccfc5529f5b",
+        "potluck_local/services/responses_api.py": "cb91cf743c35f7f7c9aa255f87415bb188467d3b599173c3c21249fb98051b47",
+        "potluck_local/services/reviewed_knowledge.py": "cf4183f688ef99ac1cd907c4b6037dae321bf83c4aca8ed765e6c322d9d050ca",
+        "potluck_local/services/runtime.py": "a84426967db24af855e383c2efa1cba4602682769ffaadfcadcbb48646d223a2",
+        "potluck_local/services/sampling.py": "755c984482aeee6a82bb209b8ea10ff8664c696efb930bce02c241bdb73e656c",
+        "potluck_local/services/settings_manager.py": "077fd1238e83c01e2a6aa8e6d29ffc76295b22839d17707543820be41f59ffcf",
+        "potluck_local/services/source_collections.py": "0b1d7009b6ee11dc48db4107c5420e547bb7af3d21e065abb83bda867c5ed716",
+        "potluck_local/services/source_schema.py": "fc02d222d7ba104bb97ae538ea28d94e4efea361268a80e8f4c7ee9afb8c7d65",
+        "potluck_local/services/split_layout.py": "863edda4e6c803ebf35b131f71134661df41e74ac2fd2633b75f213359db7f1c",
+        "potluck_local/services/split_manager.py": "9052471fa9d6b828855f0b8f257eba1e3ec815d808bf4b6f3b6ce3698cfc7f44",
+        "potluck_local/services/split_memory.py": "405a25adf73d4495bb9251ecf5be782245a97768fbff24a11ba3e5596d165760",
+        "potluck_local/services/split_native.py": "3f73f728ae98d0ed4bb2ed505af761fe813ca0df9149d657409270aee8cc1303",
+        "potluck_local/services/task_state.py": "01b328f82edf6685537281c9aae03e0fdd281508001f76456c093428ebe25495",
+        "potluck_local/services/token_estimate.py": "2e8f36d68b0d326fe83fd968d3e3b92bb4e4b20cda1d38b2c2247869ba0eab0e",
+        "potluck_local/services/tool_calls.py": "461b5b90615d24b704948fffac5389bd6e526f84f2d084fc98bfbf4a084ae9c8",
+        "potluck_local/services/tool_markers.py": "93aaaac5619ee21b63ec70031f0d488a6431c9d5dcd0b52cacea55790cbc05b4",
+        "potluck_local/services/usage_dashboard.py": "39ebe49cc64a24825c5644f12d48ffeecc5ef7623d10a5f64db8e7d748e2cb90",
+        "potluck_local/services/usage_store.py": "3d5422a3ecf2b5f51cf4f0de285fee3a077c452caa33ef5fd4ab6c6748cbc523",
+        "potluck_local/services/vault_ingestion.py": "e380e095c9cae30c94042773928265695d4bfe5f660fd63f781aeb5dc46b2725",
+        "potluck_local/services/windows_gpu.py": "597708fa31911274e79c0cb1b7114126521fcb56bb1489b76fac2ee47601d461",
+        "potluck_local/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "potluck_local/utils/crypto.py": "a1db29ba16c147dbb60eb0f67431e54e36b6d132bf920d0ca1771eb9218332f2",
+        "potluck_local/utils/logging.py": "0df600a76b714a620d3309f46f4c8e2f60bfe6d7615f68aa4f024c3ab9b9c8ec",
+        "potluck_local/utils/paths.py": "3ce152634e91cc5108afc4bd9727b44aebc8d1d4e25d82434dd19dbea36e3359",
+        "potluck_local/utils/time.py": "162c451c767e7ff7179eccdbca242ff061faa0cb30025bb615764b198f5655d6"
+      },
+      "python": "3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.3.2)]",
+      "platform": "macOS-15.7.3-arm64-arm-64bit",
+      "llama_cpp_python": "0.3.23"
+    },
+    "fixture_sha256s": {
+      "manifest.json": "e721049f681da37a132e411ed1de261bc8284ce5bfb82254b7dc81ef02faadf4",
+      "rubric.json": "2b7b689480d02b64e97ba3f658757abc59038b491e572be6c57c68247742334d",
+      "sources/authority.md": "6eb5dd7567d68bc98b7c3f265298b54ec7d50bb744255df23c431cac004f6b05",
+      "sources/direction.md": "9b9498254a0717c714a150fc980e6488d65d0c52f5460a3bfd9497c8da54edce",
+      "sources/guide-gates.md": "19201559a79ef85fc1b8fac00a0a4f482db252c59104acad7a96e21f251fa514",
+      "sources/guide-intro.md": "600f3924a14e1e0828102772bb4e5e9a44d33104eabbb07c1c577a9b044b48da",
+      "sources/guide-pilot.md": "424bd7f0300321a0731b875cdab6fd1f34099ccb9bc779dc7a08d86c80a19543",
+      "sources/guide-review.md": "699bc009318dd85a3ed4672ac4de9f2915e89e297a8103770398c991042b07a8",
+      "sources/guide-workflow.md": "bc928d7d9f5fb965a06ffce34ba62e8ef5484cb837f1db24ed645b15f795358d",
+      "sources/missing.md": "e14223954cb66261cec3f3ce7b2eae9da5303ceeb2306a489aa7f2b7d943128e",
+      "sources/packaging.md": "598a1a7f106ce2b6aac093173a25769d460229bcc83584b86a1e2f8b843e1129",
+      "sources/progress.md": "d6af4a178457687cb54a63ee82f575b5abb3a377dab5e35484870974956d8be8",
+      "sources/qualification.md": "ffca1a45eb0e2f449770467537805ffdc9a13293ebee27a699ccb940ef3f5be9",
+      "sources/temporal.md": "0664cbe0e7df34e6cc01f922ec5ba311e64d0fe0996876c06e2b817a1e9a84b1",
+      "sources.json": "5ed26a995675e38d7015e9072389d74a8ff820bacfaba33479bec04e9daea8ed"
+    },
+    "retries": 0,
+    "assessment": null,
+    "evaluation_purpose": "consumed real-source diagnostic; not fresh holdout or controlled baseline comparison",
+    "retrieval_limitation": "Normal scoped lexical retrieval, context and result limits apply; no evidence is inserted or forced."
+  },
+  "metadata_checks": {
+    "raw_case_ids": true,
+    "fixture_hashes_match_metadata": true,
+    "version": true,
+    "plan_origin": true,
+    "model_sha": true,
+    "seed": true,
+    "retries": true,
+    "no_assessment": true,
+    "snapshot_path": true,
+    "snapshot_hashes": true,
+    "settings_match_fresh_v11": true,
+    "generation_profile_matches_fresh_v11": true,
+    "model_matches_fresh_v11": true,
+    "seed_matches_fresh_v11": true,
+    "retries_match_fresh_v11": true
+  },
+  "code_identity_check": {
+    "matches": true,
+    "expected_count": 152,
+    "recorded_count": 152,
+    "missing": [],
+    "extra": [],
+    "changed": []
+  },
+  "snapshot_files_mismatched": [],
+  "cases": {
+    "pilot-readiness": {
+      "status": "success",
+      "error": null,
+      "checks": {
+        "registered_allowed": true,
+        "retrieval_scope_retrieval-001.json": true,
+        "attached_source_0": true,
+        "attached_source_1": true,
+        "attached_source_2": true,
+        "attached_source_3": true,
+        "attached_source_4": true,
+        "attached_source_5": true,
+        "all_snippets_in_presented_content": true,
+        "paragraph_trace_rebuilt": true,
+        "snippets_rebuilt": true,
+        "v3_catalog_and_notices_rebuilt": true,
+        "answer_binding_0": true,
+        "part_binding_0_0": true,
+        "part_ordered_span_0_0": true,
+        "part_binding_0_1": true,
+        "part_ordered_span_0_1": true,
+        "part_binding_0_2": true,
+        "part_ordered_span_0_2": true,
+        "aggregate_derived_0": true,
+        "coverage_gaps_rebuilt": true
+      },
+      "errors": [],
+      "retrieval": [
+        {
+          "file": "retrieval-001.json",
+          "query": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+          "result": {
+            "workspace": "pilot-eval",
+            "scope": {
+              "collection_ids": [
+                "bfacd9d5-36da-4fcf-99a7-247537882cf9"
+              ]
+            },
+            "source_chunks": [
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "13e74a2b-ca6a-5935-bfca-9f0d8fc4b57a",
+                "revision_id": "fe337869-c540-5900-9284-783f3798084e",
+                "relative_path": "guide-review.md",
+                "updated_at": "2026-10-30T15:12:12.264846+00:00",
+                "chunk_id": "27da1b97-42a2-5b33-95c3-b2b47da67adf",
+                "anchor": "review-outcomes-and-reuse",
+                "heading": "Review, outcomes and reuse",
+                "content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:27da1b97-42a2-5b33-95c3-b2b47da67adf:fe337869-c540-5900-9284-783f3798084e"
+              },
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "fe4c56da-c8c1-51fb-8214-14caf57e4026",
+                "revision_id": "702bece5-b085-5a6c-a564-519abf9775ce",
+                "relative_path": "guide-intro.md",
+                "updated_at": "2026-10-30T15:12:12.264154+00:00",
+                "chunk_id": "8e9edb86-afce-564c-ab19-cb3addf760d7",
+                "anchor": "local-company-brain-evidence-and-review",
+                "heading": "Local Company Brain evidence and review",
+                "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:8e9edb86-afce-564c-ab19-cb3addf760d7:702bece5-b085-5a6c-a564-519abf9775ce"
+              },
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "59e376f9-66fa-59b7-8b6f-d8b5530bb086",
+                "revision_id": "025be140-9bc5-5612-90e8-648f84373e55",
+                "relative_path": "guide-workflow.md",
+                "updated_at": "2026-10-30T15:12:12.265541+00:00",
+                "chunk_id": "99a7215c-1263-550a-a9a3-889c6016a944",
+                "anchor": "intro",
+                "heading": "",
+                "content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:99a7215c-1263-550a-a9a3-889c6016a944:025be140-9bc5-5612-90e8-648f84373e55"
+              },
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "0356bffa-7b4a-52fe-9213-c0b9313ff1ac",
+                "revision_id": "e98aed4a-7052-580d-b101-69a89ec06d45",
+                "relative_path": "progress.md",
+                "updated_at": "2026-10-30T15:12:12.266451+00:00",
+                "chunk_id": "94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce",
+                "anchor": "intro",
+                "heading": "",
+                "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45"
+              },
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "6cbe5bf3-a6f7-5224-b538-ccc1e3d75e3e",
+                "revision_id": "6cabf279-a476-525d-89f4-2eb4673ea904",
+                "relative_path": "guide-gates.md",
+                "updated_at": "2026-10-30T15:12:12.263290+00:00",
+                "chunk_id": "2b8b72aa-072d-5a59-9733-73718efb6f09",
+                "anchor": "intro",
+                "heading": "",
+                "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904"
+              },
+              {
+                "collection_id": "bfacd9d5-36da-4fcf-99a7-247537882cf9",
+                "document_id": "0356bffa-7b4a-52fe-9213-c0b9313ff1ac",
+                "revision_id": "e98aed4a-7052-580d-b101-69a89ec06d45",
+                "relative_path": "progress.md",
+                "updated_at": "2026-10-30T15:12:12.266451+00:00",
+                "chunk_id": "9a3b66f4-bed8-5da1-b175-9202af950b0e",
+                "anchor": "october-29-checkpoint-source-input-review-local-experimental-mode-1",
+                "heading": "October 29 checkpoint — source input review, local experimental mode",
+                "content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:12:12.267696+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:9a3b66f4-bed8-5da1-b175-9202af950b0e:e98aed4a-7052-580d-b101-69a89ec06d45"
+              }
+            ],
+            "reviewed_claims": [],
+            "missing_evidence": [],
+            "limitations": [
+              "Results reflect indexed snapshots; disk changes need a rescan.",
+              "Word overlap does not establish relevance or entailment.",
+              "At most 200 candidates per evidence kind are examined.",
+              "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+            ],
+            "scope_status": {
+              "requested": 1,
+              "ready": 1,
+              "unavailable": 0,
+              "needs_rescan": 0
+            },
+            "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+            "truncated": false,
+            "retrieval_version": "v2",
+            "retrieval_trace": {
+              "candidate_limit_reached": false,
+              "preferred_chunks_per_document": 2,
+              "deprioritized_chunks": 0,
+              "result_omitted": 0,
+              "result_limit_reached": false
+            }
+          },
+          "query_term_coverage": {
+            "what": false,
+            "actually": true,
+            "ready": true,
+            "company": true,
+            "brain": true,
+            "pilot": true,
+            "remains": true,
+            "blocked": false,
+            "evidence": true,
+            "supports": false,
+            "that": false
+          },
+          "error": null
+        }
+      ],
+      "payloads": [
+        {
+          "issue": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+          "operations": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+              "operation": "answer"
+            }
+          ],
+          "snippets": [
+            {
+              "snippet_id": "S1",
+              "text": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n",
+              "relative_path": "guide-review.md",
+              "heading": "Review, outcomes and reuse"
+            },
+            {
+              "snippet_id": "S2",
+              "text": "2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n",
+              "relative_path": "guide-review.md",
+              "heading": "Review, outcomes and reuse"
+            },
+            {
+              "snippet_id": "S3",
+              "text": "3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n",
+              "relative_path": "guide-review.md",
+              "heading": "Review, outcomes and reuse"
+            },
+            {
+              "snippet_id": "S4",
+              "text": "4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n",
+              "relative_path": "guide-review.md",
+              "heading": "Review, outcomes and reuse"
+            },
+            {
+              "snippet_id": "S5",
+              "text": "\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+              "relative_path": "guide-review.md",
+              "heading": "Review, outcomes and reuse"
+            },
+            {
+              "snippet_id": "S6",
+              "text": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+              "relative_path": "guide-intro.md",
+              "heading": "Local Company Brain evidence and review"
+            },
+            {
+              "snippet_id": "S7",
+              "text": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n",
+              "relative_path": "guide-workflow.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S8",
+              "text": "\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n",
+              "relative_path": "guide-workflow.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S9",
+              "text": "\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes ",
+              "relative_path": "guide-workflow.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S10",
+              "text": "support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+              "relative_path": "guide-workflow.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S11",
+              "text": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n",
+              "relative_path": "progress.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S12",
+              "text": "  - potluck\n",
+              "relative_path": "progress.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S13",
+              "text": "  - company-brain\n",
+              "relative_path": "progress.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S14",
+              "text": "  - implementation\n---",
+              "relative_path": "progress.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S15",
+              "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+              "relative_path": "guide-gates.md",
+              "heading": ""
+            },
+            {
+              "snippet_id": "S16",
+              "text": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n",
+              "relative_path": "progress.md",
+              "heading": "October 29 checkpoint — source input review, local experimental mode"
+            },
+            {
+              "snippet_id": "S17",
+              "text": "\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does ",
+              "relative_path": "progress.md",
+              "heading": "October 29 checkpoint — source input review, local experimental mode"
+            },
+            {
+              "snippet_id": "S18",
+              "text": "not verify its authority.\n",
+              "relative_path": "progress.md",
+              "heading": "October 29 checkpoint — source input review, local experimental mode"
+            },
+            {
+              "snippet_id": "S19",
+              "text": "\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+              "relative_path": "progress.md",
+              "heading": "October 29 checkpoint — source input review, local experimental mode"
+            }
+          ],
+          "quantities": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "source_text": "1",
+              "value": "1",
+              "unit": ""
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "source_text": "2",
+              "value": "2",
+              "unit": ""
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S3",
+              "source_text": "3",
+              "value": "3",
+              "unit": ""
+            },
+            {
+              "id": "N4",
+              "snippet_id": "S4",
+              "source_text": "4",
+              "value": "4",
+              "unit": ""
+            }
+          ],
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:27da1b97-42a2-5b33-95c3-b2b47da67adf:fe337869-c540-5900-9284-783f3798084e",
+              "source_text": "one-shot; it is not a collaborative editor.",
+              "start": 435,
+              "end": 478,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:27da1b97-42a2-5b33-95c3-b2b47da67adf:fe337869-c540-5900-9284-783f3798084e",
+              "source_text": "one-shot; create a new investigation for a ",
+              "start": 175,
+              "end": 218,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:99a7215c-1263-550a-a9a3-889c6016a944:025be140-9bc5-5612-90e8-648f84373e55",
+              "source_text": "one of its underlying source chunks, not ju",
+              "start": 259,
+              "end": 302,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "2026-10-28\nupdated: 2026-10-29\nstatus: in-pr",
+              "start": 13,
+              "end": 57,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "10-28\nupdated: 2026-10-29\nstatus: in-progr",
+              "start": 18,
+              "end": 60,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "28\nupdated: 2026-10-29\nstatus: in-progress",
+              "start": 21,
+              "end": 63,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "2026-10-29\nstatus: in-progress\ntags:\n",
+              "start": 33,
+              "end": 70,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "10-29\nstatus: in-progress\ntags:\n",
+              "start": 38,
+              "end": 70,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "29\nstatus: in-progress\ntags:\n",
+              "start": 41,
+              "end": 70,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:9a3b66f4-bed8-5da1-b175-9202af950b0e:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "two-word units such as `support tickets`. O",
+              "start": 56,
+              "end": 99,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S19",
+              "citation_id": "source:9a3b66f4-bed8-5da1-b175-9202af950b0e:e98aed4a-7052-580d-b101-69a89ec06d45",
+              "source_text": "zero denominator is diagnosed only after inp",
+              "start": 278,
+              "end": 322,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "evidence_notices": []
+        }
+      ],
+      "paragraph_trace": {
+        "version": "paragraph-v1",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "split_blocks": 2,
+        "truncated": false
+      },
+      "snippet_count": 19,
+      "evidence_count": 6,
+      "spans": {
+        "R1": {
+          "offsets": [
+            [
+              0,
+              48
+            ],
+            [
+              50,
+              70
+            ],
+            [
+              76,
+              104
+            ]
+          ],
+          "gaps": [
+            "",
+            ", ",
+            ", and ",
+            ""
+          ]
+        }
+      },
+      "missing_evidence": null,
+      "evidence": [
+        {
+          "path": "guide-review.md",
+          "presented_content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+          "citation_id": "source:27da1b97-42a2-5b33-95c3-b2b47da67adf:fe337869-c540-5900-9284-783f3798084e"
+        },
+        {
+          "path": "guide-intro.md",
+          "presented_content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+          "citation_id": "source:8e9edb86-afce-564c-ab19-cb3addf760d7:702bece5-b085-5a6c-a564-519abf9775ce"
+        },
+        {
+          "path": "guide-workflow.md",
+          "presented_content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+          "citation_id": "source:99a7215c-1263-550a-a9a3-889c6016a944:025be140-9bc5-5612-90e8-648f84373e55"
+        },
+        {
+          "path": "progress.md",
+          "presented_content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+          "citation_id": "source:94387e85-0d4c-5f4f-a8c0-5f4060d2a7ce:e98aed4a-7052-580d-b101-69a89ec06d45"
+        },
+        {
+          "path": "guide-gates.md",
+          "presented_content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+          "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904"
+        },
+        {
+          "path": "progress.md",
+          "presented_content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+          "citation_id": "source:9a3b66f4-bed8-5da1-b175-9202af950b0e:e98aed4a-7052-580d-b101-69a89ec06d45"
+        }
+      ],
+      "brief": {
+        "questions": [
+          {
+            "id": "R1",
+            "text": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?"
+          }
+        ],
+        "answers": [
+          {
+            "question_id": "R1",
+            "status": "supported",
+            "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output. Source lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.\nSource lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.\nBefore a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output.",
+            "snippet_ids": [
+              "S15"
+            ],
+            "source_excerpts": [
+              {
+                "snippet_id": "S15",
+                "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904",
+                "quote": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core."
+              }
+            ],
+            "parts": [
+              {
+                "request_span": "What is actually ready for a Company Brain pilot",
+                "status": "supported",
+                "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output. Source lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.",
+                "snippet_ids": [
+                  "S15"
+                ],
+                "source_excerpts": [
+                  {
+                    "snippet_id": "S15",
+                    "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904",
+                    "quote": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core."
+                  }
+                ]
+              },
+              {
+                "request_span": "what remains blocked",
+                "status": "supported",
+                "text": "Source lifecycle UI, authenticated organizational access, larger-corpus performance and repeatable backup/recovery remain additional work. This implementation belongs to the free/open core.",
+                "snippet_ids": [
+                  "S15"
+                ],
+                "source_excerpts": [
+                  {
+                    "snippet_id": "S15",
+                    "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904",
+                    "quote": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core."
+                  }
+                ]
+              },
+              {
+                "request_span": "what evidence supports that?",
+                "status": "supported",
+                "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations, independently label citation support and unsupported answers, and measure review effort/time to accepted output.",
+                "snippet_ids": [
+                  "S15"
+                ],
+                "source_excerpts": [
+                  {
+                    "snippet_id": "S15",
+                    "citation_id": "source:2b8b72aa-072d-5a59-9733-73718efb6f09:6cabf279-a476-525d-89f4-2eb4673ea904",
+                    "quote": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "facts": [],
+        "prior_fixes": [],
+        "hypotheses": [],
+        "recommended_checks": [],
+        "model_uncertainties": []
+      }
+    },
+    "core-company": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "snippets do not match source context"
+      },
+      "checks": {
+        "registered_allowed": true,
+        "retrieval_scope_retrieval-001.json": true
+      },
+      "errors": [],
+      "retrieval": [
+        {
+          "file": "retrieval-001.json",
+          "query": "What is available in the free core versus the paid company offering, and what is still planned?",
+          "result": {
+            "workspace": "pilot-eval",
+            "scope": {
+              "collection_ids": [
+                "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e"
+              ]
+            },
+            "source_chunks": [
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "5f294f3e-8618-568c-b303-3a5e3097a270",
+                "anchor": "commitments-to-preserve",
+                "heading": "Commitments to preserve",
+                "content": "1. Preserve the existing MIT core and already-open functionality. Do not move existing open features behind a proprietary paywall to create a paid tier.\n2. Keep local inference, owned-machine execution, and the complete first Company Brain workflow useful without a subscription or mandatory hosted account for local use.\n3. Keep basic authentication, authorization enforcement, source restrictions, deletion, security fixes, provenance, and data export in the core. A free deployment must not be unsafe by design.\n4. Do not impose artificial seat, document, token, source, or owned-machine caps on the self-hosted core. Technical capacity and safety limits still apply. Managed services may have transparent resource limits tied to actual operating costs.\n5. Keep customer-created knowledge, evaluation datasets, run artifacts, and exportable configurations portable. Customers retain their rights to their data and created artifacts; underlying model and third-party license conditions still apply.\n6. No implicit upload of private sources, traces, or training examples. Customer content is not pooled for Potluck training without separate explicit authorization. Access for support is explicit and scoped.\n7. Core functionality does not depend on a paid control service remaining available. Permission checks remain enforced during a management outage or subscription lapse; inability to verify authorization fails closed.\n8. Describe the product accurately: an open-source core with commercial organizational software/services. Identify any future proprietary component clearly; source-visible proprietary software is not described as open source.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:5f294f3e-8618-568c-b303-3a5e3097a270:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "99c51440-11eb-5dd5-86f8-beb2e5322afc",
+                "anchor": "decision-and-status",
+                "heading": "Decision and status",
+                "content": "**Rob's decision, October 28, 2026: keep Potluck's core open source while pursuing funding.** Rob requested this detailed free-versus-paid map as the working direction for subsequent builds.\n\nThis note translates that decision into a product boundary. It is an internal build policy, not a published price list, signed customer commitment, or claim that every listed capability exists. The core decision is explicit; package names, charging unit, commercial module structure, and pilot gates below are implementation recommendations to validate through use and purchasing evidence.\n\n**Free core:** run useful AI on infrastructure you control, complete a cited investigation, review the outcome, retain reusable knowledge, and evaluate improvements yourself.\n\n**Paid company offering:** deploy, administer, monitor, govern, and improve that system across an organization with less operational work and a defined support relationship.\n\nCompany size does not determine whether the core is free. An enterprise may self-host the open core for commercial use. Payment buys additional software or services, not permission to use the existing MIT code at work. Free software does not include free hardware, electricity, third-party APIs, cloud hosting, or other people's computing capacity.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:99c51440-11eb-5dd5-86f8-beb2e5322afc:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "c2f9bd0d-275f-5daf-a6bc-5a4870643d2c",
+                "revision_id": "a211f531-73d3-50cd-9fa4-d1d0df04212e",
+                "relative_path": "guide-gates.md",
+                "updated_at": "2026-10-30T15:14:41.214703+00:00",
+                "chunk_id": "a878744f-0d32-5774-987c-77e5632bffab",
+                "anchor": "intro",
+                "heading": "",
+                "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:a878744f-0d32-5774-987c-77e5632bffab:a211f531-73d3-50cd-9fa4-d1d0df04212e"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "db5ba4be-b35b-5ac0-b8b4-edfbbc1ada02",
+                "revision_id": "5b0f16c6-3d00-53fb-81ff-88fb52b14ced",
+                "relative_path": "guide-intro.md",
+                "updated_at": "2026-10-30T15:14:41.215541+00:00",
+                "chunk_id": "79a60b9c-8d30-59bb-b420-ad6b6842633c",
+                "anchor": "local-company-brain-evidence-and-review",
+                "heading": "Local Company Brain evidence and review",
+                "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:79a60b9c-8d30-59bb-b420-ad6b6842633c:5b0f16c6-3d00-53fb-81ff-88fb52b14ced"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "f6f2e295-4ac7-5541-8a15-4900080eba40",
+                "revision_id": "2c9d9893-247c-551d-b281-6cb6e0b6f0cd",
+                "relative_path": "progress.md",
+                "updated_at": "2026-10-30T15:14:41.219438+00:00",
+                "chunk_id": "53de133f-314a-54ba-9c2e-73a01e0787cc",
+                "anchor": "intro",
+                "heading": "",
+                "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:53de133f-314a-54ba-9c2e-73a01e0787cc:2c9d9893-247c-551d-b281-6cb6e0b6f0cd"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "e77f6ce0-04a7-54a9-80fa-7125fa95e655",
+                "anchor": "exact-feature-boundary-2",
+                "heading": "Exact feature boundary",
+                "content": "| Area | Free and open core | Paid company offering | Reason a company might pay |\n| --- | --- | --- | --- |\n| Models and local clients | Desktop, CLI, local API, MCP, compatible local models, manual model selection and configuration. | Central approved-model catalog, organization rollout controls and fleet configuration. | Keep deployments consistent without manually configuring each machine. |\n| Owned compute and mesh | Pair approved machines; execute on selected owned infrastructure; core scheduling, queues and model-splitting implementations as they mature. No commercial-use fee or artificial owned-node cap. | Fleet enrollment campaigns, inventory, health monitoring, capacity reporting, coordinated upgrades and staged rollbacks. | Reduce ongoing administration across machines and sites. |\n| Sources and ingestion | Local collections, connector interfaces and connector implementations we release, manual configuration, updates/deletions, source versions, visible errors. | Managed connector configuration, centrally stored secret references, monitored sync schedules, failure alerts and supported connector operation. | Keep sources current without someone tending each deployment. |\n| Knowledge lifecycle | Raw evidence, proposed claims, human approval/correction, supersession, ownership metadata and history. | Organization-wide review queues, reviewer assignment, escalation rules and oversight reports. | Make shared maintenance accountable across departments. |\n| Investigations and handoffs | Cited briefs, uncertainty, source inspection, saved handoffs, accept/correct/reject, recorded outcomes and reuse. | Administer shared workflow templates and organizational rollout; operational reporting across workspaces. | Standardize a repeated workflow and see where it succeeds or needs attention. |\n| Workspace collaboration | Basic shared-workspace operation when implemented, manual member/role management, server-side scope enforcement and permission-preserving derived artifacts. | Directory-driven provisioning, group synchronization, delegated administration and centrally managed policy inheritance. | Avoid manual access administration as teams change. |\n| Identity and security | Local/device authentication, sessions and revocation, basic roles, supported transport protection, credential handling and security fixes. A basic standards-based login adapter belongs here when implemented. | SCIM/directory lifecycle automation, multi-directory configuration, organization-wide access review and policy administration. | Coordinate joiners, role changes, departures and oversight. SSO alone is not the business model. |\n| Access and action policies | Enforcement engine; source permissions; explicit routing scope; action allowlists; local human confirmation and denial of unauthorized work. | Central policy distribution, managed exceptions, multi-stage approval configuration and delegated policy ownership. | Apply and review consistent rules across deployments. Enforcement itself stays free. |\n| Audit and provenance | Local actor/action/source/model records, review history, security-relevant events and ordinary export. | Cross-deployment audit search, scheduled evidence reports, managed retention policies and external audit-log integrations. | Answer organization-wide oversight questions without assembling records by hand. |\n| Evaluation | Create/export cases, freeze holdouts, run local comparisons, inspect failures and record quality/cost/latency. | Scheduled fleet/workflow evaluations, regression alerts, approval-gated promotion and centralized comparisons. | Catch regressions routinely and coordinate releases. A user may automate the open CLI independently. |\n| Model improvement | Open evaluation formats and local improvement tools we build; manual candidate testing and loading, including adaptation only where justified. | Managed improvement jobs, versioned organizational approvals, monitored deployment and rollback. | Operate a repeatable improvement process rather than maintain scripts. No quality improvement is guaranteed. |\n| Backup, retention and portability | Export/import, documented backup/restore, local retention and deletion controls, customer-accessible data formats. | Managed backup scheduling, restore checks, retention administration and supported recovery procedures. | Reduce operational work and establish tested recovery practices. |\n| Hosting and deployment | Self-managed installation on supported customer hardware or infrastructure. | Supported private deployment and, later, optional managed infrastructure. Commercial management can run in the customer's environment. | Purchase deployment and operating convenience without requiring private data to move to Potluck's cloud. |\n| Support | Documentation, public issue reporting, community help and public security fixes. No response-time promise. | A defined supported configuration, onboarding scope, support hours and response commitments we can meet. | Have an accountable vendor for an operational dependency. |\n| External capacity | Open routing/client components retain their license; using one's own machines stays free. | Third-party capacity, hosted services or public-pool consumption may have separately disclosed charges under a future approved offer. | Buy actual resources. Tokens, rewards and public-pool pricing are separate unresolved work. |",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:e77f6ce0-04a7-54a9-80fa-7125fa95e655:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "18203cbd-b95d-5577-bcca-50c2264bade9",
+                "anchor": "first-offer-to-validate-1",
+                "heading": "First offer to validate",
+                "content": "**A bounded, supported private engineering-investigation pilot.** Buyer hypothesis: an engineering/platform leader responsible for an expensive recurring investigation and the system that supports it. A department inside a large enterprise is a valid starting customer.\n\n- One organization, one agreed workflow and supported deployment configuration, one approved model configuration, and one useful source integration or import path.\n- Deliver the cited brief → reviewer correction → recorded outcome → reusable knowledge/evaluation loop from the open core.\n- Add the minimum repeatable company operations: source/job health view, freshness/failure alerts, controlled configuration rollout and a defined support route. Implement these before promising them as available.\n- Include a documented install/upgrade/restore process and a short operating report. Authentication, workspace authorization, source lifecycle and export are prerequisites, including in the free core.\n- Agree baseline, success measures, scope, term and fee before a paid pilot begins. A paid pilot fee is a validation offer, not evidence of willingness to pay until a buyer accepts it.\n\nThe economic hypothesis is fewer hours gathering context and keeping the system working, with reviewable evidence and customer-controlled execution. The pilot must test both workflow usefulness and the reason to pay for company operations. Initial setup services can be scoped separately, but the business should converge on repeatable software and recurring operations rather than unlimited custom implementation.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:18203cbd-b95d-5577-bcca-50c2264bade9:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "8c8f1bfe-9381-5d0e-bd6c-7fff366221bf",
+                "anchor": "packages-and-charging-approach-1",
+                "heading": "Packages and charging approach",
+                "content": "Rob subsequently approved using these package names in the website preview, with **Core $0 and company plans by discussion**. Company and Enterprise remain marked planned/in development. Rob subsequently approved publication; website commit `20434d3` is live, including [pricing](https://trypotluck.ai/pricing). No numeric paid prices or checkout are authorized by this note.\n\n| Package | Offer | Packaging direction |\n| --- | --- | --- |\n| **Potluck Core** | Complete self-managed foundation and useful workflows, including the free column above. | $0 software license fee for the core. Individual and commercial organizational use permitted under its license. Customer supplies resources and operates it. |\n| **Potluck Company** | Commercial management software plus a bounded supported private deployment: source/job health, approved model/configuration rollout, organizational oversight and support as those capabilities are delivered. | Recurring subscription. Initial pricing hypothesis: base fee per managed deployment/organization with included managed capacity and explicit extra service/resource costs. Do not meter locally generated tokens or tax every reader of company knowledge. Price and unit must be tested against value and support cost. |\n| **Enterprise deployment options** | Directory automation, multi-site administration, offline management, advanced audit integrations and broader support requirements. | Expansion of the same company product, with a scoped commercial agreement. Build only when a credible deployment requires it. No automatic 24/7 SLA, compliance certification or custom infrastructure promise. |",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:8c8f1bfe-9381-5d0e-bd6c-7fff366221bf:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "550cc2a4-c11c-56b0-baa9-0630a46c01a1",
+                "anchor": "how-this-changes-the-build-plan-1",
+                "heading": "How this changes the build plan",
+                "content": "| Stage | Work and packaging | Gate |\n| --- | --- | --- |\n| Now: complete the first batch | All five deliverables in [[Potluck First Company Brain Build Batch]] are free core: source collections, reviewed knowledge/supersession, cited evidence lookup, investigation/handoff, review/evaluation. | Complete workflow and independent quality/scope checks. No billing or entitlement service dependency. |\n| Next: safe private pilot foundation | Authentication/authorization, source lifecycle, export/restore, reproducible deployment and one source integration belong in core where they provide baseline functionality. | Safe, repeatable operation; no customer multi-user rollout before authorization is enforced. |\n| First commercial increment | Company operations for that same supported configuration: monitored sources/jobs, centrally managed model/configuration changes and defined support. Keep additional admin workflows separate from core enforcement. | Independent repeat users and an accepted paid scope; demonstrate value and record support cost. |\n| Expansion | Directory lifecycle, policy administration, larger fleets, scheduled evaluation promotion and advanced audit integrations. | Buyer-backed operational need and evidence that the deployment can be supported sustainably. |\n| Later specialization | Managed adaptation and more ambitious model improvement, public-pool capacity or broader deployment options. | Measured task improvement or capacity need, viable cost, appropriate data rights and separate operational readiness. |",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:550cc2a4-c11c-56b0-baa9-0630a46c01a1:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              },
+              {
+                "collection_id": "eb92f7e4-aa4f-4336-84a5-a3e64b895a6e",
+                "document_id": "ab250f0a-bba8-5bf2-ae96-02d712ea144f",
+                "revision_id": "8705d1c0-92b7-5c86-a207-81af1f2300ac",
+                "relative_path": "packaging.md",
+                "updated_at": "2026-10-30T15:14:41.217815+00:00",
+                "chunk_id": "ad17f526-6dc4-5af9-b845-ea172453e0d8",
+                "anchor": "exact-feature-boundary-3",
+                "heading": "Exact feature boundary",
+                "content": "The boundary is additional administration and service responsibility. Shared knowledge, basic collaboration, model splitting, citations, human review, and useful local evaluations are not automatically paid just because a company uses them.",
+                "kind": "source_chunk",
+                "last_scan_at": "2026-10-30T15:14:41.219676+00:00",
+                "freshness": "recent",
+                "uncertainty": "Source text has not been reviewed.",
+                "citation_id": "source:ad17f526-6dc4-5af9-b845-ea172453e0d8:8705d1c0-92b7-5c86-a207-81af1f2300ac"
+              }
+            ],
+            "reviewed_claims": [],
+            "missing_evidence": [
+              "Result limit reached; matching evidence was omitted."
+            ],
+            "limitations": [
+              "Results reflect indexed snapshots; disk changes need a rescan.",
+              "Word overlap does not establish relevance or entailment.",
+              "At most 200 candidates per evidence kind are examined.",
+              "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+            ],
+            "scope_status": {
+              "requested": 1,
+              "ready": 1,
+              "unavailable": 0,
+              "needs_rescan": 0
+            },
+            "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+            "truncated": true,
+            "retrieval_version": "v2",
+            "retrieval_trace": {
+              "candidate_limit_reached": false,
+              "preferred_chunks_per_document": 2,
+              "deprioritized_chunks": 8,
+              "result_omitted": 3,
+              "result_limit_reached": true
+            }
+          },
+          "query_term_coverage": {
+            "what": false,
+            "available": true,
+            "free": true,
+            "core": true,
+            "versus": true,
+            "paid": true,
+            "company": true,
+            "offering": true,
+            "still": true,
+            "planned": true
+          },
+          "error": null
+        }
+      ],
+      "payloads": []
+    }
+  }
+}

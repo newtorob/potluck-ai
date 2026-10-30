@@ -1,0 +1,119 @@
+{
+  "sources": [
+    {
+      "file": "sources/harbor_a.md",
+      "sha256": "aab9a9da384e8418354b02bc4ffb963a0b734fb200c01d053c65ff62fc5fe2ea",
+      "kind": "synthetic",
+      "description": "Fictional Harbor working note 1."
+    },
+    {
+      "file": "sources/harbor_b.md",
+      "sha256": "1df8c216e23b877ee590df2c945df583a0ad257670b45b8662fadd72bddbf6a3",
+      "kind": "synthetic",
+      "description": "Fictional Harbor working note 2."
+    },
+    {
+      "file": "sources/harbor_c.md",
+      "sha256": "2170dc95b787ae58ffc8a9ba89d1d9cf196b5a7028465e31f9ec2a41077962c4",
+      "kind": "synthetic",
+      "description": "Fictional Harbor working note 3."
+    },
+    {
+      "file": "sources/cedar_a.md",
+      "sha256": "f8efd4e6b60d0934a002f7de2a4ceba9706c8651eef2745bbadb34fa9ea105b9",
+      "kind": "synthetic",
+      "description": "Fictional Cedar working note 1."
+    },
+    {
+      "file": "sources/cedar_b.md",
+      "sha256": "51b887644294aba559a12b83644de394b2426a6d0c0381d574aa67b6691d18cd",
+      "kind": "synthetic",
+      "description": "Fictional Cedar working note 2."
+    },
+    {
+      "file": "sources/cedar_c.md",
+      "sha256": "6c3419b42edea04eba7a0b99cdb169013e81f743796d0e715089b6968eb10ce1",
+      "kind": "synthetic",
+      "description": "Fictional Cedar working note 3."
+    },
+    {
+      "file": "sources/mosaic_a.md",
+      "sha256": "906b949ad9b430c1f3ed6b443a165ac69c860139ce7b8e9a49aff519f00a5578",
+      "kind": "synthetic",
+      "description": "Fictional Mosaic working note 1."
+    },
+    {
+      "file": "sources/mosaic_b.md",
+      "sha256": "32154a805a96a943b1168bf00e0e6bebe9066c66c307c567746ca9c97d71e781",
+      "kind": "synthetic",
+      "description": "Fictional Mosaic working note 2."
+    },
+    {
+      "file": "sources/mosaic_c.md",
+      "sha256": "899a1005b22b37490889f816f039292cc08ee5ebe7a8487ea8ec0d4f18ef6c89",
+      "kind": "synthetic",
+      "description": "Fictional Mosaic working note 3."
+    },
+    {
+      "file": "sources/atlas_a.md",
+      "sha256": "7856c2e27754a42ccef760b471db34e16fcad2244b0ce0c3784b4bcca4da60e4",
+      "kind": "synthetic",
+      "description": "Fictional Atlas working note 1."
+    },
+    {
+      "file": "sources/atlas_b.md",
+      "sha256": "db804f986b37e9a4dc0a2d99ed3198399fed5eae334ab14a983ec2eec2cd2231",
+      "kind": "synthetic",
+      "description": "Fictional Atlas working note 2."
+    },
+    {
+      "file": "sources/atlas_c.md",
+      "sha256": "c59076ab32346a6f9ff69fed18bd8901b85880f80e7d6aa9cd32423f4db887e4",
+      "kind": "synthetic",
+      "description": "Fictional Atlas working note 3."
+    },
+    {
+      "file": "sources/quill_a.md",
+      "sha256": "510d57af7c242e3d6fffaeb438b8308b54ddfee6f2e896fa0f6310898ffda18d",
+      "kind": "synthetic",
+      "description": "Fictional Quill working note 1."
+    },
+    {
+      "file": "sources/quill_b.md",
+      "sha256": "e4752b00e8ccf0fd2a167f5099006faa247b117ad1549144a170d8143b92f391",
+      "kind": "synthetic",
+      "description": "Fictional Quill working note 2."
+    },
+    {
+      "file": "sources/quill_c.md",
+      "sha256": "e803d31f469cd73cb4c257e5f8627403297d3214a48c53b782afebc039228544",
+      "kind": "synthetic",
+      "description": "Fictional Quill working note 3."
+    },
+    {
+      "file": "sources/birch_a.md",
+      "sha256": "fc6264d3cde401c860f15e3f15f20acbe7c7e8e179f6630e0d62f4cc344fe5d2",
+      "kind": "synthetic",
+      "description": "Fictional Birch working note 1."
+    },
+    {
+      "file": "sources/birch_b.md",
+      "sha256": "3e42326674de79d6e891632e705be28d33068288079644c015f1c51c17ed8968",
+      "kind": "synthetic",
+      "description": "Fictional Birch working note 2."
+    },
+    {
+      "file": "sources/birch_c.md",
+      "sha256": "ef041c460560337e6647c897ef9dc20d141553da702c990040d0173d530e1629",
+      "kind": "synthetic",
+      "description": "Fictional Birch working note 3."
+    },
+    {
+      "file": "sources/excluded_canary.md",
+      "sha256": "7c9c6d1d77d1e1c2f1090281578529b58aabb3273e661e742ff36c0f0760ada7",
+      "kind": "synthetic",
+      "description": "Excluded fictional canary; no case may access this file."
+    }
+  ],
+  "excluded_canary": "sources/excluded_canary.md"
+}

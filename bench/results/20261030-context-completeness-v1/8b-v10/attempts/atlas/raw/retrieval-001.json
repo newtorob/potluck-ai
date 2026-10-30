@@ -1,0 +1,82 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4"
+  ],
+  "query": "For Atlas Loom’s sample return program, who pays postage, what must be enclosed, and when is the credit issued?",
+  "limit": 10,
+  "kwargs": {},
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+        "document_id": "15f1e9e0-2e20-517b-821f-a2fb3437c9a9",
+        "revision_id": "89113cac-c5df-5f16-b6b8-d26a32bfdad2",
+        "relative_path": "sources/atlas_a.md",
+        "updated_at": "2026-10-30T14:56:20.200028+00:00",
+        "chunk_id": "7919eecf-62b0-5667-a3bf-a7e88f0cbf8c",
+        "anchor": "atlas-working-note-1",
+        "heading": "Atlas working note 1",
+        "content": "Atlas Loom pays the return postage for sample swatches in the program by\nsupplying a prepaid label. Customers do not need to purchase postage.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7919eecf-62b0-5667-a3bf-a7e88f0cbf8c:89113cac-c5df-5f16-b6b8-d26a32bfdad2"
+      },
+      {
+        "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+        "document_id": "7e082f07-c724-5239-8b31-ac098039346a",
+        "revision_id": "d5f6c93b-69e0-5a03-a278-7f140690dc18",
+        "relative_path": "sources/atlas_b.md",
+        "updated_at": "2026-10-30T14:56:20.202085+00:00",
+        "chunk_id": "9892c3ca-8344-5112-9439-5ee05be25f63",
+        "anchor": "atlas-working-note-2",
+        "heading": "Atlas working note 2",
+        "content": "Each sample return must include the printed order slip inside the parcel.\nThe cardboard sleeve is optional and can be reused.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9892c3ca-8344-5112-9439-5ee05be25f63:d5f6c93b-69e0-5a03-a278-7f140690dc18"
+      },
+      {
+        "collection_id": "c5dcdb17-2a84-422a-a689-4b2d2f18b3d4",
+        "document_id": "1691265a-3411-5593-8474-8335b6457806",
+        "revision_id": "9e230b1f-33be-5b69-9b51-1a2aeaa0a57d",
+        "relative_path": "sources/atlas_c.md",
+        "updated_at": "2026-10-30T14:56:20.203023+00:00",
+        "chunk_id": "8099ff81-1d2c-5c50-83c9-16548241ccb3",
+        "anchor": "atlas-working-note-3",
+        "heading": "Atlas working note 3",
+        "content": "A credit is issued after the returned swatches are checked in at the depot.\nSending a parcel alone does not immediately create a credit.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T14:56:20.203116+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8099ff81-1d2c-5c50-83c9-16548241ccb3:9e230b1f-33be-5b69-9b51-1a2aeaa0a57d"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

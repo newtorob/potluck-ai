@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6f65aa48-3a55-44ff-9e37-0b8dd889279b",
+  "object": "chat.completion",
+  "created": 1793372139,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S20\", \"S21\", \"S1\", \"S10\", \"S11\"], \"text\": \"For Mosaic Orchard’s frost alert service, the alert is triggered when the orchard probe records two readings below 1°C at least ten minutes apart. The alert is sent to the grower’s registered phone by text. After receiving an alert, the grower is expected to inspect the irrigation valves before deciding whether to run sprinklers. The service does not turn the valves on.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1337,
+    "completion_tokens": 124,
+    "total_tokens": 1461
+  }
+}
