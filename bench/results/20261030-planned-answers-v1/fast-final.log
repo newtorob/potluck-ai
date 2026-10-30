@@ -1,0 +1,265 @@
+✓ privacy invariants pass: 0 peer-bound leaks, 0 aggregate-response leaks, 0 contributor leaks, 0 relay leaks
+
+ RUN  v4.1.9 /Users/rob/Documents/potluck/apps/desktop/frontend
+
+(node:63547) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63543) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63546) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63541) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63542) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63544) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63540) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63545) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63539) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63554) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63555) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63556) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63558) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63557) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63559) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63560) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63561) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63562) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63564) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63563) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63565) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63566) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63567) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63568) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63569) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63570) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63571) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63573) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63572) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63574) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63575) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63576) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63577) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63578) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63579) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63580) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63581) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63582) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63583) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63584) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63585) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63586) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63587) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63588) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63591) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63592) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63590) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63589) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63593) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:63594) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  50 passed (50)
+      Tests  527 passed (527)
+   Start at  12:37:57
+   Duration  7.03s (transform 3.04s, setup 7.88s, import 6.86s, tests 9.70s, environment 28.31s)
+
+
+> potluck-ai-frontend@0.1.0 typecheck /Users/rob/Documents/potluck/apps/desktop/frontend
+> tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json
+
+
+ RUN  v3.2.6 /Users/rob/Documents/potluck/apps/cli
+
+ ✓ test/projectInstructions-entrypoint.test.ts (5 tests) 1513ms
+   ✓ reloads instructions on saved-session resume and refuses invalid refreshed files before inference  638ms
+ ✓ test/eval-harness.test.ts (26 tests) 1671ms
+   ✓ frozen fixture contracts (no model inference) > repo-edit-v1/booking: broken baseline fails visible and independent assertions; reference passes both  350ms
+ ✓ test/inference.test.ts (7 tests) 1639ms
+   ✓ bounds hung requests and rejects an old runtime before sending input  435ms
+   ✓ sends a single prompt to a named trusted circle and reports the gateway's reason when refused  469ms
+ ✓ test/benchmark.test.ts (81 tests) 1669ms
+ ✓ test/sessions.test.ts (5 tests) 568ms
+   ✓ the installed coding agent saves and resumes history without replaying old actions  502ms
+ ✓ test/cancellation-entrypoint.test.ts (2 tests) 1041ms
+   ✓ one-shot cancellation stops its active command  537ms
+   ✓ one-shot cancellation stops its active verify  503ms
+ ✓ test/command-cancellation.test.ts (5 tests) 875ms
+   ✓ command cancellation > kills a command and its TERM-resistant descendant  388ms
+   ✓ command cancellation > kills a configured check and its descendant  399ms
+ ✓ test/packaging.test.ts (5 tests) 666ms
+ ✓ test/native-entrypoint.test.ts (2 tests) 630ms
+   ✓ the installed CLI sends native controls, applies an approved edit, and verifies (bounded=false)  324ms
+   ✓ the installed CLI sends native controls, applies an approved edit, and verifies (bounded=true)  304ms
+ ✓ test/command-repeat-recovery.test.ts (6 tests) 440ms
+ ✓ test/verification-command-recovery.test.ts (13 tests) 3290ms
+   ✓ fixed verification after approved shell commands > keeps the four actual failure limit across command invalidations  516ms
+   ✓ fixed verification after approved shell commands > stops at four actual failures reached through deferred command checks  621ms
+   ✓ fixed verification after approved shell commands > reports verification pending when repeated nonzero commands stop the task  318ms
+ ✓ test/snapshot.test.ts (18 tests) 423ms
+ ✓ test/entrypoint.test.ts (17 tests) 3664ms
+   ✓ the installed agent selects the project pin ahead of global and shared model preferences  369ms
+   ✓ reports the actual outcome of a one-shot agent run: literal write verify  352ms
+stdout | test/tools.adversarial.test.ts > vector 4: creating files that do not exist yet > ESCAPE: write_file through a DANGLING symlink creates a file outside the workspace
+DANGLING-LINK ESCAPE
+  workspace root : /var/folders/96/9r6xmnz55cbgt04ywm7tn40c0000gn/T/potluck-adv-GSWJZg
+  tool returned  : error: path escapes the working directory: notes.md
+  gate subject   : (gate never called)
+  outside target : /var/folders/96/9r6xmnz55cbgt04ywm7tn40c0000gn/T/potluck-advout-OeQ4U6/vault/planted.txt
+  target content : (nothing outside)
+
+stdout | test/tools.adversarial.test.ts > vector 4: creating files that do not exist yet > ESCAPE: the same trick via a dangling chain whose hops run outside
+DANGLING-CHAIN ESCAPE
+  tool returned  : error: path escapes the working directory: doc.md
+  target content : (nothing outside)
+
+ ✓ test/acceptance.test.ts (67 tests) 738ms
+ ✓ test/tools.test.ts (45 tests) 231ms
+ ✓ test/bounded-repair.test.ts (12 tests) 248ms
+ ✓ test/usage.test.ts (17 tests) 348ms
+ ✓ test/tools.adversarial.test.ts (40 tests) 437ms
+ ✓ test/tools.confinement.test.ts (26 tests) 283ms
+ ✓ test/tools.read-file.test.ts (39 tests) 141ms
+ ✓ test/integration-proxy.test.ts (35 tests) 146ms
+ ✓ test/repomap.test.ts (8 tests) 82ms
+ ✓ test/truncated-generation.test.ts (11 tests) 194ms
+ ✓ test/projectInstructions.test.ts (18 tests) 84ms
+ ✓ test/native-agent.test.ts (17 tests) 64ms
+ ✓ test/agent.test.ts (41 tests) 92ms
+ ✓ test/repair-evidence.test.ts (7 tests) 95ms
+ ✓ test/model-lock.test.ts (15 tests) 55ms
+ ✓ test/mutation-completion.test.ts (12 tests) 82ms
+ ✓ test/config.test.ts (34 tests) 66ms
+ ✓ test/recovery.test.ts (39 tests) 105ms
+ ✓ test/tools.concurrent-writes.test.ts (10 tests) 35ms
+ ✓ test/tools.read-freshness.test.ts (9 tests) 48ms
+ ✓ test/diagnostics.test.ts (7 tests) 45ms
+ ✓ test/batch.test.ts (22 tests) 59ms
+ ✓ test/control.test.ts (8 tests) 62ms
+ ✓ test/quality.test.ts (23 tests) 64ms
+ ✓ test/runtime.test.ts (12 tests) 5174ms
+   ✓ shared runtime > waits for process exit after discovery is removed  318ms
+   ✓ shared runtime > waits for process exit after discovery is replaced  326ms
+   ✓ shared runtime > account commands start the engine in the background when none is running  2227ms
+   ✓ shared runtime > starts once under racing launchers, reattaches, and shuts down via real Python control  2219ms
+ ✓ test/project-diagnostics.test.ts (4 tests) 18ms
+ ✓ test/setup.test.ts (5 tests) 29ms
+ ✓ test/service.test.ts (5 tests) 17ms
+ ✓ test/logs.test.ts (5 tests) 42ms
+ ✓ test/member.test.ts (17 tests) 49ms
+ ✓ test/model-recipes.test.ts (41 tests) 12ms
+ ✓ test/member-session.test.ts (4 tests) 43ms
+ ✓ test/launch-opencode.test.ts (14 tests) 5369ms
+   ✓ OpenCode launcher > keeps every native-tool request on the pinned local route and cleans the isolated profile  583ms
+   ✓ OpenCode launcher > keeps every native-tool request on the pinned mine route and cleans the isolated profile  613ms
+   ✓ OpenCode launcher > stops failed readiness {"window":null} before starting OpenCode  372ms
+   ✓ OpenCode launcher > stops failed readiness {"window":8192} before starting OpenCode  325ms
+   ✓ OpenCode launcher > stops failed readiness {"badCall":true} before starting OpenCode  419ms
+   ✓ OpenCode launcher > stops failed readiness {"badResult":true} before starting OpenCode  392ms
+   ✓ OpenCode launcher > stops failed readiness {"inferred":true} before starting OpenCode  399ms
+   ✓ OpenCode launcher > stops failed readiness {"acknowledge":false} before starting OpenCode  421ms
+   ✓ OpenCode launcher > does not report a successful one-shot after a provider rejection {"changedWindow":8192}  548ms
+   ✓ OpenCode launcher > does not report a successful one-shot after a provider rejection {"upstreamStatus":503}  588ms
+   ✓ OpenCode launcher > treats a prompt beginning with a flag as literal text  674ms
+ ✓ test/contribute.test.ts (5 tests) 19ms
+ ✓ test/source-context.test.ts (11 tests) 5ms
+ ✓ test/gateway.test.ts (75 tests) 18ms
+ ✓ test/context.test.ts (21 tests) 14ms
+ ✓ test/tools.revalidation-cancellation.test.ts (2 tests) 26ms
+ ✓ test/model-recommendations.test.ts (11 tests) 6ms
+ ✓ test/model-setup.test.ts (26 tests) 19ms
+ ✓ test/args.test.ts (54 tests) 10ms
+ ✓ test/benchmark-stats.test.ts (46 tests) 7ms
+ ✓ test/relaxedJson.test.ts (10 tests) 4ms
+ ✓ test/split.test.ts (20 tests) 6ms
+ ✓ test/manage.test.ts (20 tests) 6ms
+ ✓ test/operational-setup.test.ts (4 tests) 5ms
+ ✓ test/measured-context.test.ts (7 tests) 10ms
+ ✓ test/prompt.test.ts (2 tests) 5ms
+ ✓ test/circle.test.ts (6 tests) 10ms
+ ✓ test/aider-context.test.ts (16 tests) 7ms
+ ✓ test/availability.test.ts (2 tests) 3ms
+ ✓ test/status.test.ts (4 tests) 7ms
+ ✓ test/ui.test.ts (3 tests) 2ms
+ ✓ test/launch-preflight.test.ts (22 tests) 8940ms
+   ✓ installed Aider launcher preflight > uses the exact pinned local route before project content and throughout the launch  494ms
+   ✓ installed Aider launcher preflight > uses the exact pinned mine route before project content and throughout the launch  496ms
+   ✓ installed Aider launcher preflight > derives Aider budgets from a 8192 loaded window and cleans temporary files  456ms
+   ✓ installed Aider launcher preflight > derives Aider budgets from a 32768 loaded window and cleans temporary files  515ms
+   ✓ installed Aider launcher preflight > refuses unknown loaded window before the readiness probe or Aider  318ms
+   ✓ installed Aider launcher preflight > refuses legacy runtime before the readiness probe or Aider  418ms
+   ✓ installed Aider launcher preflight > refuses too-small loaded window before the readiness probe or Aider  352ms
+   ✓ installed Aider launcher preflight > refuses different model before the readiness probe or Aider  382ms
+   ✓ installed Aider launcher preflight > refuses different scope before the readiness probe or Aider  360ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with missing DONE  381ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with missing native finish  509ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with legacy inferred finish  375ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with content filter  397ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with native tools  404ms
+   ✓ installed Aider launcher preflight > does not launch after a probe with empty output  398ms
+   ✓ installed Aider launcher preflight > accepts a nonempty output-limited synthetic probe that reaches DONE  401ms
+   ✓ installed Aider launcher preflight > blocks the first project request when loaded context changes to 4096, then cleans up  405ms
+   ✓ installed Aider launcher preflight > blocks the first project request when loaded context changes to null, then cleans up  429ms
+   ✓ installed Aider launcher preflight > reports a rejected one-shot request even when Aider itself exits zero  423ms
+   ✓ installed Aider launcher preflight > gives safe, actionable context conflict guidance and does not start Aider  331ms
+   ✓ installed Aider launcher preflight > gives safe, actionable probe conflict guidance and does not start Aider  341ms
+   ✓ installed Aider launcher preflight > gives safe, actionable HTTP probe conflict guidance and does not start Aider  353ms
+
+ Test Files  67 passed (67)
+      Tests  1228 passed (1228)
+   Start at  12:38:13
+   Duration  9.28s (transform 1.36s, setup 0ms, collect 4.14s, tests 41.77s, environment 7ms, prepare 3.36s)
+
+
+ RUN  v5.0.0 /Users/rob/Documents/potluck/web/landing
+
+
+ Test Files  9 passed (9)
+      Tests  44 passed (44)
+   Start at  12:38:24
+   Duration  1.12s (environment 64%, transform 24%, tests 6%, import 5%, worker 1%)
+

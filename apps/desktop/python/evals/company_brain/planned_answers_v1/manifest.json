@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "id": "harbor",
+      "question": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+      "sources": [
+        "sources/harbor_guide.md",
+        "sources/harbor_limits.md",
+        "sources/harbor_roadmap.md"
+      ],
+      "plan": [
+        {
+          "request": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "orchard",
+      "question": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+      "sources": [
+        "sources/orchard_receipt.md",
+        "sources/orchard_approval.md",
+        "sources/orchard_payment.md"
+      ],
+      "plan": [
+        {
+          "request": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "lumen",
+      "question": "What are the eligibility rules and process for Lumen\u2019s customer credit, and how is the credit applied and tracked?",
+      "sources": [
+        "sources/lumen_policy.md",
+        "sources/lumen_process.md",
+        "sources/lumen_billing.md"
+      ],
+      "plan": [
+        {
+          "request": "What are the eligibility rules and process for Lumen\u2019s customer credit, and how is the credit applied and tracked?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "cedar",
+      "question": "When will Cedar\u2019s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+      "sources": [
+        "sources/cedar_launch_note.md",
+        "sources/cedar_product_update.md",
+        "sources/cedar_operations_update.md"
+      ],
+      "plan": [
+        {
+          "request": "When will Cedar\u2019s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "maple",
+      "question": "What is Maple\u2019s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+      "sources": [
+        "sources/maple_pipeline.md",
+        "sources/maple_process.md",
+        "sources/maple_snapshot.md"
+      ],
+      "plan": [
+        {
+          "request": "What is Maple\u2019s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "quartz",
+      "question": "How did Quartz\u2019s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+      "sources": [
+        "sources/quartz_first.md",
+        "sources/quartz_second.md",
+        "sources/quartz_context.md"
+      ],
+      "plan": [
+        {
+          "request": "How did Quartz\u2019s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+          "operation": "difference"
+        }
+      ]
+    }
+  ]
+}

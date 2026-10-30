@@ -1,0 +1,43 @@
+{
+  "case_ids": [
+    "pilot-readiness",
+    "core-company"
+  ],
+  "assessment": null,
+  "outputs": {
+    "pilot-readiness": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Investigation generation timed out"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 240.41862791683525,
+      "setup_seconds": 0.02726004086434841,
+      "attempt_total_seconds": 240.4458879576996,
+      "finished_at": "2026-10-30T15:54:24.131618+00:00"
+    },
+    "core-company": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Investigation generation timed out"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 255.0963663328439,
+      "setup_seconds": 0.05332233291119337,
+      "attempt_total_seconds": 255.1496886657551,
+      "finished_at": "2026-10-30T15:58:39.294756+00:00"
+    }
+  }
+}

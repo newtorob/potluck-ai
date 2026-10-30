@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "4e555aec-94a1-4811-afa6-05cfb22f5b3b",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v11/attempts/orchard/raw/allowed",
+  "files": {
+    "sources/orchard_receipt.md": "d77fdd7eaaee65877cdf950087c621200e116bf530370fab0294293f5f6efcc1",
+    "sources/orchard_approval.md": "98755280155beb55e9bedde5c99466c35df6457a56771f809ab9ad7feccacc5d",
+    "sources/orchard_payment.md": "2065243c041c3de3bbc0ada1cc37bf6e1176c95aff73b562f03c856a451cf9fd"
+  },
+  "scan": {
+    "collection_id": "4e555aec-94a1-4811-afa6-05cfb22f5b3b",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "4e555aec-94a1-4811-afa6-05cfb22f5b3b"
+  ],
+  "excluded_canary": {
+    "collection_id": "a1b6cf75-4447-4451-bb61-f0a551166fae",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v11/attempts/orchard/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "a1b6cf75-4447-4451-bb61-f0a551166fae",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

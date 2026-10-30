@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "431baa6e-4324-4c54-8d9c-d7c0c18f57d2",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/cedar/raw/allowed",
+  "files": {
+    "sources/cedar_launch_note.md": "88044628fc66ee5efdfd8b57145307f5b6eb73cace809cbad45d18a7f71ea820",
+    "sources/cedar_product_update.md": "9ed9fb5bec751d6eeea34d4e117eee13f69bb2e7fb102514960b5b0f8b6e785c",
+    "sources/cedar_operations_update.md": "ef9301212482e44747f97128ada95dbe5ba3e948c0279264c3172bc48a98d418"
+  },
+  "scan": {
+    "collection_id": "431baa6e-4324-4c54-8d9c-d7c0c18f57d2",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "431baa6e-4324-4c54-8d9c-d7c0c18f57d2"
+  ],
+  "excluded_canary": {
+    "collection_id": "248845f8-e926-4cf4-b04a-2db54bc6a075",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/cedar/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "248845f8-e926-4cf4-b04a-2db54bc6a075",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

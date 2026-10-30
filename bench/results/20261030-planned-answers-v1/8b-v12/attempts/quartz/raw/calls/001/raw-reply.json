@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e34a7f7d-52da-496f-ba5b-e63e68830308",
+  "object": "chat.completion",
+  "created": 1793377816,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"unsupported\", \"reason\": \"The source text does not provide enough information to calculate the change in average onboarding time. The quantities for the first and second periods are not fully extracted, and the exact values for the average onboarding times are not provided.\",\"minuend_id\": \"unavailable\", \"subtrahend_id\": \"unavailable\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [\"S1\", \"S3\"], \"limitation_basis\": \"not_established\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1276,
+    "completion_tokens": 129,
+    "total_tokens": 1405
+  }
+}

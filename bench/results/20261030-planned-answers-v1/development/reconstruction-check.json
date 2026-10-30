@@ -1,0 +1,14 @@
+{
+  "candidate-dev1": {
+    "apply_exit": 0,
+    "stderr": "",
+    "production_files": 153,
+    "mismatches": []
+  },
+  "candidate-dev2": {
+    "apply_exit": 0,
+    "stderr": "",
+    "production_files": 153,
+    "mismatches": []
+  }
+}

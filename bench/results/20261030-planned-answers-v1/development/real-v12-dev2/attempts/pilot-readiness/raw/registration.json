@@ -1,0 +1,21 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "5aedfb7a-0e81-4aec-b68c-b0672f8d63b4",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/development/real-v12-dev2/attempts/pilot-readiness/raw/allowed",
+  "files": {
+    "guide-intro.md": "600f3924a14e1e0828102772bb4e5e9a44d33104eabbb07c1c577a9b044b48da",
+    "guide-workflow.md": "bc928d7d9f5fb965a06ffce34ba62e8ef5484cb837f1db24ed645b15f795358d",
+    "guide-review.md": "699bc009318dd85a3ed4672ac4de9f2915e89e297a8103770398c991042b07a8",
+    "guide-gates.md": "19201559a79ef85fc1b8fac00a0a4f482db252c59104acad7a96e21f251fa514",
+    "qualification.md": "ffca1a45eb0e2f449770467537805ffdc9a13293ebee27a699ccb940ef3f5be9",
+    "progress.md": "d6af4a178457687cb54a63ee82f575b5abb3a377dab5e35484870974956d8be8"
+  },
+  "scan": {
+    "collection_id": "5aedfb7a-0e81-4aec-b68c-b0672f8d63b4",
+    "files_scanned": 6,
+    "files_added": 6,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 10
+  }
+}

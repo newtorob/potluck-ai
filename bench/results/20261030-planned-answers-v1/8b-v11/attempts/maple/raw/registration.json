@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v11/attempts/maple/raw/allowed",
+  "files": {
+    "sources/maple_pipeline.md": "039146d09f29af6b1d789398c550841de71fa2a1f628c0831e8b3a95507b3145",
+    "sources/maple_process.md": "49474755310fb34f7427c9acb4690829483acdb2240e4ce6a1530cf52fc80639",
+    "sources/maple_snapshot.md": "7f0d74554d197191f33dc5e99e0ba72f015e5d7b42fef00e119a86f28e7062ea"
+  },
+  "scan": {
+    "collection_id": "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc"
+  ],
+  "excluded_canary": {
+    "collection_id": "8abb8fb6-188e-4441-81dd-23f8ecdfb65a",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v11/attempts/maple/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "8abb8fb6-188e-4441-81dd-23f8ecdfb65a",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

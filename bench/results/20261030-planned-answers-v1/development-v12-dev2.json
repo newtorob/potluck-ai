@@ -1,0 +1,27 @@
+{
+  "scope": "Consumed real-source development cases, separate from fresh evaluation",
+  "denominator": 2,
+  "rubric_pass_cases": 0,
+  "cases": {
+    "pilot-readiness": {
+      "status": "error",
+      "error": "Investigation generation timed out",
+      "failure_stage": "inference_or_validation",
+      "rubric_pass": false,
+      "text_complete": false,
+      "attached_support": false,
+      "answer_status": null,
+      "reason": "No final answer or attached excerpts returned; all required facets fail. No forbidden claim can be observed in a nonexistent answer."
+    },
+    "core-company": {
+      "status": "error",
+      "error": "Investigation generation timed out",
+      "failure_stage": "inference_or_validation",
+      "rubric_pass": false,
+      "text_complete": false,
+      "attached_support": false,
+      "answer_status": null,
+      "reason": "No final answer or attached excerpts returned; all required facets fail. No forbidden claim can be observed in a nonexistent answer."
+    }
+  }
+}

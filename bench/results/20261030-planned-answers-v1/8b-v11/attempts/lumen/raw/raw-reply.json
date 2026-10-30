@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f3b2b9ed-1896-459e-b6fd-217064939856",
+  "object": "chat.completion",
+  "created": 1793376940,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.\",\"status\": \"supported\", \"request_span\": \"What are the eligibility rules and process for Lumen’s customer credit\"}, {\"snippet_ids\": [\"S3\", \"S4\"], \"text\": \"A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later.\", \"status\": \"supported\", \"request_span\": \"and how is the credit applied and tracked?\"}, {\"snippet_ids\": [\"S5\", \"S6\"], \"text\": \"Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.\", \"status\": \"supported\", \"request_span\": \"and how is the credit applied and tracked?\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1434,
+    "completion_tokens": 368,
+    "total_tokens": 1802
+  }
+}

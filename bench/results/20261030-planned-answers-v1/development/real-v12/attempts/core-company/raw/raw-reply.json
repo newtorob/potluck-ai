@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4d7c7213-fb95-48df-9154-b4d83750ed6d",
+  "object": "chat.completion",
+  "created": 1793375664,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"What is available in the free core versus the paid company offering\", \"and what is still planned?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 108,
+    "completion_tokens": 26,
+    "total_tokens": 134
+  }
+}

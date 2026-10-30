@@ -8,12 +8,16 @@ MAX_SNIPPETS = 100
 MAX_QUOTE_LENGTH = 500
 
 
-def snippets_from_evidence(evidence: list[dict[str, Any]]) -> tuple[list[dict[str, str]], dict[str, Any]]:
+def snippets_from_evidence(evidence: list[dict[str, Any]], *, version: str = 'paragraph-v1') -> tuple[list[dict[str, str]], dict[str, Any]]:
     """Return contiguous substrings and explicit truncation information.
 
     A single newline inside prose stays in its paragraph. Blank lines and list
     markers mark boundaries; long blocks split at whitespace when possible.
     """
+    if version == 'paragraph-v2':
+        return _snippets_v2(evidence)
+    if version != 'paragraph-v1':
+        raise ValueError(f'Unknown paragraph version: {version}')
     sources: dict[str, str] = {}
     for record in evidence:
         children = record['sources'] if record['kind'] == 'reviewed_claim' else [record]
@@ -61,3 +65,53 @@ def snippets_from_evidence(evidence: list[dict[str, Any]]) -> tuple[list[dict[st
                       'max_quote_length': MAX_QUOTE_LENGTH,
                       'omitted_snippets': omitted, 'split_blocks': split_blocks,
                       'truncated': omitted > 0}
+
+
+def _snippets_v2(evidence: list[dict[str, Any]]) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    sources: dict[str, str] = {}
+    for record in evidence:
+        children = record['sources'] if record['kind'] == 'reviewed_claim' else [record]
+        for child in children:
+            cid = child['citation_id']
+            content = child.get('presented_content', '')
+            if len(content) > len(sources.get(cid, '')):
+                sources[cid] = content
+
+    snippets: list[dict[str, str]] = []
+    omitted = omitted_characters = split_blocks = whitespace_only_characters = 0
+    for cid, content in sources.items():
+        if not content.strip():
+            whitespace_only_characters += len(content)
+            continue
+        boundaries = [0]
+        in_fence = False
+        for match in re.finditer(r'(?m)^.*(?:\n|$)', content):
+            line = match.group()
+            if not line:
+                continue
+            if line.lstrip().startswith(('```', '~~~')):
+                in_fence = not in_fence
+            elif not in_fence and match.start() > boundaries[-1]:
+                if not line.strip() or re.match(r'\s*(?:[-*+]\s+|\d+[.)]\s+)', line):
+                    boundaries.append(match.start())
+        boundaries.append(len(content))
+        for start, stop in zip(boundaries, boundaries[1:]):
+            while start < stop:
+                end = min(start + MAX_QUOTE_LENGTH, stop)
+                if end < stop:
+                    split_blocks += 1
+                    spaces = list(re.finditer(r'\s+', content[start:end]))
+                    if spaces:
+                        end = start + spaces[-1].end()
+                if len(snippets) < MAX_SNIPPETS:
+                    snippets.append({'snippet_id': f'S{len(snippets) + 1}',
+                                     'citation_id': cid, 'quote': content[start:end]})
+                else:
+                    omitted += 1
+                    omitted_characters += end - start
+                start = end
+    return snippets, {'version': 'paragraph-v2', 'max_snippets': MAX_SNIPPETS,
+                      'max_quote_length': MAX_QUOTE_LENGTH, 'omitted_snippets': omitted,
+                      'omitted_characters': omitted_characters,
+                      'whitespace_only_characters': whitespace_only_characters,
+                      'split_blocks': split_blocks, 'truncated': omitted > 0}

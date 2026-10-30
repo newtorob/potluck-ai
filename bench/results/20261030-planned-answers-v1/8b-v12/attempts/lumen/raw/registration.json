@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "a019804f-2003-46b6-8d18-e07679db3308",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/lumen/raw/allowed",
+  "files": {
+    "sources/lumen_policy.md": "ac9b31582929d44921592c3fad9a9b2108682ddfff2ecb00b089455ac5982e3d",
+    "sources/lumen_process.md": "e184377a8fbe4fda5fb4303f52b84b82c6700c9a3f9bd07ee8106fadea6305a1",
+    "sources/lumen_billing.md": "d8d04c301e447e089f39895769df8c04d50d376d8671ad315c0c712037924fab"
+  },
+  "scan": {
+    "collection_id": "a019804f-2003-46b6-8d18-e07679db3308",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "a019804f-2003-46b6-8d18-e07679db3308"
+  ],
+  "excluded_canary": {
+    "collection_id": "9682a6ef-d071-4751-acf4-fe75d4ca7947",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/lumen/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "9682a6ef-d071-4751-acf4-fe75d4ca7947",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

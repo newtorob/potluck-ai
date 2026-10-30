@@ -1,0 +1,350 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "d9d66ef0-a00c-4782-9622-d7e89eef9800",
+    "workspace": "pilot-eval",
+    "issue": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "conflicting",
+          "text": "The approval field is blank in the draft timetable note (S1), and the separate timetable note does not identify the approver (S3). The collection does not contain a signed approval record (S5).\nThe first departure time is 06:40 in one draft (S1) and 07:10 in another note (S3).",
+          "snippet_ids": [
+            "S1",
+            "S3",
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+              "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+              "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+              "quote": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n"
+            }
+          ],
+          "parts": [
+            {
+              "request_span": "approved Quill Ferry’s winter timetable",
+              "status": "unknown",
+              "text": "The approval field is blank in the draft timetable note (S1), and the separate timetable note does not identify the approver (S3). The collection does not contain a signed approval record (S5).",
+              "snippet_ids": [
+                "S1",
+                "S3",
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                  "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                  "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+                  "quote": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n"
+                }
+              ],
+              "id": "R1P1"
+            },
+            {
+              "request_span": "first departure time",
+              "status": "conflicting",
+              "text": "The first departure time is 06:40 in one draft (S1) and 07:10 in another note (S3).",
+              "snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                  "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                  "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+                }
+              ],
+              "id": "R1P2"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+        "document_id": "d93158e7-dc0a-5e44-bca5-5c904ddc22ec",
+        "revision_id": "cc6d7232-4500-56c1-98b2-5a8b15835eed",
+        "relative_path": "sources/quill_a.md",
+        "updated_at": "2026-10-30T15:58:58.902730+00:00",
+        "chunk_id": "6ec56296-7317-5492-937b-a2ec16109ffa",
+        "anchor": "quill-working-note-1",
+        "heading": "Quill working note 1",
+        "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+        "presented_content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+      },
+      {
+        "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+        "document_id": "13a8c381-525d-58df-80af-852bd223f807",
+        "revision_id": "ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+        "relative_path": "sources/quill_b.md",
+        "updated_at": "2026-10-30T15:58:58.903674+00:00",
+        "chunk_id": "14e37219-7c36-5cf1-9e8c-0dc0e34e5606",
+        "anchor": "quill-working-note-2",
+        "heading": "Quill working note 2",
+        "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+        "presented_content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+      },
+      {
+        "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+        "document_id": "2c7e2c87-cbcb-57a0-91a0-b690054245c3",
+        "revision_id": "6377b6a1-995d-5333-846c-c0b0c1427c64",
+        "relative_path": "sources/quill_c.md",
+        "updated_at": "2026-10-30T15:58:58.904328+00:00",
+        "chunk_id": "418f46cf-a918-58f5-a09a-e7c6f782fd86",
+        "anchor": "quill-working-note-3",
+        "heading": "Quill working note 3",
+        "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+        "presented_content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T16:00:42.642278+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v12",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 103724,
+      "created_at": "2026-10-30T16:00:42.642278+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified.",
+        "unmatched_request_text": {
+          "R1": [
+            "Who ",
+            ", and what is the ",
+            "?"
+          ]
+        }
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "request_span": "approved Quill Ferry’s winter timetable"
+          },
+          {
+            "id": "R1P2",
+            "request_span": "first departure time"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "request-spans-v1",
+      "answer_part_unmatched_text": {
+        "R1": [
+          "Who ",
+          ", and what is the ",
+          "?"
+        ]
+      },
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+          "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+          "quote": "\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+          "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+          "quote": "\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+          "quote": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+          "quote": "\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+          "source_text": "06:40. The\ndraft leaves the approval field",
+          "start": 61,
+          "end": 103,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+          "source_text": "40. The\ndraft leaves the approval field bl",
+          "start": 64,
+          "end": 106,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+          "source_text": "07:10 and does\nnot identify the approver. ",
+          "start": 62,
+          "end": 104,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+          "source_text": "10 and does\nnot identify the approver. Nei",
+          "start": 65,
+          "end": 107,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+          "source_text": "two times.\n",
+          "start": 154,
+          "end": 165,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "728c7cf0-37da-4118-b462-37456346f3d6"
+    ]
+  },
+  "latency_seconds": 103.73686704225838,
+  "setup_seconds": 0.029052416794002056,
+  "attempt_total_seconds": 103.76591945905238,
+  "finished_at": "2026-10-30T16:00:42.649482+00:00"
+}

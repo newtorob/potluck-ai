@@ -1,0 +1,100 @@
+{
+  "scope": "Consumed development cases only: two real-source cases and old Quill; not a fresh holdout.",
+  "independence": "No fresh fixture, production implementation, prompts or root scores inspected.",
+  "denominator": 3,
+  "rubric_pass_cases": 1,
+  "cases": {
+    "pilot-readiness": {
+      "status": "error",
+      "error": "Investigation generation timed out",
+      "failure_stage": "inference_or_validation",
+      "plan": "First call returned three topical plan spans. A plan is not an answer.",
+      "required_facets": [
+        {
+          "name": "local-owner workflow",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "experimental v9 qualification and interpretation",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "pilot gates and review effort",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "shared deployment authorization and operational gates remain",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "curated evidence and absence of measured owner acceptance/review time",
+          "text": false,
+          "attached_support": false
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "answer_status": null,
+      "extra_claim_concerns": []
+    },
+    "core-company": {
+      "status": "error",
+      "error": "Investigation generation timed out",
+      "failure_stage": "inference_or_validation",
+      "plan": "First call returned two topical plan spans. A plan is not an answer.",
+      "required_facets": [
+        {
+          "name": "MIT commercial core and first workflow",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "planned company offering, Core $0 and plans by discussion",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "local-owner status and remaining authorization",
+          "text": false,
+          "attached_support": false
+        },
+        {
+          "name": "absence of paid price, checkout, signed pilot and evidence of paid adoption",
+          "text": false,
+          "attached_support": false
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": false,
+      "answer_status": null,
+      "extra_claim_concerns": []
+    },
+    "quill": {
+      "status": "success",
+      "answer_status": "conflicting",
+      "required_facets": [
+        {
+          "name": "approver not identified in available sources",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 quill_a blank approval field and S5 quill_c no signed approval record; S3 quill_b also says approver unidentified."
+        },
+        {
+          "name": "unresolved 06:40 versus 07:10 conflict",
+          "text": true,
+          "attached_support": true,
+          "reason": "S1 quill_a and S3 quill_b provide both times; S3 explicitly states no final decision."
+        }
+      ],
+      "forbidden_violations": [],
+      "rubric_pass": true,
+      "status_coherence": "Conflicting matches unresolved departure; answer identifies approval as unestablished through precise source facts.",
+      "extra_claim_concerns": [],
+      "quote_binding": "S1, S3, S5 resolve to their respective evidence and support cited claims."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "real-v12",
+    "command": [
+      "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/run_real_development.py",
+      "--snapshot",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-dev1/apps/desktop/python",
+      "--snapshot-manifest",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-dev1/snapshot.json",
+      "--model",
+      "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+      "--sha256",
+      "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "--version",
+      "v12",
+      "--output",
+      "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/development/real-v12"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "conflict-v12",
+    "command": [
+      "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/run_conflict_development.py",
+      "--snapshot",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-dev1/apps/desktop/python",
+      "--snapshot-manifest",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-dev1/snapshot.json",
+      "--model",
+      "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+      "--sha256",
+      "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "--version",
+      "v12",
+      "--output",
+      "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/development/conflict-v12"
+    ],
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,179 @@
+{
+  "reviewer": "primary",
+  "method": "Read frozen sources/rubric after candidate freeze; assess answer and attached quotes, independently of semantic agent scores for fresh cases. All declared cases remain denominator.",
+  "fresh": {
+    "v11": {
+      "harbor": {
+        "required": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "pass": true,
+        "status_coherent": true,
+        "notes": "S1 guide supports paid admin/completed CSV; S3 limits supports all three limits; S5 roadmap supports planned cadence/filter and undecided API. No forbidden claim."
+      },
+      "orchard": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Raw reply repeats full question span for six parts; invalid format. Raw prose is not accepted/attached answer evidence."
+      },
+      "lumen": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Raw reply repeats applied/tracked request span and exceeds aggregate answer budget; validation rejects it."
+      },
+      "cedar": {
+        "required": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Raw first part uses the full question, followed by overlapping owner/scope spans; format validation rejects it. Raw status/date wording also does not clearly preserve conflict, but not scored as a saved answer."
+      },
+      "maple": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Raw repeated/full overlapping spans plus nonexact capitalized span; validation rejects it."
+      },
+      "quartz": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "Saved unavailable-calculation draft, no requested result or measurement explanation. S1/S3 show20/15calendar days but quantity parser cannot extract that expression. The response says values are not clearly provided although sources state them. Independent fixture-plan issue also requires percentage under single difference operation."
+      }
+    },
+    "v12": {
+      "harbor": {
+        "required": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Fixed IDs all present and distinct, but text lengths {'R1P1': 914, 'R1P2': 447, 'R1P3': 458} exceed1000 aggregate including overhead. Raw prose not counted as saved/attached answer. Regression from baseline usable complete answer."
+      },
+      "orchard": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Saved final reply contains an unescaped newline/control character inside the first JSON string and is rejected by JSON decoding. The attempted prose also reaches the per-part cap mid-sentence and would exceed aggregate length if repaired; fixed IDs are visible but not a valid decoded answer."
+      },
+      "lumen": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "Planner failure before final generation. Last span how is the credit tracked is a paraphrase absent from original request; exact-substring validation rejects it."
+      },
+      "cedar": {
+        "required": [
+          true,
+          true,
+          true,
+          false
+        ],
+        "pass": false,
+        "status_coherent": true,
+        "notes": "Usable draft, correct conflicting targets(S1/S5), coordinator(S1/S5), approved scope(S3). It does not claim launch occurred, but omits employee-preview versus customer-launch distinction and lacks attached launch-note preview paragraph. Frozen fourth criterion not fully satisfied."
+      },
+      "maple": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": null,
+        "notes": "No usable draft. Fixed IDs present but long duplicated factual prose exceeds aggregate answer budget. Known renewal facts are also marked unknown in raw second part; no score given for raw rejected output."
+      },
+      "quartz": {
+        "required": [
+          false,
+          false,
+          false
+        ],
+        "pass": false,
+        "status_coherent": false,
+        "notes": "Saved unavailable-calculation draft misses requested values/calculation/measurement meaning. Parser does not extract calendar days (only40/50onboarding counts); response falsely says exact averages not provided though attached excerpts explicitlystate20/15. Also fixture-plan cannot explicitly represent requested percentage under one difference operation."
+      }
+    }
+  },
+  "development": {
+    "dev1": {
+      "pilot-readiness": {
+        "pass": false,
+        "notes": "No final answer;240.419s timeout."
+      },
+      "core-company": {
+        "pass": false,
+        "notes": "No final answer;255.096s timeout."
+      },
+      "quill": {
+        "pass": true,
+        "notes": "Read full answer and S1/S3/S5 bindings. Approver unknown;06:40 and07:10 unresolved, coherent per-part and aggregate conflict labels."
+      }
+    },
+    "dev2": {
+      "pilot-readiness": {
+        "pass": false,
+        "notes": "No final answer;241.029s timeout."
+      },
+      "core-company": {
+        "pass": false,
+        "notes": "No final answer;241.178s timeout."
+      }
+    }
+  },
+  "limitations": [
+    "Quartz one difference operation does not represent both requested arithmetic outputs; keep denominator, annotate fixture-plan issue.",
+    "Small synthetic source set; lacks requested list-format stress coverage.",
+    "No pilot readiness or long-corpus claim."
+  ],
+  "fresh_summary": {
+    "v11": {
+      "complete_answer_and_support": 1,
+      "usable_drafts": 2,
+      "cases": 6
+    },
+    "v12": {
+      "complete_answer_and_support": 0,
+      "usable_drafts": 2,
+      "cases": 6
+    },
+    "promotion": "Rejected; internal only. Shared UI/default unchanged."
+  },
+  "reconciliation": "Independent Terra semantic assessment agrees: freshv11 1/6,v12 0/6; dev1 1/3; dev2 0/2. Cedar criterion4 interpreted as requiring employee-preview distinction in answer and attachedsupport. Quartz missing percentage additionallylimited byfixtureplan; clear numeric sourcevalues are present despite unavailable parser assessment."
+}

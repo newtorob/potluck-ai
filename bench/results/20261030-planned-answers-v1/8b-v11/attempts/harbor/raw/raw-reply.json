@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-17afa530-f465-4bcd-8458-ccfb023a2cb2",
+  "object": "chat.completion",
+  "created": 1793376694,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S1\"], \"text\": \"Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\",\"status\": \"supported\", \"request_span\": \"What can Harbor customers do today with export scheduling\"}, {\"snippet_ids\": [\"S3\"], \"text\": \"A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\",\"status\": \"supported\", \"request_span\": \"what are its current limits\"}, {\"snippet_ids\": [\"S5\"], \"text\": \"The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\",\"status\": \"supported\", \"request_span\": \"what improvements are planned\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1310,
+    "completion_tokens": 283,
+    "total_tokens": 1593
+  }
+}

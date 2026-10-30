@@ -1,0 +1,161 @@
+{
+  "harbor": {
+    "8b-v12": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        },
+        {
+          "call": "002",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    }
+  },
+  "orchard": {
+    "8b-v11": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    },
+    "8b-v12": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        },
+        {
+          "call": "002",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": false,
+          "json_error": "Invalid control character at: line 1 column 1078 (char 1077)"
+        }
+      ]
+    }
+  },
+  "lumen": {
+    "8b-v11": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    },
+    "8b-v12": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    }
+  },
+  "cedar": {
+    "8b-v11": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    }
+  },
+  "maple": {
+    "8b-v11": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    },
+    "8b-v12": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "calls": [
+        {
+          "call": "001",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        },
+        {
+          "call": "002",
+          "reply_saved": true,
+          "finish_reason": "stop",
+          "valid_json": true,
+          "structural_issues": []
+        }
+      ]
+    }
+  }
+}

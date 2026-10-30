@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "ecdc17bf-590f-4658-abe9-a649b2a005a9",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/quartz/raw/allowed",
+  "files": {
+    "sources/quartz_first.md": "1c66a582e14b853b5472580c0bb79855c5845fcd59d10dbb7d481049ed89f753",
+    "sources/quartz_second.md": "7db3169f6663a0cdac711bd3babd2f35e30d7a904dddadc039b304a83f78e4c9",
+    "sources/quartz_context.md": "2fcbcae4112e5958ec93ff06de7a4dc33f1aba39d440f5f78ec857ed85112f22"
+  },
+  "scan": {
+    "collection_id": "ecdc17bf-590f-4658-abe9-a649b2a005a9",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "ecdc17bf-590f-4658-abe9-a649b2a005a9"
+  ],
+  "excluded_canary": {
+    "collection_id": "d96c88d5-cea9-4195-bcc6-1cdb4d2fc82d",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12/attempts/quartz/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "d96c88d5-cea9-4195-bcc6-1cdb4d2fc82d",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

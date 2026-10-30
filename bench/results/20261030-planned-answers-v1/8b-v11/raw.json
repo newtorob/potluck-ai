@@ -1,0 +1,747 @@
+{
+  "case_ids": [
+    "harbor",
+    "orchard",
+    "lumen",
+    "cedar",
+    "maple",
+    "quartz"
+  ],
+  "assessment": null,
+  "outputs": {
+    "harbor": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "bca99a78-1e52-4e9a-9bdc-a6a23be30e3f",
+        "workspace": "pilot-eval",
+        "issue": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\nA workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\nThe reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.",
+              "snippet_ids": [
+                "S1",
+                "S3",
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+                  "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+                  "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:ea8fa5d3-e742-53aa-b828-12096f8612f3:03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+                  "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+                }
+              ],
+              "parts": [
+                {
+                  "request_span": "What can Harbor customers do today with export scheduling",
+                  "status": "supported",
+                  "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.",
+                  "snippet_ids": [
+                    "S1"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+                      "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+                    }
+                  ]
+                },
+                {
+                  "request_span": "what are its current limits",
+                  "status": "supported",
+                  "text": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.",
+                  "snippet_ids": [
+                    "S3"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+                      "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                    }
+                  ]
+                },
+                {
+                  "request_span": "what improvements are planned",
+                  "status": "supported",
+                  "text": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:ea8fa5d3-e742-53aa-b828-12096f8612f3:03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+                      "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "c9bba584-6e55-4452-bcd3-d05213ff30f1",
+            "document_id": "ba67da5b-34f8-510e-9895-0e3a500189a3",
+            "revision_id": "bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+            "relative_path": "sources/harbor_guide.md",
+            "updated_at": "2026-10-30T16:11:34.506490+00:00",
+            "chunk_id": "fdafecf3-85c7-5b66-8985-b51baf5f4648",
+            "anchor": "harbor-export-scheduling",
+            "heading": "Harbor export scheduling",
+            "content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:11:34.508028+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+            "presented_content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+          },
+          {
+            "collection_id": "c9bba584-6e55-4452-bcd3-d05213ff30f1",
+            "document_id": "eed06cbb-fd33-5111-aa9f-0decfaf438a8",
+            "revision_id": "e79f00c5-9b60-55a8-922f-1104cfc14e66",
+            "relative_path": "sources/harbor_limits.md",
+            "updated_at": "2026-10-30T16:11:34.507353+00:00",
+            "chunk_id": "86ad6ea9-e0d3-55ed-a204-b4010e8079e5",
+            "anchor": "operational-limits",
+            "heading": "Operational limits",
+            "content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:11:34.508028+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+            "presented_content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+          },
+          {
+            "collection_id": "c9bba584-6e55-4452-bcd3-d05213ff30f1",
+            "document_id": "8a072c63-6010-52cf-98cd-6f6ce48c5d00",
+            "revision_id": "03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+            "relative_path": "sources/harbor_roadmap.md",
+            "updated_at": "2026-10-30T16:11:34.507955+00:00",
+            "chunk_id": "ea8fa5d3-e742-53aa-b828-12096f8612f3",
+            "anchor": "reporting-work-planned",
+            "heading": "Reporting work planned",
+            "content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:11:34.508028+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:ea8fa5d3-e742-53aa-b828-12096f8612f3:03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+            "presented_content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T16:13:05.808113+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v11",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 91289,
+          "created_at": "2026-10-30T16:13:05.808113+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v1",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified.",
+            "unmatched_request_text": {
+              "R1": [
+                "",
+                ", ",
+                ", and ",
+                "?"
+              ]
+            }
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+              "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+              "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+              "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+              "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:ea8fa5d3-e742-53aa-b828-12096f8612f3:03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+              "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:ea8fa5d3-e742-53aa-b828-12096f8612f3:03a87c63-0685-5e2b-aaba-d7e5dcf600d4",
+              "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:fdafecf3-85c7-5b66-8985-b51baf5f4648:bba58bcf-61f8-5273-a8fe-cd5b89cf4df6",
+              "source_text": "seven days. Scheduling does not grant access ",
+              "start": 288,
+              "end": 333,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:86ad6ea9-e0d3-55ed-a204-b4010e8079e5:e79f00c5-9b60-55a8-922f-1104cfc14e66",
+              "source_text": "five active export schedules. A schedule run",
+              "start": 31,
+              "end": 75,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "c9bba584-6e55-4452-bcd3-d05213ff30f1"
+        ]
+      },
+      "latency_seconds": 91.30119658447802,
+      "setup_seconds": 0.02709683310240507,
+      "attempt_total_seconds": 91.32829341758043,
+      "finished_at": "2026-10-30T16:13:05.815828+00:00"
+    },
+    "orchard": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 154.62545108236372,
+      "setup_seconds": 0.027408000081777573,
+      "attempt_total_seconds": 154.6528590824455,
+      "finished_at": "2026-10-30T16:15:40.471089+00:00"
+    },
+    "lumen": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 92.96269704122096,
+      "setup_seconds": 0.034092625603079796,
+      "attempt_total_seconds": 92.99678966682404,
+      "finished_at": "2026-10-30T16:17:13.469283+00:00"
+    },
+    "cedar": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 46.04754833411425,
+      "setup_seconds": 0.026137500070035458,
+      "attempt_total_seconds": 46.07368583418429,
+      "finished_at": "2026-10-30T16:17:59.543997+00:00"
+    },
+    "maple": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 137.74706054199487,
+      "setup_seconds": 0.024523832835257053,
+      "attempt_total_seconds": 137.77158437483013,
+      "finished_at": "2026-10-30T16:20:17.323135+00:00"
+    },
+    "quartz": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "02bb6ace-daf1-4168-9f42-7a4ecc60b596",
+        "workspace": "pilot-eval",
+        "issue": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "Calculation unavailable. Model assessment: The source text contains values that cannot be extracted for calculation, such as the average onboarding time in days and the number of completed onboardings for each period. The values are not clearly provided or formatted in a way that can be extracted for calculation.",
+              "snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+                  "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+                  "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "unknown",
+                "text": "Calculation unavailable. Model assessment: The source text contains values that cannot be extracted for calculation, such as the average onboarding time in days and the number of completed onboardings for each period. The values are not clearly provided or formatted in a way that can be extracted for calculation.",
+                "formula": null,
+                "result": null,
+                "unit": null,
+                "reason": "The source text contains values that cannot be extracted for calculation, such as the average onboarding time in days and the number of completed onboardings for each period. The values are not clearly provided or formatted in a way that can be extracted for calculation.",
+                "inputs": [
+                  {
+                    "id": "N2",
+                    "snippet_id": "S3",
+                    "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+                    "source_text": "50 completed onboardings",
+                    "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                    "start": 172,
+                    "end": 196,
+                    "value": "50",
+                    "unit": "completed onboardings",
+                    "dimension": "count"
+                  },
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+                    "source_text": "40 completed onboardings",
+                    "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                    "start": 188,
+                    "end": 212,
+                    "value": "40",
+                    "unit": "completed onboardings",
+                    "dimension": "count"
+                  }
+                ],
+                "rounding": null,
+                "limitation_kind": "unsupported",
+                "algorithm_version": "cited-calculations-v3",
+                "caveat": "Arithmetic does not verify source selection or authority.",
+                "operand_roles": {
+                  "minuend_id": "N1",
+                  "subtrahend_id": "N2"
+                },
+                "known_input_snippet_ids": [
+                  "S1",
+                  "S3"
+                ],
+                "competing_snippet_ids": [],
+                "limitation_snippet_ids": [
+                  "S1",
+                  "S3"
+                ],
+                "limitation_basis": "not_established",
+                "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "72a4aa81-52ec-4e65-80ba-61d729c3ad26",
+            "document_id": "967126a3-5146-5fab-8720-c9949877685f",
+            "revision_id": "49fafc3d-2923-548e-b709-05d485a2ed1a",
+            "relative_path": "sources/quartz_first.md",
+            "updated_at": "2026-10-30T16:20:17.345140+00:00",
+            "chunk_id": "5fb1dd78-44d5-5575-ae7e-2f1068da0e62",
+            "anchor": "first-measurement-period",
+            "heading": "First measurement period",
+            "content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:20:17.345934+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+            "presented_content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+          },
+          {
+            "collection_id": "72a4aa81-52ec-4e65-80ba-61d729c3ad26",
+            "document_id": "d81c99a5-5c0a-532e-aec1-6330b54675ab",
+            "revision_id": "50ff17b8-bb16-5338-a7bc-94093f94d82b",
+            "relative_path": "sources/quartz_second.md",
+            "updated_at": "2026-10-30T16:20:17.345836+00:00",
+            "chunk_id": "612bb782-828b-5cc6-a92b-93418ed914a3",
+            "anchor": "second-measurement-period",
+            "heading": "Second measurement period",
+            "content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:20:17.345934+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+            "presented_content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+          },
+          {
+            "collection_id": "72a4aa81-52ec-4e65-80ba-61d729c3ad26",
+            "document_id": "3790440e-6c0d-59d5-8f04-b61f5ce197ba",
+            "revision_id": "32196666-d702-56c9-9757-3cd93d4a1fa6",
+            "relative_path": "sources/quartz_context.md",
+            "updated_at": "2026-10-30T16:20:17.344304+00:00",
+            "chunk_id": "8e210660-79c1-5cfd-8c13-559af405dade",
+            "anchor": "measurement-context",
+            "heading": "Measurement context",
+            "content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T16:20:17.345934+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:8e210660-79c1-5cfd-8c13-559af405dade:32196666-d702-56c9-9757-3cd93d4a1fa6",
+            "presented_content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T16:21:17.070825+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v11",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 59713,
+          "created_at": "2026-10-30T16:21:17.070825+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v1",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified.",
+            "unmatched_request_text": {}
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+              "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+              "quote": "\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+              "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+              "quote": "\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:8e210660-79c1-5cfd-8c13-559af405dade:32196666-d702-56c9-9757-3cd93d4a1fa6",
+              "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:8e210660-79c1-5cfd-8c13-559af405dade:32196666-d702-56c9-9757-3cd93d4a1fa6",
+              "quote": "\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+              "source_text": "40 completed onboardings",
+              "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+              "start": 188,
+              "end": 212,
+              "value": "40",
+              "unit": "completed onboardings",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S3",
+              "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+              "source_text": "50 completed onboardings",
+              "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+              "start": 172,
+              "end": 196,
+              "value": "50",
+              "unit": "completed onboardings",
+              "dimension": "count"
+            }
+          ],
+          "quantity_parser_version": "v3",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+              "source_text": "20 calendar days from signed agreement to ",
+              "start": 108,
+              "end": 150,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+              "source_text": "15 calendar days from signed agreement to ",
+              "start": 91,
+              "end": 133,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "unknown",
+              "text": "Calculation unavailable. Model assessment: The source text contains values that cannot be extracted for calculation, such as the average onboarding time in days and the number of completed onboardings for each period. The values are not clearly provided or formatted in a way that can be extracted for calculation.",
+              "formula": null,
+              "result": null,
+              "unit": null,
+              "reason": "The source text contains values that cannot be extracted for calculation, such as the average onboarding time in days and the number of completed onboardings for each period. The values are not clearly provided or formatted in a way that can be extracted for calculation.",
+              "inputs": [
+                {
+                  "id": "N2",
+                  "snippet_id": "S3",
+                  "citation_id": "source:612bb782-828b-5cc6-a92b-93418ed914a3:50ff17b8-bb16-5338-a7bc-94093f94d82b",
+                  "source_text": "50 completed onboardings",
+                  "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                  "start": 172,
+                  "end": 196,
+                  "value": "50",
+                  "unit": "completed onboardings",
+                  "dimension": "count"
+                },
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:5fb1dd78-44d5-5575-ae7e-2f1068da0e62:49fafc3d-2923-548e-b709-05d485a2ed1a",
+                  "source_text": "40 completed onboardings",
+                  "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                  "start": 188,
+                  "end": 212,
+                  "value": "40",
+                  "unit": "completed onboardings",
+                  "dimension": "count"
+                }
+              ],
+              "rounding": null,
+              "limitation_kind": "unsupported",
+              "algorithm_version": "cited-calculations-v3",
+              "caveat": "Arithmetic does not verify source selection or authority.",
+              "operand_roles": {
+                "minuend_id": "N1",
+                "subtrahend_id": "N2"
+              },
+              "known_input_snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "competing_snippet_ids": [],
+              "limitation_snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "limitation_basis": "not_established",
+              "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "72a4aa81-52ec-4e65-80ba-61d729c3ad26"
+        ]
+      },
+      "latency_seconds": 59.72645749989897,
+      "setup_seconds": 0.02787083387374878,
+      "attempt_total_seconds": 59.75432833377272,
+      "finished_at": "2026-10-30T16:21:17.079039+00:00"
+    }
+  }
+}

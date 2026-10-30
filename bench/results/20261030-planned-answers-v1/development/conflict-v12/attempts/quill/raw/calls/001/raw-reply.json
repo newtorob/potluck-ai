@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-99b4b6d0-5c1e-4657-b24e-5eb27985427b",
+  "object": "chat.completion",
+  "created": 1793375939,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"approved Quill Ferry’s winter timetable\", \"first departure time\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 106,
+    "completion_tokens": 18,
+    "total_tokens": 124
+  }
+}

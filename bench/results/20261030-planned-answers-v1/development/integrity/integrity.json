@@ -1,0 +1,1662 @@
+{
+  "purpose": "consumed development only; no fresh holdout or controlled comparison",
+  "semantic_assessment": false,
+  "notes": [
+    "Exact source and citation bindings do not establish semantic support.",
+    "All declared attempts including errors remain in the denominator."
+  ],
+  "snapshot_manifest_sha256": "1d34e8d817db9c0f99244cdcfd048873e0c69188852231017f401fb52b26f92d",
+  "snapshot_files_mismatched": [],
+  "runs": {
+    "real-v12": {
+      "fixture_sums_sha256": "2663630bd7e60f84f98ee879ac2b4069b566347a3b55937d63530d9aca786372",
+      "metadata_checks": {
+        "recorded_fixture_hashes": true,
+        "recorded_snapshot_manifest": true,
+        "snapshot_path": true,
+        "version": true,
+        "seed": true,
+        "retries": true,
+        "plan_origin": true,
+        "raw_case_ids": true,
+        "no_assessment": true
+      },
+      "code_identity": {
+        "matches": true,
+        "expected_count": 153,
+        "recorded_count": 153,
+        "missing": [],
+        "extra": [],
+        "changed": []
+      },
+      "cases": {
+        "pilot-readiness": {
+          "status": "error",
+          "error": {
+            "type": "ValueError",
+            "message": "Investigation generation timed out"
+          },
+          "checks": {
+            "registered_allowed": true,
+            "retrieval_scope_retrieval-001.json": true,
+            "planner_input_operations_only": true,
+            "planner_schema": true
+          },
+          "errors": [],
+          "retrieval": [
+            {
+              "file": "retrieval-001.json",
+              "query": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+              "result": {
+                "workspace": "pilot-eval",
+                "scope": {
+                  "collection_ids": [
+                    "1013e52a-3a3e-4339-bb26-16f4f8f858fd"
+                  ]
+                },
+                "source_chunks": [
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "fef2acb2-24d0-5e6f-bde8-13a4831ed5dd",
+                    "revision_id": "abe5f96c-a0b6-54ff-a849-8027673d43a4",
+                    "relative_path": "guide-review.md",
+                    "updated_at": "2026-10-30T15:50:23.686248+00:00",
+                    "chunk_id": "8ca2be6c-7d71-53ec-ab73-38cd91be8f7d",
+                    "anchor": "review-outcomes-and-reuse",
+                    "heading": "Review, outcomes and reuse",
+                    "content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:8ca2be6c-7d71-53ec-ab73-38cd91be8f7d:abe5f96c-a0b6-54ff-a849-8027673d43a4"
+                  },
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "d7cf81fe-7d12-5f06-b0aa-f495b2117796",
+                    "revision_id": "d2feada3-6664-59cc-a5c4-b27203bc89b7",
+                    "relative_path": "guide-intro.md",
+                    "updated_at": "2026-10-30T15:50:23.685359+00:00",
+                    "chunk_id": "d98a01e4-5b3f-59a2-bc11-1e2da1ff456a",
+                    "anchor": "local-company-brain-evidence-and-review",
+                    "heading": "Local Company Brain evidence and review",
+                    "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:d98a01e4-5b3f-59a2-bc11-1e2da1ff456a:d2feada3-6664-59cc-a5c4-b27203bc89b7"
+                  },
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "38f83ac9-f1d6-54d1-8369-700a419e790e",
+                    "revision_id": "5044e276-5efc-559f-a947-7763c9b9a8b7",
+                    "relative_path": "guide-workflow.md",
+                    "updated_at": "2026-10-30T15:50:23.687007+00:00",
+                    "chunk_id": "2f7b8f46-75fb-5990-a5e9-d63d10909cce",
+                    "anchor": "intro",
+                    "heading": "",
+                    "content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:2f7b8f46-75fb-5990-a5e9-d63d10909cce:5044e276-5efc-559f-a947-7763c9b9a8b7"
+                  },
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "f4a92541-750a-5b92-9550-56b522184817",
+                    "revision_id": "cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                    "relative_path": "progress.md",
+                    "updated_at": "2026-10-30T15:50:23.687989+00:00",
+                    "chunk_id": "8ecfb2d3-1229-567b-b8f5-6fc4cda3601e",
+                    "anchor": "intro",
+                    "heading": "",
+                    "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12"
+                  },
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "403a30df-69ce-51ff-9e00-509386e77514",
+                    "revision_id": "6427bc8c-d592-5ac7-a5c4-b4abf41d872b",
+                    "relative_path": "guide-gates.md",
+                    "updated_at": "2026-10-30T15:50:23.684394+00:00",
+                    "chunk_id": "692871d9-9af1-5de6-a069-0f8b71f07e51",
+                    "anchor": "intro",
+                    "heading": "",
+                    "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:692871d9-9af1-5de6-a069-0f8b71f07e51:6427bc8c-d592-5ac7-a5c4-b4abf41d872b"
+                  },
+                  {
+                    "collection_id": "1013e52a-3a3e-4339-bb26-16f4f8f858fd",
+                    "document_id": "f4a92541-750a-5b92-9550-56b522184817",
+                    "revision_id": "cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                    "relative_path": "progress.md",
+                    "updated_at": "2026-10-30T15:50:23.687989+00:00",
+                    "chunk_id": "f8f3416d-bf71-59c1-8256-b61f39cf3053",
+                    "anchor": "october-29-checkpoint-source-input-review-local-experimental-mode-1",
+                    "heading": "October 29 checkpoint — source input review, local experimental mode",
+                    "content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:50:23.689133+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:f8f3416d-bf71-59c1-8256-b61f39cf3053:cc21b743-b22a-5d7c-8bd3-8bf504d01a12"
+                  }
+                ],
+                "reviewed_claims": [],
+                "missing_evidence": [],
+                "limitations": [
+                  "Results reflect indexed snapshots; disk changes need a rescan.",
+                  "Word overlap does not establish relevance or entailment.",
+                  "At most 200 candidates per evidence kind are examined.",
+                  "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+                ],
+                "scope_status": {
+                  "requested": 1,
+                  "ready": 1,
+                  "unavailable": 0,
+                  "needs_rescan": 0
+                },
+                "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+                "truncated": false,
+                "retrieval_version": "v2",
+                "retrieval_trace": {
+                  "candidate_limit_reached": false,
+                  "preferred_chunks_per_document": 2,
+                  "deprioritized_chunks": 0,
+                  "result_omitted": 0,
+                  "result_limit_reached": false
+                }
+              },
+              "query_term_coverage": {
+                "what": false,
+                "actually": true,
+                "ready": true,
+                "company": true,
+                "brain": true,
+                "pilot": true,
+                "remains": true,
+                "blocked": false,
+                "evidence": true,
+                "supports": false,
+                "that": false
+              },
+              "error": null
+            }
+          ],
+          "payloads": [
+            {
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+                  "operation": "answer"
+                }
+              ]
+            },
+            {
+              "issue": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+                  "operation": "answer"
+                }
+              ],
+              "snippets": [
+                {
+                  "snippet_id": "S1",
+                  "text": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n",
+                  "relative_path": "guide-review.md",
+                  "heading": "Review, outcomes and reuse"
+                },
+                {
+                  "snippet_id": "S2",
+                  "text": "2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n",
+                  "relative_path": "guide-review.md",
+                  "heading": "Review, outcomes and reuse"
+                },
+                {
+                  "snippet_id": "S3",
+                  "text": "3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n",
+                  "relative_path": "guide-review.md",
+                  "heading": "Review, outcomes and reuse"
+                },
+                {
+                  "snippet_id": "S4",
+                  "text": "4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n",
+                  "relative_path": "guide-review.md",
+                  "heading": "Review, outcomes and reuse"
+                },
+                {
+                  "snippet_id": "S5",
+                  "text": "\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+                  "relative_path": "guide-review.md",
+                  "heading": "Review, outcomes and reuse"
+                },
+                {
+                  "snippet_id": "S6",
+                  "text": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                  "relative_path": "guide-intro.md",
+                  "heading": "Local Company Brain evidence and review"
+                },
+                {
+                  "snippet_id": "S7",
+                  "text": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n",
+                  "relative_path": "guide-workflow.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S8",
+                  "text": "\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n",
+                  "relative_path": "guide-workflow.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S9",
+                  "text": "\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes ",
+                  "relative_path": "guide-workflow.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S10",
+                  "text": "support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+                  "relative_path": "guide-workflow.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S11",
+                  "text": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S12",
+                  "text": "  - potluck\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S13",
+                  "text": "  - company-brain\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S14",
+                  "text": "  - implementation\n---",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S15",
+                  "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                  "relative_path": "guide-gates.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S16",
+                  "text": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n",
+                  "relative_path": "progress.md",
+                  "heading": "October 29 checkpoint — source input review, local experimental mode"
+                },
+                {
+                  "snippet_id": "S17",
+                  "text": "\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does ",
+                  "relative_path": "progress.md",
+                  "heading": "October 29 checkpoint — source input review, local experimental mode"
+                },
+                {
+                  "snippet_id": "S18",
+                  "text": "not verify its authority.\n",
+                  "relative_path": "progress.md",
+                  "heading": "October 29 checkpoint — source input review, local experimental mode"
+                },
+                {
+                  "snippet_id": "S19",
+                  "text": "\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+                  "relative_path": "progress.md",
+                  "heading": "October 29 checkpoint — source input review, local experimental mode"
+                }
+              ],
+              "quantities": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "source_text": "1",
+                  "value": "1",
+                  "unit": ""
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S2",
+                  "source_text": "2",
+                  "value": "2",
+                  "unit": ""
+                },
+                {
+                  "id": "N3",
+                  "snippet_id": "S3",
+                  "source_text": "3",
+                  "value": "3",
+                  "unit": ""
+                },
+                {
+                  "id": "N4",
+                  "snippet_id": "S4",
+                  "source_text": "4",
+                  "value": "4",
+                  "unit": ""
+                }
+              ],
+              "extraction_notices": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:8ca2be6c-7d71-53ec-ab73-38cd91be8f7d:abe5f96c-a0b6-54ff-a849-8027673d43a4",
+                  "source_text": "one-shot; it is not a collaborative editor.",
+                  "start": 435,
+                  "end": 478,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:8ca2be6c-7d71-53ec-ab73-38cd91be8f7d:abe5f96c-a0b6-54ff-a849-8027673d43a4",
+                  "source_text": "one-shot; create a new investigation for a ",
+                  "start": 175,
+                  "end": 218,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S9",
+                  "citation_id": "source:2f7b8f46-75fb-5990-a5e9-d63d10909cce:5044e276-5efc-559f-a947-7763c9b9a8b7",
+                  "source_text": "one of its underlying source chunks, not ju",
+                  "start": 259,
+                  "end": 302,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "2026-10-28\nupdated: 2026-10-29\nstatus: in-pr",
+                  "start": 13,
+                  "end": 57,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "10-28\nupdated: 2026-10-29\nstatus: in-progr",
+                  "start": 18,
+                  "end": 60,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "28\nupdated: 2026-10-29\nstatus: in-progress",
+                  "start": 21,
+                  "end": 63,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "2026-10-29\nstatus: in-progress\ntags:\n",
+                  "start": 33,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "10-29\nstatus: in-progress\ntags:\n",
+                  "start": 38,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:8ecfb2d3-1229-567b-b8f5-6fc4cda3601e:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "29\nstatus: in-progress\ntags:\n",
+                  "start": 41,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S19",
+                  "citation_id": "source:f8f3416d-bf71-59c1-8256-b61f39cf3053:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "two-word units such as `support tickets`. O",
+                  "start": 56,
+                  "end": 99,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S19",
+                  "citation_id": "source:f8f3416d-bf71-59c1-8256-b61f39cf3053:cc21b743-b22a-5d7c-8bd3-8bf504d01a12",
+                  "source_text": "zero denominator is diagnosed only after inp",
+                  "start": 278,
+                  "end": 322,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                }
+              ],
+              "answer_parts": {
+                "R1": [
+                  {
+                    "id": "R1P1",
+                    "request_span": "What is actually ready for a Company Brain pilot"
+                  },
+                  {
+                    "id": "R1P2",
+                    "request_span": "what remains blocked"
+                  },
+                  {
+                    "id": "R1P3",
+                    "request_span": "what evidence supports that?"
+                  }
+                ]
+              },
+              "evidence_notices": []
+            }
+          ]
+        },
+        "core-company": {
+          "status": "error",
+          "error": {
+            "type": "ValueError",
+            "message": "Investigation generation timed out"
+          },
+          "checks": {
+            "registered_allowed": true,
+            "retrieval_scope_retrieval-001.json": true,
+            "planner_input_operations_only": true,
+            "planner_schema": true
+          },
+          "errors": [],
+          "retrieval": [
+            {
+              "file": "retrieval-001.json",
+              "query": "What is available in the free core versus the paid company offering, and what is still planned?",
+              "result": {
+                "workspace": "pilot-eval",
+                "scope": {
+                  "collection_ids": [
+                    "f5180d42-0e36-4215-af80-d0cbbfd26fa5"
+                  ]
+                },
+                "source_chunks": [
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "7b15bbd6-b018-5247-a04d-1fa508649004",
+                    "anchor": "commitments-to-preserve",
+                    "heading": "Commitments to preserve",
+                    "content": "1. Preserve the existing MIT core and already-open functionality. Do not move existing open features behind a proprietary paywall to create a paid tier.\n2. Keep local inference, owned-machine execution, and the complete first Company Brain workflow useful without a subscription or mandatory hosted account for local use.\n3. Keep basic authentication, authorization enforcement, source restrictions, deletion, security fixes, provenance, and data export in the core. A free deployment must not be unsafe by design.\n4. Do not impose artificial seat, document, token, source, or owned-machine caps on the self-hosted core. Technical capacity and safety limits still apply. Managed services may have transparent resource limits tied to actual operating costs.\n5. Keep customer-created knowledge, evaluation datasets, run artifacts, and exportable configurations portable. Customers retain their rights to their data and created artifacts; underlying model and third-party license conditions still apply.\n6. No implicit upload of private sources, traces, or training examples. Customer content is not pooled for Potluck training without separate explicit authorization. Access for support is explicit and scoped.\n7. Core functionality does not depend on a paid control service remaining available. Permission checks remain enforced during a management outage or subscription lapse; inability to verify authorization fails closed.\n8. Describe the product accurately: an open-source core with commercial organizational software/services. Identify any future proprietary component clearly; source-visible proprietary software is not described as open source.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:7b15bbd6-b018-5247-a04d-1fa508649004:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "b3d53dba-372f-5517-be56-702a7b02402d",
+                    "anchor": "decision-and-status",
+                    "heading": "Decision and status",
+                    "content": "**Rob's decision, October 28, 2026: keep Potluck's core open source while pursuing funding.** Rob requested this detailed free-versus-paid map as the working direction for subsequent builds.\n\nThis note translates that decision into a product boundary. It is an internal build policy, not a published price list, signed customer commitment, or claim that every listed capability exists. The core decision is explicit; package names, charging unit, commercial module structure, and pilot gates below are implementation recommendations to validate through use and purchasing evidence.\n\n**Free core:** run useful AI on infrastructure you control, complete a cited investigation, review the outcome, retain reusable knowledge, and evaluate improvements yourself.\n\n**Paid company offering:** deploy, administer, monitor, govern, and improve that system across an organization with less operational work and a defined support relationship.\n\nCompany size does not determine whether the core is free. An enterprise may self-host the open core for commercial use. Payment buys additional software or services, not permission to use the existing MIT code at work. Free software does not include free hardware, electricity, third-party APIs, cloud hosting, or other people's computing capacity.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:b3d53dba-372f-5517-be56-702a7b02402d:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "1b16b976-4838-5eb0-a483-e426de91e020",
+                    "revision_id": "d25a2efd-713e-5b19-96f7-9b52e87888bf",
+                    "relative_path": "guide-gates.md",
+                    "updated_at": "2026-10-30T15:54:24.186155+00:00",
+                    "chunk_id": "aad9c30d-bc8a-5396-be33-d010fc8c5412",
+                    "anchor": "intro",
+                    "heading": "",
+                    "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:aad9c30d-bc8a-5396-be33-d010fc8c5412:d25a2efd-713e-5b19-96f7-9b52e87888bf"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "1027164d-bbf0-5cea-8015-3f86edac61d4",
+                    "revision_id": "3fcd4990-057b-5c29-9c1e-556cb7d7dc40",
+                    "relative_path": "guide-intro.md",
+                    "updated_at": "2026-10-30T15:54:24.186904+00:00",
+                    "chunk_id": "2dcb7e98-ea9b-584d-8eaa-377b637afd23",
+                    "anchor": "local-company-brain-evidence-and-review",
+                    "heading": "Local Company Brain evidence and review",
+                    "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:2dcb7e98-ea9b-584d-8eaa-377b637afd23:3fcd4990-057b-5c29-9c1e-556cb7d7dc40"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "d3e44128-8016-5c49-8457-0bab4f9c9046",
+                    "revision_id": "87612bd5-7bac-59cf-979f-1117d637815f",
+                    "relative_path": "progress.md",
+                    "updated_at": "2026-10-30T15:54:24.190441+00:00",
+                    "chunk_id": "1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8",
+                    "anchor": "intro",
+                    "heading": "",
+                    "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "4df83713-de6d-50b3-8315-266628e39bc3",
+                    "anchor": "exact-feature-boundary-2",
+                    "heading": "Exact feature boundary",
+                    "content": "| Area | Free and open core | Paid company offering | Reason a company might pay |\n| --- | --- | --- | --- |\n| Models and local clients | Desktop, CLI, local API, MCP, compatible local models, manual model selection and configuration. | Central approved-model catalog, organization rollout controls and fleet configuration. | Keep deployments consistent without manually configuring each machine. |\n| Owned compute and mesh | Pair approved machines; execute on selected owned infrastructure; core scheduling, queues and model-splitting implementations as they mature. No commercial-use fee or artificial owned-node cap. | Fleet enrollment campaigns, inventory, health monitoring, capacity reporting, coordinated upgrades and staged rollbacks. | Reduce ongoing administration across machines and sites. |\n| Sources and ingestion | Local collections, connector interfaces and connector implementations we release, manual configuration, updates/deletions, source versions, visible errors. | Managed connector configuration, centrally stored secret references, monitored sync schedules, failure alerts and supported connector operation. | Keep sources current without someone tending each deployment. |\n| Knowledge lifecycle | Raw evidence, proposed claims, human approval/correction, supersession, ownership metadata and history. | Organization-wide review queues, reviewer assignment, escalation rules and oversight reports. | Make shared maintenance accountable across departments. |\n| Investigations and handoffs | Cited briefs, uncertainty, source inspection, saved handoffs, accept/correct/reject, recorded outcomes and reuse. | Administer shared workflow templates and organizational rollout; operational reporting across workspaces. | Standardize a repeated workflow and see where it succeeds or needs attention. |\n| Workspace collaboration | Basic shared-workspace operation when implemented, manual member/role management, server-side scope enforcement and permission-preserving derived artifacts. | Directory-driven provisioning, group synchronization, delegated administration and centrally managed policy inheritance. | Avoid manual access administration as teams change. |\n| Identity and security | Local/device authentication, sessions and revocation, basic roles, supported transport protection, credential handling and security fixes. A basic standards-based login adapter belongs here when implemented. | SCIM/directory lifecycle automation, multi-directory configuration, organization-wide access review and policy administration. | Coordinate joiners, role changes, departures and oversight. SSO alone is not the business model. |\n| Access and action policies | Enforcement engine; source permissions; explicit routing scope; action allowlists; local human confirmation and denial of unauthorized work. | Central policy distribution, managed exceptions, multi-stage approval configuration and delegated policy ownership. | Apply and review consistent rules across deployments. Enforcement itself stays free. |\n| Audit and provenance | Local actor/action/source/model records, review history, security-relevant events and ordinary export. | Cross-deployment audit search, scheduled evidence reports, managed retention policies and external audit-log integrations. | Answer organization-wide oversight questions without assembling records by hand. |\n| Evaluation | Create/export cases, freeze holdouts, run local comparisons, inspect failures and record quality/cost/latency. | Scheduled fleet/workflow evaluations, regression alerts, approval-gated promotion and centralized comparisons. | Catch regressions routinely and coordinate releases. A user may automate the open CLI independently. |\n| Model improvement | Open evaluation formats and local improvement tools we build; manual candidate testing and loading, including adaptation only where justified. | Managed improvement jobs, versioned organizational approvals, monitored deployment and rollback. | Operate a repeatable improvement process rather than maintain scripts. No quality improvement is guaranteed. |\n| Backup, retention and portability | Export/import, documented backup/restore, local retention and deletion controls, customer-accessible data formats. | Managed backup scheduling, restore checks, retention administration and supported recovery procedures. | Reduce operational work and establish tested recovery practices. |\n| Hosting and deployment | Self-managed installation on supported customer hardware or infrastructure. | Supported private deployment and, later, optional managed infrastructure. Commercial management can run in the customer's environment. | Purchase deployment and operating convenience without requiring private data to move to Potluck's cloud. |\n| Support | Documentation, public issue reporting, community help and public security fixes. No response-time promise. | A defined supported configuration, onboarding scope, support hours and response commitments we can meet. | Have an accountable vendor for an operational dependency. |\n| External capacity | Open routing/client components retain their license; using one's own machines stays free. | Third-party capacity, hosted services or public-pool consumption may have separately disclosed charges under a future approved offer. | Buy actual resources. Tokens, rewards and public-pool pricing are separate unresolved work. |",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:4df83713-de6d-50b3-8315-266628e39bc3:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "9a87c255-562a-5339-8062-dc8669548e7f",
+                    "anchor": "first-offer-to-validate-1",
+                    "heading": "First offer to validate",
+                    "content": "**A bounded, supported private engineering-investigation pilot.** Buyer hypothesis: an engineering/platform leader responsible for an expensive recurring investigation and the system that supports it. A department inside a large enterprise is a valid starting customer.\n\n- One organization, one agreed workflow and supported deployment configuration, one approved model configuration, and one useful source integration or import path.\n- Deliver the cited brief → reviewer correction → recorded outcome → reusable knowledge/evaluation loop from the open core.\n- Add the minimum repeatable company operations: source/job health view, freshness/failure alerts, controlled configuration rollout and a defined support route. Implement these before promising them as available.\n- Include a documented install/upgrade/restore process and a short operating report. Authentication, workspace authorization, source lifecycle and export are prerequisites, including in the free core.\n- Agree baseline, success measures, scope, term and fee before a paid pilot begins. A paid pilot fee is a validation offer, not evidence of willingness to pay until a buyer accepts it.\n\nThe economic hypothesis is fewer hours gathering context and keeping the system working, with reviewable evidence and customer-controlled execution. The pilot must test both workflow usefulness and the reason to pay for company operations. Initial setup services can be scoped separately, but the business should converge on repeatable software and recurring operations rather than unlimited custom implementation.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:9a87c255-562a-5339-8062-dc8669548e7f:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "8f4fbaf3-9a6f-5840-859c-d38802b64dd4",
+                    "anchor": "packages-and-charging-approach-1",
+                    "heading": "Packages and charging approach",
+                    "content": "Rob subsequently approved using these package names in the website preview, with **Core $0 and company plans by discussion**. Company and Enterprise remain marked planned/in development. Rob subsequently approved publication; website commit `20434d3` is live, including [pricing](https://trypotluck.ai/pricing). No numeric paid prices or checkout are authorized by this note.\n\n| Package | Offer | Packaging direction |\n| --- | --- | --- |\n| **Potluck Core** | Complete self-managed foundation and useful workflows, including the free column above. | $0 software license fee for the core. Individual and commercial organizational use permitted under its license. Customer supplies resources and operates it. |\n| **Potluck Company** | Commercial management software plus a bounded supported private deployment: source/job health, approved model/configuration rollout, organizational oversight and support as those capabilities are delivered. | Recurring subscription. Initial pricing hypothesis: base fee per managed deployment/organization with included managed capacity and explicit extra service/resource costs. Do not meter locally generated tokens or tax every reader of company knowledge. Price and unit must be tested against value and support cost. |\n| **Enterprise deployment options** | Directory automation, multi-site administration, offline management, advanced audit integrations and broader support requirements. | Expansion of the same company product, with a scoped commercial agreement. Build only when a credible deployment requires it. No automatic 24/7 SLA, compliance certification or custom infrastructure promise. |",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:8f4fbaf3-9a6f-5840-859c-d38802b64dd4:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "400dad09-3f1c-50ab-baa5-11bfe65bb4c2",
+                    "anchor": "how-this-changes-the-build-plan-1",
+                    "heading": "How this changes the build plan",
+                    "content": "| Stage | Work and packaging | Gate |\n| --- | --- | --- |\n| Now: complete the first batch | All five deliverables in [[Potluck First Company Brain Build Batch]] are free core: source collections, reviewed knowledge/supersession, cited evidence lookup, investigation/handoff, review/evaluation. | Complete workflow and independent quality/scope checks. No billing or entitlement service dependency. |\n| Next: safe private pilot foundation | Authentication/authorization, source lifecycle, export/restore, reproducible deployment and one source integration belong in core where they provide baseline functionality. | Safe, repeatable operation; no customer multi-user rollout before authorization is enforced. |\n| First commercial increment | Company operations for that same supported configuration: monitored sources/jobs, centrally managed model/configuration changes and defined support. Keep additional admin workflows separate from core enforcement. | Independent repeat users and an accepted paid scope; demonstrate value and record support cost. |\n| Expansion | Directory lifecycle, policy administration, larger fleets, scheduled evaluation promotion and advanced audit integrations. | Buyer-backed operational need and evidence that the deployment can be supported sustainably. |\n| Later specialization | Managed adaptation and more ambitious model improvement, public-pool capacity or broader deployment options. | Measured task improvement or capacity need, viable cost, appropriate data rights and separate operational readiness. |",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:400dad09-3f1c-50ab-baa5-11bfe65bb4c2:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  },
+                  {
+                    "collection_id": "f5180d42-0e36-4215-af80-d0cbbfd26fa5",
+                    "document_id": "8f026a49-413f-5913-af3a-6f1b7db02240",
+                    "revision_id": "2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                    "relative_path": "packaging.md",
+                    "updated_at": "2026-10-30T15:54:24.188950+00:00",
+                    "chunk_id": "b47569d8-6785-56e7-b271-3d2c48e51304",
+                    "anchor": "exact-feature-boundary-3",
+                    "heading": "Exact feature boundary",
+                    "content": "The boundary is additional administration and service responsibility. Shared knowledge, basic collaboration, model splitting, citations, human review, and useful local evaluations are not automatically paid just because a company uses them.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:54:24.190642+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:b47569d8-6785-56e7-b271-3d2c48e51304:2cdcce36-a385-53f3-8e1b-dc14b87c4880"
+                  }
+                ],
+                "reviewed_claims": [],
+                "missing_evidence": [
+                  "Result limit reached; matching evidence was omitted."
+                ],
+                "limitations": [
+                  "Results reflect indexed snapshots; disk changes need a rescan.",
+                  "Word overlap does not establish relevance or entailment.",
+                  "At most 200 candidates per evidence kind are examined.",
+                  "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+                ],
+                "scope_status": {
+                  "requested": 1,
+                  "ready": 1,
+                  "unavailable": 0,
+                  "needs_rescan": 0
+                },
+                "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+                "truncated": true,
+                "retrieval_version": "v2",
+                "retrieval_trace": {
+                  "candidate_limit_reached": false,
+                  "preferred_chunks_per_document": 2,
+                  "deprioritized_chunks": 8,
+                  "result_omitted": 3,
+                  "result_limit_reached": true
+                }
+              },
+              "query_term_coverage": {
+                "what": false,
+                "available": true,
+                "free": true,
+                "core": true,
+                "versus": true,
+                "paid": true,
+                "company": true,
+                "offering": true,
+                "still": true,
+                "planned": true
+              },
+              "error": null
+            }
+          ],
+          "payloads": [
+            {
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "What is available in the free core versus the paid company offering, and what is still planned?",
+                  "operation": "answer"
+                }
+              ]
+            },
+            {
+              "issue": "What is available in the free core versus the paid company offering, and what is still planned?",
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "What is available in the free core versus the paid company offering, and what is still planned?",
+                  "operation": "answer"
+                }
+              ],
+              "snippets": [
+                {
+                  "snippet_id": "S1",
+                  "text": "1. Preserve the existing MIT core and already-open functionality. Do not move existing open features behind a proprietary paywall to create a paid tier.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S2",
+                  "text": "2. Keep local inference, owned-machine execution, and the complete first Company Brain workflow useful without a subscription or mandatory hosted account for local use.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S3",
+                  "text": "3. Keep basic authentication, authorization enforcement, source restrictions, deletion, security fixes, provenance, and data export in the core. A free deployment must not be unsafe by design.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S4",
+                  "text": "4. Do not impose artificial seat, document, token, source, or owned-machine caps on the self-hosted core. Technical capacity and safety limits still apply. Managed services may have transparent resource limits tied to actual operating costs.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S5",
+                  "text": "5. Keep customer-created knowledge, evaluation datasets, run artifacts, and exportable configurations portable. Customers retain their rights to their data and created artifacts; underlying model and third-party license conditions still apply.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S6",
+                  "text": "6. No implicit upload of private sources, traces, or training examples. Customer content is not pooled for Potluck training without separate explicit authorization. Access for support is explicit and scoped.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S7",
+                  "text": "7. Core functionality does not depend on a paid control service remaining available. Permission checks remain enforced during a management outage or subscription lapse; inability to verify authorization fails closed.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S8",
+                  "text": "8. Describe the product accurately: an open-source core with commercial organizational software/services. Identify any future proprietary component clearly; source-visible proprietary software is not described as open source.",
+                  "relative_path": "packaging.md",
+                  "heading": "Commitments to preserve"
+                },
+                {
+                  "snippet_id": "S9",
+                  "text": "**Rob's decision, October 28, 2026: keep Potluck's core open source while pursuing funding.** Rob requested this detailed free-versus-paid map as the working direction for subsequent builds.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Decision and status"
+                },
+                {
+                  "snippet_id": "S10",
+                  "text": "\nThis note translates that decision into a product boundary. It is an internal build policy, not a published price list, signed customer commitment, or claim that every listed capability exists. The core decision is explicit; package names, charging unit, commercial module structure, and pilot gates below are implementation recommendations to validate through use and purchasing evidence.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Decision and status"
+                },
+                {
+                  "snippet_id": "S11",
+                  "text": "\n**Free core:** run useful AI on infrastructure you control, complete a cited investigation, review the outcome, retain reusable knowledge, and evaluate improvements yourself.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Decision and status"
+                },
+                {
+                  "snippet_id": "S12",
+                  "text": "\n**Paid company offering:** deploy, administer, monitor, govern, and improve that system across an organization with less operational work and a defined support relationship.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Decision and status"
+                },
+                {
+                  "snippet_id": "S13",
+                  "text": "\nCompany size does not determine whether the core is free. An enterprise may self-host the open core for commercial use. Payment buys additional software or services, not permission to use the existing MIT code at work. Free software does not include free hardware, electricity, third-party APIs, cloud hosting, or other people's computing capacity.",
+                  "relative_path": "packaging.md",
+                  "heading": "Decision and status"
+                },
+                {
+                  "snippet_id": "S14",
+                  "text": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+                  "relative_path": "guide-gates.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S15",
+                  "text": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+                  "relative_path": "guide-intro.md",
+                  "heading": "Local Company Brain evidence and review"
+                },
+                {
+                  "snippet_id": "S16",
+                  "text": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S17",
+                  "text": "  - potluck\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S18",
+                  "text": "  - company-brain\n",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S19",
+                  "text": "  - implementation\n---",
+                  "relative_path": "progress.md",
+                  "heading": ""
+                },
+                {
+                  "snippet_id": "S20",
+                  "text": "| Area | Free and open core | Paid company offering | Reason a company might pay |\n| --- | --- | --- | --- |\n| Models and local clients | Desktop, CLI, local API, MCP, compatible local models, manual model selection and configuration. | Central approved-model catalog, organization rollout controls and fleet configuration. | Keep deployments consistent without manually configuring each machine. |\n| Owned compute and mesh | Pair approved machines; execute on selected owned infrastructure; core ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S21",
+                  "text": "scheduling, queues and model-splitting implementations as they mature. No commercial-use fee or artificial owned-node cap. | Fleet enrollment campaigns, inventory, health monitoring, capacity reporting, coordinated upgrades and staged rollbacks. | Reduce ongoing administration across machines and sites. |\n| Sources and ingestion | Local collections, connector interfaces and connector implementations we release, manual configuration, updates/deletions, source versions, visible errors. | Managed ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S22",
+                  "text": "connector configuration, centrally stored secret references, monitored sync schedules, failure alerts and supported connector operation. | Keep sources current without someone tending each deployment. |\n| Knowledge lifecycle | Raw evidence, proposed claims, human approval/correction, supersession, ownership metadata and history. | Organization-wide review queues, reviewer assignment, escalation rules and oversight reports. | Make shared maintenance accountable across departments. |\n| ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S23",
+                  "text": "Investigations and handoffs | Cited briefs, uncertainty, source inspection, saved handoffs, accept/correct/reject, recorded outcomes and reuse. | Administer shared workflow templates and organizational rollout; operational reporting across workspaces. | Standardize a repeated workflow and see where it succeeds or needs attention. |\n| Workspace collaboration | Basic shared-workspace operation when implemented, manual member/role management, server-side scope enforcement and permission-preserving ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S24",
+                  "text": "derived artifacts. | Directory-driven provisioning, group synchronization, delegated administration and centrally managed policy inheritance. | Avoid manual access administration as teams change. |\n| Identity and security | Local/device authentication, sessions and revocation, basic roles, supported transport protection, credential handling and security fixes. A basic standards-based login adapter belongs here when implemented. | SCIM/directory lifecycle automation, multi-directory ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S25",
+                  "text": "configuration, organization-wide access review and policy administration. | Coordinate joiners, role changes, departures and oversight. SSO alone is not the business model. |\n| Access and action policies | Enforcement engine; source permissions; explicit routing scope; action allowlists; local human confirmation and denial of unauthorized work. | Central policy distribution, managed exceptions, multi-stage approval configuration and delegated policy ownership. | Apply and review consistent ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S26",
+                  "text": "rules across deployments. Enforcement itself stays free. |\n| Audit and provenance | Local actor/action/source/model records, review history, security-relevant events and ordinary export. | Cross-deployment audit search, scheduled evidence reports, managed retention policies and external audit-log integrations. | Answer organization-wide oversight questions without assembling records by hand. |\n| Evaluation | Create/export cases, freeze holdouts, run local comparisons, inspect failures and ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S27",
+                  "text": "record quality/cost/latency. | Scheduled fleet/workflow evaluations, regression alerts, approval-gated promotion and centralized comparisons. | Catch regressions routinely and coordinate releases. A user may automate the open CLI independently. |\n| Model improvement | Open evaluation formats and local improvement tools we build; manual candidate testing and loading, including adaptation only where justified. | Managed improvement jobs, versioned organizational approvals, monitored deployment ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S28",
+                  "text": "and rollback. | Operate a repeatable improvement process rather than maintain scripts. No quality improvement is guaranteed. |\n| Backup, retention and portability | Export/import, documented backup/restore, local retention and deletion controls, customer-accessible data formats. | Managed backup scheduling, restore checks, retention administration and supported recovery procedures. | Reduce operational work and establish tested recovery practices. |\n| Hosting and deployment | Self-managed ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S29",
+                  "text": "installation on supported customer hardware or infrastructure. | Supported private deployment and, later, optional managed infrastructure. Commercial management can run in the customer's environment. | Purchase deployment and operating convenience without requiring private data to move to Potluck's cloud. |\n| Support | Documentation, public issue reporting, community help and public security fixes. No response-time promise. | A defined supported configuration, onboarding scope, support hours ",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S30",
+                  "text": "and response commitments we can meet. | Have an accountable vendor for an operational dependency. |\n| External capacity | Open routing/client components retain their license; using one's own machines stays free. | Third-party capacity, hosted services or public-pool consumption may have separately disclosed charges under a future approved offer. | Buy actual resources. Tokens, rewards and public-pool pricing are separate unresolved work. |",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                },
+                {
+                  "snippet_id": "S31",
+                  "text": "**A bounded, supported private engineering-investigation pilot.** Buyer hypothesis: an engineering/platform leader responsible for an expensive recurring investigation and the system that supports it. A department inside a large enterprise is a valid starting customer.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S32",
+                  "text": "\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S33",
+                  "text": "- One organization, one agreed workflow and supported deployment configuration, one approved model configuration, and one useful source integration or import path.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S34",
+                  "text": "- Deliver the cited brief → reviewer correction → recorded outcome → reusable knowledge/evaluation loop from the open core.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S35",
+                  "text": "- Add the minimum repeatable company operations: source/job health view, freshness/failure alerts, controlled configuration rollout and a defined support route. Implement these before promising them as available.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S36",
+                  "text": "- Include a documented install/upgrade/restore process and a short operating report. Authentication, workspace authorization, source lifecycle and export are prerequisites, including in the free core.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S37",
+                  "text": "- Agree baseline, success measures, scope, term and fee before a paid pilot begins. A paid pilot fee is a validation offer, not evidence of willingness to pay until a buyer accepts it.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S38",
+                  "text": "\nThe economic hypothesis is fewer hours gathering context and keeping the system working, with reviewable evidence and customer-controlled execution. The pilot must test both workflow usefulness and the reason to pay for company operations. Initial setup services can be scoped separately, but the business should converge on repeatable software and recurring operations rather than unlimited custom implementation.",
+                  "relative_path": "packaging.md",
+                  "heading": "First offer to validate"
+                },
+                {
+                  "snippet_id": "S39",
+                  "text": "Rob subsequently approved using these package names in the website preview, with **Core $0 and company plans by discussion**. Company and Enterprise remain marked planned/in development. Rob subsequently approved publication; website commit `20434d3` is live, including [pricing](https://trypotluck.ai/pricing). No numeric paid prices or checkout are authorized by this note.\n",
+                  "relative_path": "packaging.md",
+                  "heading": "Packages and charging approach"
+                },
+                {
+                  "snippet_id": "S40",
+                  "text": "\n| Package | Offer | Packaging direction |\n| --- | --- | --- |\n| **Potluck Core** | Complete self-managed foundation and useful workflows, including the free column above. | $0 software license fee for the core. Individual and commercial organizational use permitted under its license. Customer supplies resources and operates it. |\n| **Potluck Company** | Commercial management software plus a bounded supported private deployment: source/job health, approved model/configuration rollout, ",
+                  "relative_path": "packaging.md",
+                  "heading": "Packages and charging approach"
+                },
+                {
+                  "snippet_id": "S41",
+                  "text": "organizational oversight and support as those capabilities are delivered. | Recurring subscription. Initial pricing hypothesis: base fee per managed deployment/organization with included managed capacity and explicit extra service/resource costs. Do not meter locally generated tokens or tax every reader of company knowledge. Price and unit must be tested against value and support cost. |\n| **Enterprise deployment options** | Directory automation, multi-site administration, offline management, ",
+                  "relative_path": "packaging.md",
+                  "heading": "Packages and charging approach"
+                },
+                {
+                  "snippet_id": "S42",
+                  "text": "advanced audit integrations and broader support requirements. | Expansion of the same company product, with a scoped commercial agreement. Build only when a credible deployment requires it. No automatic 24/7 SLA, compliance certification or custom infrastructure promise. |",
+                  "relative_path": "packaging.md",
+                  "heading": "Packages and charging approach"
+                },
+                {
+                  "snippet_id": "S43",
+                  "text": "| Stage | Work and packaging | Gate |\n| --- | --- | --- |\n| Now: complete the first batch | All five deliverables in [[Potluck First Company Brain Build Batch]] are free core: source collections, reviewed knowledge/supersession, cited evidence lookup, investigation/handoff, review/evaluation. | Complete workflow and independent quality/scope checks. No billing or entitlement service dependency. |\n| Next: safe private pilot foundation | Authentication/authorization, source lifecycle, ",
+                  "relative_path": "packaging.md",
+                  "heading": "How this changes the build plan"
+                },
+                {
+                  "snippet_id": "S44",
+                  "text": "export/restore, reproducible deployment and one source integration belong in core where they provide baseline functionality. | Safe, repeatable operation; no customer multi-user rollout before authorization is enforced. |\n| First commercial increment | Company operations for that same supported configuration: monitored sources/jobs, centrally managed model/configuration changes and defined support. Keep additional admin workflows separate from core enforcement. | Independent repeat users and an ",
+                  "relative_path": "packaging.md",
+                  "heading": "How this changes the build plan"
+                },
+                {
+                  "snippet_id": "S45",
+                  "text": "accepted paid scope; demonstrate value and record support cost. |\n| Expansion | Directory lifecycle, policy administration, larger fleets, scheduled evaluation promotion and advanced audit integrations. | Buyer-backed operational need and evidence that the deployment can be supported sustainably. |\n| Later specialization | Managed adaptation and more ambitious model improvement, public-pool capacity or broader deployment options. | Measured task improvement or capacity need, viable cost, ",
+                  "relative_path": "packaging.md",
+                  "heading": "How this changes the build plan"
+                },
+                {
+                  "snippet_id": "S46",
+                  "text": "appropriate data rights and separate operational readiness. |",
+                  "relative_path": "packaging.md",
+                  "heading": "How this changes the build plan"
+                },
+                {
+                  "snippet_id": "S47",
+                  "text": "The boundary is additional administration and service responsibility. Shared knowledge, basic collaboration, model splitting, citations, human review, and useful local evaluations are not automatically paid just because a company uses them.",
+                  "relative_path": "packaging.md",
+                  "heading": "Exact feature boundary"
+                }
+              ],
+              "quantities": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "source_text": "1",
+                  "value": "1",
+                  "unit": ""
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S2",
+                  "source_text": "2",
+                  "value": "2",
+                  "unit": ""
+                },
+                {
+                  "id": "N3",
+                  "snippet_id": "S3",
+                  "source_text": "3",
+                  "value": "3",
+                  "unit": ""
+                },
+                {
+                  "id": "N4",
+                  "snippet_id": "S4",
+                  "source_text": "4",
+                  "value": "4",
+                  "unit": ""
+                },
+                {
+                  "id": "N5",
+                  "snippet_id": "S5",
+                  "source_text": "5",
+                  "value": "5",
+                  "unit": ""
+                },
+                {
+                  "id": "N6",
+                  "snippet_id": "S6",
+                  "source_text": "6",
+                  "value": "6",
+                  "unit": ""
+                },
+                {
+                  "id": "N7",
+                  "snippet_id": "S7",
+                  "source_text": "7",
+                  "value": "7",
+                  "unit": ""
+                },
+                {
+                  "id": "N8",
+                  "snippet_id": "S8",
+                  "source_text": "8",
+                  "value": "8",
+                  "unit": ""
+                },
+                {
+                  "id": "N9",
+                  "snippet_id": "S43",
+                  "source_text": "five deliverables",
+                  "value": "5",
+                  "unit": "deliverables"
+                }
+              ],
+              "extraction_notices": [
+                {
+                  "snippet_id": "S9",
+                  "citation_id": "source:b3d53dba-372f-5517-be56-702a7b02402d:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "28, 2026: keep Potluck's core open source ",
+                  "start": 26,
+                  "end": 68,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S9",
+                  "citation_id": "source:b3d53dba-372f-5517-be56-702a7b02402d:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "2026: keep Potluck's core open source while ",
+                  "start": 30,
+                  "end": 74,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "2026-10-28\nupdated: 2026-10-29\nstatus: in-pr",
+                  "start": 13,
+                  "end": 57,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "10-28\nupdated: 2026-10-29\nstatus: in-progr",
+                  "start": 18,
+                  "end": 60,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "28\nupdated: 2026-10-29\nstatus: in-progress",
+                  "start": 21,
+                  "end": 63,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "2026-10-29\nstatus: in-progress\ntags:\n",
+                  "start": 33,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "10-29\nstatus: in-progress\ntags:\n",
+                  "start": 38,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S16",
+                  "citation_id": "source:1617ae3d-ddb5-5f8e-abd2-2fa65e41b8c8:87612bd5-7bac-59cf-979f-1117d637815f",
+                  "source_text": "29\nstatus: in-progress\ntags:\n",
+                  "start": 41,
+                  "end": 70,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S30",
+                  "citation_id": "source:4df83713-de6d-50b3-8315-266628e39bc3:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "one's own machines stays free. | Third-part",
+                  "start": 181,
+                  "end": 224,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S33",
+                  "citation_id": "source:9a87c255-562a-5339-8062-dc8669548e7f:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "One organization, one agreed workflow and s",
+                  "start": 2,
+                  "end": 45,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S33",
+                  "citation_id": "source:9a87c255-562a-5339-8062-dc8669548e7f:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "one agreed workflow and supported deploymen",
+                  "start": 20,
+                  "end": 63,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S33",
+                  "citation_id": "source:9a87c255-562a-5339-8062-dc8669548e7f:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "one approved model configuration, and one u",
+                  "start": 80,
+                  "end": 123,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S33",
+                  "citation_id": "source:9a87c255-562a-5339-8062-dc8669548e7f:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "one useful source integration or import pat",
+                  "start": 118,
+                  "end": 161,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S39",
+                  "citation_id": "source:8f4fbaf3-9a6f-5840-859c-d38802b64dd4:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "0 and company plans by discussion**. Comp",
+                  "start": 89,
+                  "end": 130,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S39",
+                  "citation_id": "source:8f4fbaf3-9a6f-5840-859c-d38802b64dd4:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "20434d3` is live, including [pricing](https:",
+                  "start": 242,
+                  "end": 286,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S40",
+                  "citation_id": "source:8f4fbaf3-9a6f-5840-859c-d38802b64dd4:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "0 software license fee for the core. Indi",
+                  "start": 175,
+                  "end": 216,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S42",
+                  "citation_id": "source:8f4fbaf3-9a6f-5840-859c-d38802b64dd4:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "24/7 SLA, compliance certification or custom",
+                  "start": 203,
+                  "end": 247,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S44",
+                  "citation_id": "source:400dad09-3f1c-50ab-baa5-11bfe65bb4c2:2cdcce36-a385-53f3-8e1b-dc14b87c4880",
+                  "source_text": "one source integration belong in core where",
+                  "start": 44,
+                  "end": 87,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                }
+              ],
+              "answer_parts": {
+                "R1": [
+                  {
+                    "id": "R1P1",
+                    "request_span": "What is available in the free core versus the paid company offering"
+                  },
+                  {
+                    "id": "R1P2",
+                    "request_span": "and what is still planned?"
+                  }
+                ]
+              },
+              "evidence_notices": [
+                "Result limit reached; matching evidence was omitted."
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "conflict-v12": {
+      "fixture_sums_sha256": "f80904200972dd990d0502b7447833b6f3e18eb269390a1afdebbb2113c71afd",
+      "metadata_checks": {
+        "recorded_fixture_hashes": true,
+        "recorded_snapshot_manifest": true,
+        "snapshot_path": true,
+        "version": true,
+        "seed": true,
+        "retries": true,
+        "plan_origin": true,
+        "raw_case_ids": true,
+        "no_assessment": true
+      },
+      "code_identity": {
+        "matches": true,
+        "expected_count": 153,
+        "recorded_count": 153,
+        "missing": [],
+        "extra": [],
+        "changed": []
+      },
+      "cases": {
+        "quill": {
+          "status": "success",
+          "error": null,
+          "checks": {
+            "registered_allowed": true,
+            "registered_excluded": true,
+            "scope_excludes_canary": true,
+            "retrieval_scope_retrieval-001.json": true,
+            "retrieval_canary_absent_retrieval-001.json": true,
+            "prompt_canary_absent_001": true,
+            "prompt_canary_absent_002": true,
+            "raw_reply_canary_absent_001": true,
+            "raw_reply_canary_absent_002": true,
+            "planner_input_operations_only": true,
+            "planner_schema": true,
+            "answer_canary_absent": true,
+            "attached_source_0": true,
+            "attached_source_1": true,
+            "attached_source_2": true,
+            "all_snippets_in_presented_content": true,
+            "paragraph_trace_rebuilt": true,
+            "snippets_rebuilt": true,
+            "planner_provenance": true,
+            "prefix_invariant_source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed": true,
+            "prefix_invariant_source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10": true,
+            "prefix_invariant_source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64": true,
+            "planner_raw_decodes_to_stored_plan": true,
+            "final_schema_fixed_ids_required": true,
+            "fixed_parts_match_plan_R1": true,
+            "v3_catalog_and_notices_rebuilt": true,
+            "answer_binding_0": true,
+            "part_binding_0_0": true,
+            "part_ordered_span_0_0": true,
+            "part_binding_0_1": true,
+            "part_ordered_span_0_1": true,
+            "aggregate_derived_0": true,
+            "coverage_gaps_rebuilt": true
+          },
+          "errors": [],
+          "retrieval": [
+            {
+              "file": "retrieval-001.json",
+              "query": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+              "result": {
+                "workspace": "pilot-eval",
+                "scope": {
+                  "collection_ids": [
+                    "728c7cf0-37da-4118-b462-37456346f3d6"
+                  ]
+                },
+                "source_chunks": [
+                  {
+                    "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+                    "document_id": "d93158e7-dc0a-5e44-bca5-5c904ddc22ec",
+                    "revision_id": "cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                    "relative_path": "sources/quill_a.md",
+                    "updated_at": "2026-10-30T15:58:58.902730+00:00",
+                    "chunk_id": "6ec56296-7317-5492-937b-a2ec16109ffa",
+                    "anchor": "quill-working-note-1",
+                    "heading": "Quill working note 1",
+                    "content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed"
+                  },
+                  {
+                    "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+                    "document_id": "13a8c381-525d-58df-80af-852bd223f807",
+                    "revision_id": "ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                    "relative_path": "sources/quill_b.md",
+                    "updated_at": "2026-10-30T15:58:58.903674+00:00",
+                    "chunk_id": "14e37219-7c36-5cf1-9e8c-0dc0e34e5606",
+                    "anchor": "quill-working-note-2",
+                    "heading": "Quill working note 2",
+                    "content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10"
+                  },
+                  {
+                    "collection_id": "728c7cf0-37da-4118-b462-37456346f3d6",
+                    "document_id": "2c7e2c87-cbcb-57a0-91a0-b690054245c3",
+                    "revision_id": "6377b6a1-995d-5333-846c-c0b0c1427c64",
+                    "relative_path": "sources/quill_c.md",
+                    "updated_at": "2026-10-30T15:58:58.904328+00:00",
+                    "chunk_id": "418f46cf-a918-58f5-a09a-e7c6f782fd86",
+                    "anchor": "quill-working-note-3",
+                    "heading": "Quill working note 3",
+                    "content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+                    "kind": "source_chunk",
+                    "last_scan_at": "2026-10-30T15:58:58.904422+00:00",
+                    "freshness": "recent",
+                    "uncertainty": "Source text has not been reviewed.",
+                    "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64"
+                  }
+                ],
+                "reviewed_claims": [],
+                "missing_evidence": [],
+                "limitations": [
+                  "Results reflect indexed snapshots; disk changes need a rescan.",
+                  "Word overlap does not establish relevance or entailment.",
+                  "At most 200 candidates per evidence kind are examined.",
+                  "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+                ],
+                "scope_status": {
+                  "requested": 1,
+                  "ready": 1,
+                  "unavailable": 0,
+                  "needs_rescan": 0
+                },
+                "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+                "truncated": false,
+                "retrieval_version": "v2",
+                "retrieval_trace": {
+                  "candidate_limit_reached": false,
+                  "preferred_chunks_per_document": 2,
+                  "deprioritized_chunks": 0,
+                  "result_omitted": 0,
+                  "result_limit_reached": false
+                }
+              },
+              "query_term_coverage": {
+                "approved": false,
+                "quill": true,
+                "ferry": false,
+                "winter": true,
+                "timetable": true,
+                "what": false,
+                "first": true,
+                "departure": true,
+                "time": true
+              },
+              "error": null
+            }
+          ],
+          "payloads": [
+            {
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+                  "operation": "answer"
+                }
+              ]
+            },
+            {
+              "issue": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+              "operations": [
+                {
+                  "id": "R1",
+                  "question_id": "Q1",
+                  "request": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?",
+                  "operation": "answer"
+                }
+              ],
+              "snippets": [
+                {
+                  "snippet_id": "S1",
+                  "text": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n",
+                  "relative_path": "sources/quill_a.md",
+                  "heading": "Quill working note 1"
+                },
+                {
+                  "snippet_id": "S2",
+                  "text": "\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+                  "relative_path": "sources/quill_a.md",
+                  "heading": "Quill working note 1"
+                },
+                {
+                  "snippet_id": "S3",
+                  "text": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n",
+                  "relative_path": "sources/quill_b.md",
+                  "heading": "Quill working note 2"
+                },
+                {
+                  "snippet_id": "S4",
+                  "text": "\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+                  "relative_path": "sources/quill_b.md",
+                  "heading": "Quill working note 2"
+                },
+                {
+                  "snippet_id": "S5",
+                  "text": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n",
+                  "relative_path": "sources/quill_c.md",
+                  "heading": "Quill working note 3"
+                },
+                {
+                  "snippet_id": "S6",
+                  "text": "\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+                  "relative_path": "sources/quill_c.md",
+                  "heading": "Quill working note 3"
+                }
+              ],
+              "quantities": [],
+              "extraction_notices": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                  "source_text": "06:40. The\ndraft leaves the approval field",
+                  "start": 61,
+                  "end": 103,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                  "source_text": "40. The\ndraft leaves the approval field bl",
+                  "start": 64,
+                  "end": 106,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                  "source_text": "07:10 and does\nnot identify the approver. ",
+                  "start": 62,
+                  "end": 104,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                  "source_text": "10 and does\nnot identify the approver. Nei",
+                  "start": 65,
+                  "end": 107,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                  "source_text": "two times.\n",
+                  "start": 154,
+                  "end": 165,
+                  "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+                }
+              ],
+              "answer_parts": {
+                "R1": [
+                  {
+                    "id": "R1P1",
+                    "request_span": "approved Quill Ferry’s winter timetable"
+                  },
+                  {
+                    "id": "R1P2",
+                    "request_span": "first departure time"
+                  }
+                ]
+              },
+              "evidence_notices": []
+            }
+          ],
+          "paragraph_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "snippet_count": 6,
+          "evidence_count": 3,
+          "spans": {
+            "R1": {
+              "offsets": [
+                [
+                  4,
+                  43
+                ],
+                [
+                  61,
+                  81
+                ]
+              ],
+              "gaps": [
+                "Who ",
+                ", and what is the ",
+                "?"
+              ]
+            }
+          },
+          "missing_evidence": null,
+          "evidence": [
+            {
+              "path": "sources/quill_a.md",
+              "presented_content": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n\nTo prepare the shared working folder, staff place the latest notes beside the intake\nsheet and retain the previous copy in the archive. A coordinator checks the file\nname and the date before the next handoff. If a document is missing, the team\nrecords that gap and asks for the original; a replacement is not assumed to exist.",
+              "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed"
+            },
+            {
+              "path": "sources/quill_b.md",
+              "presented_content": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n\nFor routine handoffs, open the checklist, mark the items already reviewed, and\nleave the remainder for the next shift. The checklist is a record of work in\nprogress, not an authorization to change the underlying arrangement. Staff can\nadd a short note when a handoff crosses a weekend or a public holiday.",
+              "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10"
+            },
+            {
+              "path": "sources/quill_c.md",
+              "presented_content": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n\nThe office keeps a separate log for day-to-day questions. Each entry contains the\ndate received and a brief description, followed by the initials of the person\nwho filed it. Entries are reviewed in batches, and outdated drafts stay labeled\nas drafts until someone supplies a verified replacement.",
+              "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64"
+            }
+          ],
+          "brief": {
+            "questions": [
+              {
+                "id": "R1",
+                "text": "Who approved Quill Ferry’s winter timetable, and what is the first departure time?"
+              }
+            ],
+            "answers": [
+              {
+                "question_id": "R1",
+                "status": "conflicting",
+                "text": "The approval field is blank in the draft timetable note (S1), and the separate timetable note does not identify the approver (S3). The collection does not contain a signed approval record (S5).\nThe first departure time is 06:40 in one draft (S1) and 07:10 in another note (S3).",
+                "snippet_ids": [
+                  "S1",
+                  "S3",
+                  "S5"
+                ],
+                "source_excerpts": [
+                  {
+                    "snippet_id": "S1",
+                    "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                    "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+                  },
+                  {
+                    "snippet_id": "S3",
+                    "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                    "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+                  },
+                  {
+                    "snippet_id": "S5",
+                    "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+                    "quote": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n"
+                  }
+                ],
+                "parts": [
+                  {
+                    "request_span": "approved Quill Ferry’s winter timetable",
+                    "status": "unknown",
+                    "text": "The approval field is blank in the draft timetable note (S1), and the separate timetable note does not identify the approver (S3). The collection does not contain a signed approval record (S5).",
+                    "snippet_ids": [
+                      "S1",
+                      "S3",
+                      "S5"
+                    ],
+                    "source_excerpts": [
+                      {
+                        "snippet_id": "S1",
+                        "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                        "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+                      },
+                      {
+                        "snippet_id": "S3",
+                        "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                        "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+                      },
+                      {
+                        "snippet_id": "S5",
+                        "citation_id": "source:418f46cf-a918-58f5-a09a-e7c6f782fd86:6377b6a1-995d-5333-846c-c0b0c1427c64",
+                        "quote": "Staff should keep draft timetable copies together and label them with the\ndate received. The collection does not contain a signed approval record.\n"
+                      }
+                    ],
+                    "id": "R1P1"
+                  },
+                  {
+                    "request_span": "first departure time",
+                    "status": "conflicting",
+                    "text": "The first departure time is 06:40 in one draft (S1) and 07:10 in another note (S3).",
+                    "snippet_ids": [
+                      "S1",
+                      "S3"
+                    ],
+                    "source_excerpts": [
+                      {
+                        "snippet_id": "S1",
+                        "citation_id": "source:6ec56296-7317-5492-937b-a2ec16109ffa:cc6d7232-4500-56c1-98b2-5a8b15835eed",
+                        "quote": "A draft of the winter timetable names the first departure as 06:40. The\ndraft leaves the approval field blank.\n"
+                      },
+                      {
+                        "snippet_id": "S3",
+                        "citation_id": "source:14e37219-7c36-5cf1-9e8c-0dc0e34e5606:ca6c2718-59c4-5aee-a45e-a8b46a982e10",
+                        "quote": "A separate timetable note lists the first winter departure as 07:10 and does\nnot identify the approver. Neither note records a final decision between the\ntwo times.\n"
+                      }
+                    ],
+                    "id": "R1P2"
+                  }
+                ]
+              }
+            ],
+            "facts": [],
+            "prior_fixes": [],
+            "hypotheses": [],
+            "recommended_checks": [],
+            "model_uncertainties": []
+          }
+        }
+      }
+    }
+  }
+}

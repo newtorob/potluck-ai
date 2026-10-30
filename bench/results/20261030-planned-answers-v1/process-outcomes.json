@@ -1,0 +1,46 @@
+[
+  {
+    "name": "v11",
+    "command": [
+      "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/run_fresh.py",
+      "--snapshot",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/baseline-frozen/apps/desktop/python",
+      "--snapshot-manifest",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/baseline-frozen/snapshot.json",
+      "--fixture-dir",
+      "/Users/rob/Documents/potluck/apps/desktop/python/evals/company_brain/planned_answers_v1",
+      "--model",
+      "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+      "--sha256",
+      "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "--version",
+      "v11",
+      "--output",
+      "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v11"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "v12",
+    "command": [
+      "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/run_fresh.py",
+      "--snapshot",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-frozen/apps/desktop/python",
+      "--snapshot-manifest",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/planned-answers/candidate-frozen/snapshot.json",
+      "--fixture-dir",
+      "/Users/rob/Documents/potluck/apps/desktop/python/evals/company_brain/planned_answers_v1",
+      "--model",
+      "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+      "--sha256",
+      "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "--version",
+      "v12",
+      "--output",
+      "/Users/rob/Documents/potluck/bench/results/20261030-planned-answers-v1/8b-v12"
+    ],
+    "exit_code": 0
+  }
+]

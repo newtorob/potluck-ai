@@ -1,0 +1,326 @@
+{
+  "method": "Frozen readiness rubric: every required criterion including specified attached-source support, and no forbidden claim. Errors remain in denominator. Source availability alone is not attached support.",
+  "fixture_limitations": "Quartz plan supplies a single difference operation, not an explicit second percentage operation; missing percentage cannot cleanly be attributed to regression. Its source averages are nevertheless plainly stated. Six cases and full rubric remain unchanged. Small synthetic scopes and one seed do not establish pilot readiness.",
+  "arms": {
+    "8b-v11": {
+      "denominator": 6,
+      "ready_cases": 1,
+      "cases": {
+        "harbor": {
+          "criteria": [
+            {
+              "criterion": "Identify CSV exports of completed orders and paid workspace administrators, supported by harbor_guide.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "State five active schedules, at most daily cadence, and exclusion of pending and cancelled orders, supported by harbor_limits.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "Identify weekly/monthly cadence and optional cancelled orders as planned, not shipped, supported by harbor_roadmap.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "Identify the requested schedule API as undecided and unscheduled, supported by harbor_roadmap.md.",
+              "answer_text": true,
+              "attached_support": true
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": true,
+          "answer_status": "supported",
+          "notes": "All four facets supported by S1 guide, S3 limits, S5 roadmap.",
+          "quote_binding": "attached excerpts resolve to evidence"
+        },
+        "orchard": {
+          "criteria": [
+            {
+              "criterion": "Describe accounts payable coordinator receipt, checks, ledger entry and routing, supported by orchard_receipt.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe budget owner checks, approval and mismatch investigation, supported by orchard_approval.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe treasury specialist Thursday payment run, fourteen-day eligibility, payment and reference, supported by orchard_payment.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "lumen": {
+          "criteria": [
+            {
+              "criterion": "State the four consecutive hour production outage threshold, paid workspace, exclusions, ten percent amount and thirty-day request window, supported by lumen_policy.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe portal request and support verification and decision, supported by lumen_process.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe next invoice application, invoice adjustment tracking, no cash payout and carryforward, supported by lumen_billing.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "cedar": {
+          "criteria": [
+            {
+              "criterion": "Report conflicting October 18 and October 25 targets without choosing a launch date, citing cedar_product_update.md and cedar_operations_update.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Identify Mira Chen as launch readiness coordinator, supported by cedar_product_update.md or cedar_operations_update.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Identify open support case viewing and contact detail updates as first release scope, supported by cedar_launch_note.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Do not assert a customer launch has occurred; employee preview is distinct, supported by cedar_launch_note.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "maple": {
+          "criteria": [
+            {
+              "criterion": "Say customer retention rate cannot be determined from the provided documents, citing maple_snapshot.md and maple_process.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Report twelve expiring contracts, eight renewed, two not renewed and two unresolved, supported by maple_pipeline.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Explain that contracts are not necessarily distinct customers, supported by maple_pipeline.md or maple_snapshot.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "quartz": {
+          "criteria": [
+            {
+              "criterion": "State the average fell from 20 to 15 calendar days, a decrease of 5 days and 25 percent relative to the first period, supported by quartz_first.md and quartz_second.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Explain that the measure is elapsed calendar days from signed agreement to completed setup for completed cohorts, supported by quartz_first.md and quartz_second.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Avoid claiming a cause from this comparison, supported by quartz_context.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": "unknown",
+          "notes": "Answer asserts calculation unavailable and exact values not clearly extractable; S1 and S3 actually quote 20 and 15 calendar days and measurement definition. The answer does not state required facts or attach context source.",
+          "quote_binding": "attached excerpts resolve to evidence"
+        }
+      }
+    },
+    "8b-v12": {
+      "denominator": 6,
+      "ready_cases": 0,
+      "cases": {
+        "harbor": {
+          "criteria": [
+            {
+              "criterion": "Identify CSV exports of completed orders and paid workspace administrators, supported by harbor_guide.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "State five active schedules, at most daily cadence, and exclusion of pending and cancelled orders, supported by harbor_limits.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Identify weekly/monthly cadence and optional cancelled orders as planned, not shipped, supported by harbor_roadmap.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Identify the requested schedule API as undecided and unscheduled, supported by harbor_roadmap.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "orchard": {
+          "criteria": [
+            {
+              "criterion": "Describe accounts payable coordinator receipt, checks, ledger entry and routing, supported by orchard_receipt.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe budget owner checks, approval and mismatch investigation, supported by orchard_approval.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe treasury specialist Thursday payment run, fourteen-day eligibility, payment and reference, supported by orchard_payment.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "lumen": {
+          "criteria": [
+            {
+              "criterion": "State the four consecutive hour production outage threshold, paid workspace, exclusions, ten percent amount and thirty-day request window, supported by lumen_policy.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe portal request and support verification and decision, supported by lumen_process.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Describe next invoice application, invoice adjustment tracking, no cash payout and carryforward, supported by lumen_billing.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "cedar": {
+          "criteria": [
+            {
+              "criterion": "Report conflicting October 18 and October 25 targets without choosing a launch date, citing cedar_product_update.md and cedar_operations_update.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "Identify Mira Chen as launch readiness coordinator, supported by cedar_product_update.md or cedar_operations_update.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "Identify open support case viewing and contact detail updates as first release scope, supported by cedar_launch_note.md.",
+              "answer_text": true,
+              "attached_support": true
+            },
+            {
+              "criterion": "Do not assert a customer launch has occurred; employee preview is distinct, supported by cedar_launch_note.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": "conflicting",
+          "notes": "S1 operations and S5 product attach both target dates and coordinator; S3 launch note supports first-release scope. No customer launch claimed, but employee-preview versus customer-launch distinction is absent from answer and attached S3; fourth criterion fails.",
+          "quote_binding": "attached excerpts resolve to evidence"
+        },
+        "maple": {
+          "criteria": [
+            {
+              "criterion": "Say customer retention rate cannot be determined from the provided documents, citing maple_snapshot.md and maple_process.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Report twelve expiring contracts, eight renewed, two not renewed and two unresolved, supported by maple_pipeline.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Explain that contracts are not necessarily distinct customers, supported by maple_pipeline.md or maple_snapshot.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": null,
+          "notes": "Invalid model format; no answer.",
+          "quote_binding": "not assessable: no answer"
+        },
+        "quartz": {
+          "criteria": [
+            {
+              "criterion": "State the average fell from 20 to 15 calendar days, a decrease of 5 days and 25 percent relative to the first period, supported by quartz_first.md and quartz_second.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Explain that the measure is elapsed calendar days from signed agreement to completed setup for completed cohorts, supported by quartz_first.md and quartz_second.md.",
+              "answer_text": false,
+              "attached_support": false
+            },
+            {
+              "criterion": "Avoid claiming a cause from this comparison, supported by quartz_context.md.",
+              "answer_text": false,
+              "attached_support": false
+            }
+          ],
+          "forbidden_violations": [],
+          "ready": false,
+          "answer_status": "unknown",
+          "notes": "Answer says exact averages are not provided, but attached S1 and S3 clearly give 20 and 15 calendar days; no required answer or context citation.",
+          "quote_binding": "attached excerpts resolve to evidence"
+        }
+      }
+    }
+  }
+}

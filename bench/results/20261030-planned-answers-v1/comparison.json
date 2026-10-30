@@ -1,0 +1,268 @@
+{
+  "decision": "Do not promote internalv12. No UI/default switch changed.",
+  "strict_complete_answer_and_support": {
+    "v11": 1,
+    "v12": 0,
+    "denominator": 6
+  },
+  "usable_saved_drafts": {
+    "v11": 2,
+    "v12": 2,
+    "denominator": 6
+  },
+  "semantic_review_agreement": true,
+  "method": "Same six frozen synthetic cases/scopes, seed7 installedqwen3-8b-q4 CPU-only; fixture-supplied mainplans. V12 source-free factual partplans are planned_unreviewed. No post-freeze production/prompt tuning or retries.",
+  "development": {
+    "dev1": {
+      "pilot-readiness": {
+        "pass": false,
+        "notes": "No final answer;240.419s timeout."
+      },
+      "core-company": {
+        "pass": false,
+        "notes": "No final answer;255.096s timeout."
+      },
+      "quill": {
+        "pass": true,
+        "notes": "Read full answer and S1/S3/S5 bindings. Approver unknown;06:40 and07:10 unresolved, coherent per-part and aggregate conflict labels."
+      }
+    },
+    "dev2": {
+      "pilot-readiness": {
+        "pass": false,
+        "notes": "No final answer;241.029s timeout."
+      },
+      "core-company": {
+        "pass": false,
+        "notes": "No final answer;241.178s timeout."
+      }
+    }
+  },
+  "cases": {
+    "harbor": {
+      "v11": {
+        "status": "success",
+        "error": null,
+        "latency_seconds": 91.30119658447802,
+        "assessment": {
+          "required": [
+            true,
+            true,
+            true,
+            true
+          ],
+          "pass": true,
+          "status_coherent": true,
+          "notes": "S1 guide supports paid admin/completed CSV; S3 limits supports all three limits; S5 roadmap supports planned cadence/filter and undecided API. No forbidden claim."
+        }
+      },
+      "v12": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 206.0492071248591,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Fixed IDs all present and distinct, but text lengths {'R1P1': 914, 'R1P2': 447, 'R1P3': 458} exceed1000 aggregate including overhead. Raw prose not counted as saved/attached answer. Regression from baseline usable complete answer."
+        }
+      }
+    },
+    "orchard": {
+      "v11": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 154.62545108236372,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Raw reply repeats full question span for six parts; invalid format. Raw prose is not accepted/attached answer evidence."
+        }
+      },
+      "v12": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 102.92850645724684,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Saved final reply contains an unescaped newline/control character inside the first JSON string and is rejected by JSON decoding. The attempted prose also reaches the per-part cap mid-sentence and would exceed aggregate length if repaired; fixed IDs are visible but not a valid decoded answer."
+        }
+      }
+    },
+    "lumen": {
+      "v11": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 92.96269704122096,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Raw reply repeats applied/tracked request span and exceeds aggregate answer budget; validation rejects it."
+        }
+      },
+      "v12": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 6.6069422494620085,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "Planner failure before final generation. Last span how is the credit tracked is a paraphrase absent from original request; exact-substring validation rejects it."
+        }
+      }
+    },
+    "cedar": {
+      "v11": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 46.04754833411425,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Raw first part uses the full question, followed by overlapping owner/scope spans; format validation rejects it. Raw status/date wording also does not clearly preserve conflict, but not scored as a saved answer."
+        }
+      },
+      "v12": {
+        "status": "success",
+        "error": null,
+        "latency_seconds": 72.87652120832354,
+        "assessment": {
+          "required": [
+            true,
+            true,
+            true,
+            false
+          ],
+          "pass": false,
+          "status_coherent": true,
+          "notes": "Usable draft, correct conflicting targets(S1/S5), coordinator(S1/S5), approved scope(S3). It does not claim launch occurred, but omits employee-preview versus customer-launch distinction and lacks attached launch-note preview paragraph. Frozen fourth criterion not fully satisfied."
+        }
+      }
+    },
+    "maple": {
+      "v11": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 137.74706054199487,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Raw repeated/full overlapping spans plus nonexact capitalized span; validation rejects it."
+        }
+      },
+      "v12": {
+        "status": "error",
+        "error": {
+          "type": "ValueError",
+          "message": "Invalid model format"
+        },
+        "latency_seconds": 122.04323483351618,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "No usable draft. Fixed IDs present but long duplicated factual prose exceeds aggregate answer budget. Known renewal facts are also marked unknown in raw second part; no score given for raw rejected output."
+        }
+      }
+    },
+    "quartz": {
+      "v11": {
+        "status": "success",
+        "error": null,
+        "latency_seconds": 59.72645749989897,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": null,
+          "notes": "Saved unavailable-calculation draft, no requested result or measurement explanation. S1/S3 show20/15calendar days but quantity parser cannot extract that expression. The response says values are not clearly provided although sources state them. Independent fixture-plan issue also requires percentage under single difference operation."
+        }
+      },
+      "v12": {
+        "status": "success",
+        "error": null,
+        "latency_seconds": 36.512467665597796,
+        "assessment": {
+          "required": [
+            false,
+            false,
+            false
+          ],
+          "pass": false,
+          "status_coherent": false,
+          "notes": "Saved unavailable-calculation draft misses requested values/calculation/measurement meaning. Parser does not extract calendar days (only40/50onboarding counts); response falsely says exact averages not provided though attached excerpts explicitlystate20/15. Also fixture-plan cannot explicitly represent requested percentage under one difference operation."
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Quartz one difference operation does not represent both requested arithmetic outputs; keep denominator, annotate fixture-plan issue.",
+    "Small synthetic source set; lacks requested list-format stress coverage.",
+    "No pilot readiness or long-corpus claim."
+  ]
+}

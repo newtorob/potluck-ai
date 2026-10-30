@@ -1,0 +1,103 @@
+{
+  "scope": "Read-only isolated decoder diagnostics using saved prompts/replies. Snippet IDs/text are exact saved prompt values; citation IDs are placeholders, so this is not a source-binding audit. Does not repair or score invalid output.",
+  "cases": {
+    "v11/cedar": {
+      "strict_json_valid": true,
+      "text_lengths": [
+        468,
+        136,
+        202
+      ],
+      "aggregate_chars_with_overhead": 812,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Invalid span"
+      }
+    },
+    "v11/lumen": {
+      "strict_json_valid": true,
+      "text_lengths": [
+        530,
+        453,
+        401
+      ],
+      "aggregate_chars_with_overhead": 1390,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Invalid span"
+      }
+    },
+    "v11/maple": {
+      "strict_json_valid": true,
+      "text_lengths": [
+        313,
+        313,
+        320,
+        320,
+        302,
+        302
+      ],
+      "aggregate_chars_with_overhead": 1882,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Invalid span"
+      }
+    },
+    "v11/orchard": {
+      "strict_json_valid": true,
+      "text_lengths": [
+        370,
+        180,
+        301,
+        205,
+        302,
+        147
+      ],
+      "aggregate_chars_with_overhead": 1517,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Invalid span"
+      }
+    },
+    "v12/harbor": {
+      "plan_valid": true,
+      "strict_json_valid": true,
+      "text_lengths": [
+        914,
+        447,
+        458
+      ],
+      "aggregate_chars_with_overhead": 1825,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Answer too long"
+      }
+    },
+    "v12/lumen": {
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      }
+    },
+    "v12/maple": {
+      "plan_valid": true,
+      "strict_json_valid": true,
+      "text_lengths": [
+        635,
+        939
+      ],
+      "aggregate_chars_with_overhead": 1578,
+      "replayed_rejection": {
+        "type": "ValueError",
+        "message": "Answer too long"
+      }
+    },
+    "v12/orchard": {
+      "plan_valid": true,
+      "replayed_rejection": {
+        "type": "JSONDecodeError",
+        "message": "Invalid control character at: line 1 column 1078 (char 1077)"
+      }
+    }
+  }
+}

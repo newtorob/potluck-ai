@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-70c49ff3-a7b5-4818-a30a-1c619cd6f4ff",
+  "object": "chat.completion",
+  "created": 1793375423,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"What is actually ready for a Company Brain pilot\", \"what remains blocked\", \"what evidence supports that?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 27,
+    "total_tokens": 136
+  }
+}

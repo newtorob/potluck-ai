@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0b45b743-b6a7-4b76-ac19-f65374a1d70f",
+  "object": "chat.completion",
+  "created": 1793377511,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"How does Orchard handle a supplier invoice from receipt through approval and payment\", \"and who owns each stage?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 27,
+    "total_tokens": 136
+  }
+}

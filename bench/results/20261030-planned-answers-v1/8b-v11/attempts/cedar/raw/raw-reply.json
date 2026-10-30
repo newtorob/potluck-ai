@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0ec6cbab-64bb-4232-8c11-e21f61e2c862",
+  "object": "chat.completion",
+  "created": 1793377033,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"parts\": [{\"snippet_ids\": [\"S1\", \"S5\"], \"text\": \"Cedar’s new customer portal is scheduled to launch on October 25 according to the operations update, while the product update mentions an October 18 target. Mira Chen is named as the launch readiness coordinator in both the operations update and the product update. The scope of the portal is confirmed to include letting customers view their open support cases and update contact details, with payment history and invoice downloads not approved for the first release.\" , \"status\": \"supported\", \"request_span\": \"When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?\"}, {\"snippet_ids\": [\"S1\", \"S5\"], \"text\": \"The launch is owned by Mira Chen, who is named as the launch readiness coordinator in both the operations update and the product update.\", \"status\": \"supported\", \"request_span\": \"who owns the launch\"}, {\"snippet_ids\": [\"S3\"], \"text\": \"The scope of the portal is confirmed to include letting customers view their open support cases and update contact details, with payment history and invoice downloads not approved for the first release.\", \"status\": \"supported\", \"request_span\": \"what is confirmed about its scope\"}]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1212,
+    "completion_tokens": 270,
+    "total_tokens": 1482
+  }
+}

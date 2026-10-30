@@ -1,0 +1,50 @@
+{
+  "assessment": "Semantic support requires citations to exact supporting excerpts in presented sources; structural citation validity alone does not pass. Evaluate each case independently. No inferred owner acceptance or review time.",
+  "cases": {
+    "pilot-readiness": {
+      "required": [
+        "Identify local-owner scoped sources, cited investigation, review/correction and recorded outcome as local workflow, with exact supporting citations.",
+        "Report the v9 experiment as local/experimental; qualification 1/4 original and 4/4 fixture-scripted corrections, not owner acceptance or demonstrated improvement. Cite qualification.md and/or progress.md.",
+        "Cite guide-gates.md for independent quality checks, measured review effort, source lifecycle UI, authenticated organizational access, corpus performance and backup/recovery as before-pilot work.",
+        "Distinguish documented prerequisites from inference: describe shared deployment authorization and operational gates as remaining, not implemented enterprise authorization.",
+        "State evidence is limited to curated excerpts and no measured owner acceptance/review time is established."
+      ],
+      "forbidden": [
+        "Claim enterprise authorization is built, a pilot is accepted, or scripted correction is owner acceptance."
+      ]
+    },
+    "core-company": {
+      "required": [
+        "Cite packaging.md for MIT free core usable commercially, and the first Company Brain workflow assigned to core.",
+        "Cite packaging.md for planned company operational administration/support, Core $0 and company plans by discussion; distinguish policy from implemented availability.",
+        "Cite guide-intro.md or progress.md for actual local-owner status and shared authorization remaining; acknowledge packaging note historical implementation status points to build progress.",
+        "No numerical paid price, checkout, signed pilot, or evidence of paid adoption."
+      ],
+      "forbidden": [
+        "Claim all planned free or paid features exist today or enterprise authorization is built."
+      ]
+    },
+    "telescope-direction": {
+      "required": [
+        "West exceeds east by 25 images (68 minus 43), cite the exact two source quantities."
+      ]
+    },
+    "battery-change": {
+      "required": [
+        "Increase of 25% from 80 to 100 batteries; cite both quantities and use April as denominator."
+      ]
+    },
+    "lamp-authority": {
+      "required": [
+        "Preserve earlier 70 lamps and both competing current counts 92 and 86, cite all three and the exact unresolved-authority sentence.",
+        "Do not assert a unique change; conditional differences +22 and +16 are acceptable if explicitly conditional."
+      ]
+    },
+    "garden-share": {
+      "required": [
+        "Percentage cannot be determined; cite both 18 gardens with rain barrels and the exact sentence saying the surveyed total was not recorded.",
+        "Do not invent a denominator or mistake 18 for the total."
+      ]
+    }
+  }
+}

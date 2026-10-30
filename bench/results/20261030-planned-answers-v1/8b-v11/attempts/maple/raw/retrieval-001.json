@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc"
+  ],
+  "query": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc",
+        "document_id": "d3a27060-7978-5806-abfa-7071b3435688",
+        "revision_id": "26065ffa-d1d9-5258-94b0-93edc73712e7",
+        "relative_path": "sources/maple_snapshot.md",
+        "updated_at": "2026-10-30T16:17:59.563556+00:00",
+        "chunk_id": "b137be3b-43b6-5f7b-bf1e-eec597647c14",
+        "anchor": "quarter-end-snapshot",
+        "heading": "Quarter-end snapshot",
+        "content": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n\nThe snapshot was prepared after the quarter closed and includes open negotiations as unresolved rather than automatically treating them as lost.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:59.563624+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b137be3b-43b6-5f7b-bf1e-eec597647c14:26065ffa-d1d9-5258-94b0-93edc73712e7"
+      },
+      {
+        "collection_id": "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc",
+        "document_id": "ccd7b74b-a5c6-5ea8-8354-3bcfb89c7c9f",
+        "revision_id": "1ee31133-6e07-5ca6-ab63-c15197a09db4",
+        "relative_path": "sources/maple_process.md",
+        "updated_at": "2026-10-30T16:17:59.563016+00:00",
+        "chunk_id": "d2583930-95db-5537-afad-47142818e215",
+        "anchor": "renewal-process",
+        "heading": "Renewal process",
+        "content": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:59.563624+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d2583930-95db-5537-afad-47142818e215:1ee31133-6e07-5ca6-ab63-c15197a09db4"
+      },
+      {
+        "collection_id": "91dc64f2-8f91-46eb-8f5f-ccca2b44eecc",
+        "document_id": "6ee1718d-41a7-5709-93da-11b5888f9f32",
+        "revision_id": "cc9c34c6-d5ca-5d9e-a9c2-f5bd129840e2",
+        "relative_path": "sources/maple_pipeline.md",
+        "updated_at": "2026-10-30T16:17:59.562353+00:00",
+        "chunk_id": "d6372e86-91d0-5190-b1c5-e170ca09daae",
+        "anchor": "enterprise-renewal-pipeline",
+        "heading": "Enterprise renewal pipeline",
+        "content": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:59.563624+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d6372e86-91d0-5190-b1c5-e170ca09daae:cc9c34c6-d5ca-5d9e-a9c2-f5bd129840e2"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

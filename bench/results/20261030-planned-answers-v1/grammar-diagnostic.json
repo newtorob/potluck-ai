@@ -1,0 +1,19 @@
+{
+  "scope": "Offline schema conversion for saved Harbor requests; no generation or performance attribution",
+  "measurements": {
+    "8b-v11": {
+      "schema_chars": 714,
+      "grammar_chars": 13524,
+      "grammar_lines": 17,
+      "grammar_conversion_seconds": 0.006051458418369293,
+      "user_prompt_chars": 3362
+    },
+    "8b-v12": {
+      "schema_chars": 1360,
+      "grammar_chars": 26724,
+      "grammar_lines": 32,
+      "grammar_conversion_seconds": 0.00019904132932424545,
+      "user_prompt_chars": 2931
+    }
+  }
+}

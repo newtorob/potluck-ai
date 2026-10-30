@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "5a658476-c7a5-4d28-b7a4-27df17f64d17"
+  ],
+  "query": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "5a658476-c7a5-4d28-b7a4-27df17f64d17"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "5a658476-c7a5-4d28-b7a4-27df17f64d17",
+        "document_id": "51cd4d33-1852-5b82-b9f6-955ffca65282",
+        "revision_id": "d389ce27-7baa-5f5f-8f47-be7d22dafabf",
+        "relative_path": "sources/cedar_operations_update.md",
+        "updated_at": "2026-10-30T16:17:13.489098+00:00",
+        "chunk_id": "7de80a96-9ca0-5625-be2b-55e062c488a4",
+        "anchor": "operations-update",
+        "heading": "Operations update",
+        "content": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:13.489697+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7de80a96-9ca0-5625-be2b-55e062c488a4:d389ce27-7baa-5f5f-8f47-be7d22dafabf"
+      },
+      {
+        "collection_id": "5a658476-c7a5-4d28-b7a4-27df17f64d17",
+        "document_id": "4eeb5da7-a773-51b2-ac3f-9425b0b320d0",
+        "revision_id": "bd44a48f-a697-5315-a69e-5e102b21540d",
+        "relative_path": "sources/cedar_launch_note.md",
+        "updated_at": "2026-10-30T16:17:13.488365+00:00",
+        "chunk_id": "6b9e16b1-0cde-5b15-ba82-22794d4a208a",
+        "anchor": "portal-launch-note",
+        "heading": "Portal launch note",
+        "content": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:13.489697+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6b9e16b1-0cde-5b15-ba82-22794d4a208a:bd44a48f-a697-5315-a69e-5e102b21540d"
+      },
+      {
+        "collection_id": "5a658476-c7a5-4d28-b7a4-27df17f64d17",
+        "document_id": "94cc82b9-38a9-533e-8f08-d0a3dc5d26a9",
+        "revision_id": "4b314932-6595-5981-9b04-0280f1778edb",
+        "relative_path": "sources/cedar_product_update.md",
+        "updated_at": "2026-10-30T16:17:13.489621+00:00",
+        "chunk_id": "5135ba61-8a56-5a6e-a2df-0f7b63a921aa",
+        "anchor": "product-update",
+        "heading": "Product update",
+        "content": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T16:17:13.489697+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:5135ba61-8a56-5a6e-a2df-0f7b63a921aa:4b314932-6595-5981-9b04-0280f1778edb"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}
