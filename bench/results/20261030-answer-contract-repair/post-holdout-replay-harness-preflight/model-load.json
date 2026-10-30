@@ -1,0 +1,11 @@
+{
+  "report": {
+    "mode": "recorded-response-replay",
+    "model_loaded": false,
+    "source_run": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/fresh-v13"
+  },
+  "inference_summary": {
+    "new_inference": false
+  },
+  "actual_placement_note": "See runtime report."
+}

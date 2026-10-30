@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fa600fb1-8ef1-44e9-a79b-936375ff1be0",
+  "object": "chat.completion",
+  "created": 1793380512,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{ \"R1\": { \"R1P1\": { \"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase\", \"status\": \"unknown\"}, \"R1P2\": { \"snippet_ids\": [\"S3\", \"S4\"], \"text\": \"The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for\", \"status\": \"unknown\"}, \"R1P3\": { \"snippet_ids\": [\"S5\", \"S6\"], \"text\": \"The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside\", \"status\": \"unknown\"}, \"R1P4\": { \"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\", \"S5\", \"S6\"], \"text\": \"At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase\", \"status\": \"unknown\"} } }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 738,
+    "completion_tokens": 320,
+    "total_tokens": 1058
+  }
+}

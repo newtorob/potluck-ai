@@ -1,0 +1,16 @@
+{
+  "quartz": [
+    {
+      "request": "How did Quartz average onboarding time change in calendar days from the first period to the second?",
+      "operation": "difference"
+    },
+    {
+      "request": "What was the percentage change in Quartz average onboarding time from the first period to the second?",
+      "operation": "percent_change"
+    },
+    {
+      "request": "What do the Quartz onboarding figures measure?",
+      "operation": "answer"
+    }
+  ]
+}

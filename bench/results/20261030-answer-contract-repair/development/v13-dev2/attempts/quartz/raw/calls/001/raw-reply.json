@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5bfcd042-a5da-4b4d-8adc-37886d414d99",
+  "object": "chat.completion",
+  "created": 1793381646,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R3\": [\"What specific metrics do the Quartz onboarding figures track?\", \"What aspects of user onboarding are measured by Quartz figures?\", \"What data points are included in the Quartz onboarding figures?\", \"What do the figures in Quartz's onboarding process represent?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 93,
+    "completion_tokens": 56,
+    "total_tokens": 149
+  }
+}

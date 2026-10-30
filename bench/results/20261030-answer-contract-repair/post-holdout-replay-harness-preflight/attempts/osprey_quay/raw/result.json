@@ -1,0 +1,17 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "AttributeError",
+    "message": "'ReplayRuntime' object has no attribute 'validate_investigation_profile'"
+  },
+  "failure_stage": "pre_inference",
+  "latency_seconds": 0.00019299983978271484,
+  "setup_seconds": 0.02314708288758993,
+  "attempt_total_seconds": 0.023340082727372646,
+  "finished_at": "2026-10-30T18:08:31.940797+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "sidecar": {
+    "exit_code": 0,
+    "elapsed_seconds": 416.57609724998474
+  },
+  "fast": {
+    "exit_code": 0,
+    "elapsed_seconds": 31.074660417623818
+  }
+}

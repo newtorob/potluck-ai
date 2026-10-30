@@ -1,0 +1,363 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "8fa61034-217f-4232-984f-6b648e14c280",
+    "workspace": "pilot-eval",
+    "issue": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file. The team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page. A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace\nA workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.\nThe reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request. The roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+              "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+              "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+              "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+              "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+              "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+              "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+            }
+          ],
+          "parts": [
+            {
+              "id": "R1P1",
+              "label": "List the current capabilities of export scheduling for Harbor customers.",
+              "status": "supported",
+              "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file. The team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page. A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                  "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                  "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+                }
+              ]
+            },
+            {
+              "id": "R1P2",
+              "label": "Identify the existing limitations of export scheduling in Harbor.",
+              "status": "supported",
+              "text": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+              "snippet_ids": [
+                "S3",
+                "S4"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+                }
+              ]
+            },
+            {
+              "id": "R1P3",
+              "label": "Outline the planned improvements for export scheduling in Harbor.",
+              "status": "supported",
+              "text": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request. The roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+              "snippet_ids": [
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                  "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                  "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+        "document_id": "25e91832-e48d-52ff-ad13-a870f3bde97b",
+        "revision_id": "94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+        "relative_path": "sources/harbor_guide.md",
+        "updated_at": "2026-10-30T17:24:01.107140+00:00",
+        "chunk_id": "23374977-40ac-5f35-8552-290546ebe9ff",
+        "anchor": "harbor-export-scheduling",
+        "heading": "Harbor export scheduling",
+        "content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+        "presented_content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+      },
+      {
+        "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+        "document_id": "522b8e05-2e13-503f-b376-fbf5842774af",
+        "revision_id": "8feb4813-78e9-5e3d-bac5-13821a3260d6",
+        "relative_path": "sources/harbor_limits.md",
+        "updated_at": "2026-10-30T17:24:01.108137+00:00",
+        "chunk_id": "43bb4da1-67df-5c75-b8b5-ff4809d7293b",
+        "anchor": "operational-limits",
+        "heading": "Operational limits",
+        "content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+        "presented_content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+      },
+      {
+        "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+        "document_id": "cb93f12e-ce71-50ea-9391-dbfdab90a270",
+        "revision_id": "9233dcda-6fa1-5e42-8c03-cdc59f831760",
+        "relative_path": "sources/harbor_roadmap.md",
+        "updated_at": "2026-10-30T17:24:01.108971+00:00",
+        "chunk_id": "dedc5389-7ba2-5403-a533-93ab64d9fe97",
+        "anchor": "reporting-work-planned",
+        "heading": "Reporting work planned",
+        "content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+        "presented_content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T17:26:35.035772+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 153914,
+      "created_at": "2026-10-30T17:26:35.035772+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "label": "List the current capabilities of export scheduling for Harbor customers."
+          },
+          {
+            "id": "R1P2",
+            "label": "Identify the existing limitations of export scheduling in Harbor."
+          },
+          {
+            "id": "R1P3",
+            "label": "Outline the planned improvements for export scheduling in Harbor."
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "deliverable-labels-v1",
+      "answer_part_unmatched_text": {},
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+          "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+          "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+          "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+          "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+          "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+          "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+          "source_text": "seven days. Scheduling does not grant access ",
+          "start": 288,
+          "end": 333,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+          "source_text": "five active export schedules. A schedule run",
+          "start": 31,
+          "end": 75,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "291f9ca6-95fd-44c1-89aa-1e03b3775e47"
+    ]
+  },
+  "latency_seconds": 153.92664816696197,
+  "setup_seconds": 0.03352983295917511,
+  "attempt_total_seconds": 153.96017799992114,
+  "finished_at": "2026-10-30T17:26:35.043894+00:00"
+}

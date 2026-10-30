@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ef7f41c1-d3f3-4cb3-9274-f4d3100f6320",
+  "object": "chat.completion",
+  "created": 1793381195,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Orchard's invoice receipt process starts with the procurement team receiving the invoice, followed by the accounts recei\", \"The invoice is then forwarded to the finance team for approval, with the finance manager owning the approval stage\", \"Once approved, the payment is processed by the accounts payable department, with the accounts payable clerk owning the支付\", \"The entire process is documented in Orchard's system, with audit trails maintained for each stage\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 104,
+    "completion_tokens": 92,
+    "total_tokens": 196
+  }
+}

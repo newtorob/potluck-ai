@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-caa413a5-946a-4228-bc54-530743ba3a87",
+  "object": "chat.completion",
+  "created": 1793382390,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"receipt\", \"approval\", \"payment\", \"who owns each stage\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 104,
+    "completion_tokens": 19,
+    "total_tokens": 123
+  }
+}

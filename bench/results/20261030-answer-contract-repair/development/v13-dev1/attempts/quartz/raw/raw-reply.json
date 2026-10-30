@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-8e046663-e7d8-4c3c-8bee-75b902eae9aa",
+  "object": "chat.completion",
+  "created": 1793380796,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R3\": [\"Quartz onboarding figures measure user sign-up rates\", \"they track the number of new users joining the platform\", \"they provide insights into the effectiveness of onboarding processes\", \"they are used to evaluate user acquisition strategies\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 87,
+    "completion_tokens": 50,
+    "total_tokens": 137
+  }
+}

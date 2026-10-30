@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "28721aca-3252-4d73-8ac4-698ac0e8ee48"
+  ],
+  "query": "What is known about the Osprey Quay migration schedule, the scope of the disagreement, and who will decide between the dates? Distinguish the other dated events.",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "28721aca-3252-4d73-8ac4-698ac0e8ee48"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "28721aca-3252-4d73-8ac4-698ac0e8ee48",
+        "document_id": "2365ceff-0b36-58a2-b5d1-7e34edf098ed",
+        "revision_id": "5e68ad4d-b00f-5c3b-b9e0-784a18be1514",
+        "relative_path": "sources/osprey_quay/source-3.md",
+        "updated_at": "2026-10-30T17:59:52.768910+00:00",
+        "chunk_id": "4cb02486-9600-56c2-9855-2802612558b9",
+        "anchor": "migration-governance-minutes-10-april-2026",
+        "heading": "Migration governance minutes — 10 April 2026",
+        "content": "Representatives from delivery, customer operations, and infrastructure reviewed the two published cutover entries. They agreed the inconsistency could affect customer communications and that an explicit decision is needed before notifications are finalized. The minutes do not contain a vote, a chosen date, or an approval to treat either document as authoritative. The group distinguishes the date of a technical rehearsal from the date customer operations will limit editing and from the date the managed ledger takes over production traffic. A new date should only be added to customer notifications after the decision is recorded with the affected teams. The records describe the migration of the shared reservation ledger used by every terminal, not a phased rollout by terminal; the conflicting cutover entries therefore cannot be reconciled by treating one as a pilot and the other as a general launch. The minutes have been circulated for follow-up, but circulation itself is not a decision. No decision-making role is assigned by implication from attendance at the meeting.\n\nThe minutes explicitly say the person or role authorized to choose between the 21 April and 23 April cutover dates has not yet been identified. The resolution date is also unrecorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:59:52.768993+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4cb02486-9600-56c2-9855-2802612558b9:5e68ad4d-b00f-5c3b-b9e0-784a18be1514"
+      },
+      {
+        "collection_id": "28721aca-3252-4d73-8ac4-698ac0e8ee48",
+        "document_id": "bbeaeeb9-1ed9-5c94-950e-fdc924a1432b",
+        "revision_id": "02eba2dc-a551-5016-a15d-a70159fab0d8",
+        "relative_path": "sources/osprey_quay/source-2.md",
+        "updated_at": "2026-10-30T17:59:52.768237+00:00",
+        "chunk_id": "19daa234-b00f-5360-87b3-b2e25803c031",
+        "anchor": "customer-operations-calendar-8-april-2026",
+        "heading": "Customer operations calendar — 8 April 2026",
+        "content": "The customer operations calendar lists notifications that must be sent before the booking service is placed in a read-only state. Terminal operators need enough notice to move any time-sensitive edits, while the support team needs a staffed response channel for the period around cutover. The calendar's operational owner maintains customer-facing dates, but the calendar does not explain who has authority to settle a disagreement with engineering about the live cutover. The entries cover the shared service used by all terminals; no individual terminal has a separate migration date in this calendar. An internal test of notification templates appears on the calendar as a preparation event and does not represent any service restriction. Customer operations has not recorded a successful production cutover or a final decision on the calendar discrepancy. Staff should report the discrepancy instead of silently choosing the later date because it appears in the newer document.\n\nThe calendar lists a customer read-only window on 20 April and live ledger cutover on 23 April 2026. It conflicts with the delivery note's 21 April cutover date, but both entries concern the same shared-service migration.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:59:52.768993+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:19daa234-b00f-5360-87b3-b2e25803c031:02eba2dc-a551-5016-a15d-a70159fab0d8"
+      },
+      {
+        "collection_id": "28721aca-3252-4d73-8ac4-698ac0e8ee48",
+        "document_id": "fc1ea27d-14f2-572d-b1d2-b5301aea81b1",
+        "revision_id": "e0e18387-7c1d-5e6a-9e43-b162afce481a",
+        "relative_path": "sources/osprey_quay/source-1.md",
+        "updated_at": "2026-10-30T17:59:52.767500+00:00",
+        "chunk_id": "08de33f4-2a8c-52a1-a3df-b3e4919080ca",
+        "anchor": "migration-delivery-note-4-april-2026",
+        "heading": "Migration delivery note — 4 April 2026",
+        "content": "Osprey Quay operates a booking service for independent ferry terminals. The delivery team is moving the reservation ledger from a legacy database to a managed database. The rollout plan separates the internal rehearsal, customer read-only window, and cutover because each event has different participants and rollback conditions. The rehearsal uses copied data and does not change customer bookings. The read-only window temporarily prevents new edits while the team checks the migrated ledger; customers can still view their existing bookings during that window. Cutover is the event at which the managed database becomes the live system of record. A rollback plan remains available if reconciliation fails, and the team will retain the old database until the post-cutover verification completes. The delivery team has told customer support to avoid describing the rehearsal as a customer launch. Individual terminals are not required to change their own software for this migration. The implementation work applies to all terminals served by the shared booking service, rather than just a single pilot terminal.\n\nThe delivery note schedules the internal rehearsal for 14 April and the live ledger cutover for 21 April 2026. These are separate events; the rehearsal does not switch production traffic.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:59:52.768993+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:08de33f4-2a8c-52a1-a3df-b3e4919080ca:e0e18387-7c1d-5e6a-9e43-b162afce481a"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

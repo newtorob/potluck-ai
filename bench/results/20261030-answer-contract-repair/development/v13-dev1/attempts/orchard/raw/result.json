@@ -1,0 +1,393 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "9f3bc12d-26dc-49b3-90ef-89d32b623a97",
+    "workspace": "pilot-eval",
+    "issue": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase\nThe budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for\nThe treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside\nAt Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+              "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+              "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+              "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+              "quote": "\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+              "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+              "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+            }
+          ],
+          "parts": [
+            {
+              "id": "R1P1",
+              "label": "Invoice Receipt Process",
+              "status": "unknown",
+              "text": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase",
+              "snippet_ids": [
+                "S1",
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+                  "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+                  "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+                }
+              ]
+            },
+            {
+              "id": "R1P2",
+              "label": "Invoice Approval Ownership",
+              "status": "unknown",
+              "text": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for",
+              "snippet_ids": [
+                "S3",
+                "S4"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+                  "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+                  "quote": "\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+                }
+              ]
+            },
+            {
+              "id": "R1P3",
+              "label": "Invoice Payment Process",
+              "status": "unknown",
+              "text": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside",
+              "snippet_ids": [
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+                  "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+                  "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+                }
+              ]
+            },
+            {
+              "id": "R1P4",
+              "label": "Stage Ownership Overview",
+              "status": "unknown",
+              "text": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+                  "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+                  "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+                  "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+                  "quote": "\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+                  "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+                  "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "f6e1214e-ccd8-4ce1-a21d-3c12605f621e",
+        "document_id": "997dad09-ecb0-50bf-9c02-015ae432aeda",
+        "revision_id": "0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+        "relative_path": "sources/orchard_receipt.md",
+        "updated_at": "2026-10-30T17:14:57.463924+00:00",
+        "chunk_id": "d1ef0535-1203-51cd-9ac4-91372a7835fa",
+        "anchor": "supplier-invoice-intake",
+        "heading": "Supplier invoice intake",
+        "content": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:14:57.463995+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+        "presented_content": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+      },
+      {
+        "collection_id": "f6e1214e-ccd8-4ce1-a21d-3c12605f621e",
+        "document_id": "26424b3a-1262-5107-a2ac-e6ece9ab850c",
+        "revision_id": "bf123097-58e8-5209-b24e-7be59965ba1d",
+        "relative_path": "sources/orchard_approval.md",
+        "updated_at": "2026-10-30T17:14:57.462617+00:00",
+        "chunk_id": "dfac623d-0bab-5e26-a360-2e4784595121",
+        "anchor": "budget-approval",
+        "heading": "Budget approval",
+        "content": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:14:57.463995+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+        "presented_content": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+      },
+      {
+        "collection_id": "f6e1214e-ccd8-4ce1-a21d-3c12605f621e",
+        "document_id": "1d643a12-fe4f-5543-854b-290c7543087a",
+        "revision_id": "711f81a0-b8f8-5ba5-808d-22229131dfb1",
+        "relative_path": "sources/orchard_payment.md",
+        "updated_at": "2026-10-30T17:14:57.463339+00:00",
+        "chunk_id": "a2717ea6-7c5d-5f85-a97a-508b209c109f",
+        "anchor": "payment-run",
+        "heading": "Payment run",
+        "content": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:14:57.463995+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+        "presented_content": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T17:16:08.609045+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 71134,
+      "created_at": "2026-10-30T17:16:08.609045+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "label": "Invoice Receipt Process"
+          },
+          {
+            "id": "R1P2",
+            "label": "Invoice Approval Ownership"
+          },
+          {
+            "id": "R1P3",
+            "label": "Invoice Payment Process"
+          },
+          {
+            "id": "R1P4",
+            "label": "Stage Ownership Overview"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "deliverable-labels-v1",
+      "answer_part_unmatched_text": {},
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+          "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:d1ef0535-1203-51cd-9ac4-91372a7835fa:0d0a9de5-6bae-5bbf-a89e-7a492a02c139",
+          "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+          "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:dfac623d-0bab-5e26-a360-2e4784595121:bf123097-58e8-5209-b24e-7be59965ba1d",
+          "quote": "\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+          "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+          "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:a2717ea6-7c5d-5f85-a97a-508b209c109f:711f81a0-b8f8-5ba5-808d-22229131dfb1",
+          "source_text": "fourteen days. Treasury sends the payment and re",
+          "start": 129,
+          "end": 177,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "f6e1214e-ccd8-4ce1-a21d-3c12605f621e"
+    ]
+  },
+  "latency_seconds": 71.1455775424838,
+  "setup_seconds": 0.027701208367943764,
+  "attempt_total_seconds": 71.17327875085175,
+  "finished_at": "2026-10-30T17:16:08.616260+00:00"
+}

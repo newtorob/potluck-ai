@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "95cdba41-aff2-4a9d-ac22-68bb78d2af1b"
+  ],
+  "query": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "95cdba41-aff2-4a9d-ac22-68bb78d2af1b"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+        "document_id": "a005a1ee-7f4a-51ad-b26d-fe8b83b89207",
+        "revision_id": "b4293a57-2d2f-552c-934f-8db7123902b0",
+        "relative_path": "sources/orchard_receipt.md",
+        "updated_at": "2026-10-30T17:26:35.063926+00:00",
+        "chunk_id": "44b2d71b-9e1c-549a-b6e5-7dce156cd7d4",
+        "anchor": "supplier-invoice-intake",
+        "heading": "Supplier invoice intake",
+        "content": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0"
+      },
+      {
+        "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+        "document_id": "203ddfc7-2ecb-5600-85e0-acb5ca720ee1",
+        "revision_id": "38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+        "relative_path": "sources/orchard_approval.md",
+        "updated_at": "2026-10-30T17:26:35.062517+00:00",
+        "chunk_id": "6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5",
+        "anchor": "budget-approval",
+        "heading": "Budget approval",
+        "content": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20"
+      },
+      {
+        "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+        "document_id": "65351b84-b996-5c69-9bfb-c5fb56a79ed7",
+        "revision_id": "77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+        "relative_path": "sources/orchard_payment.md",
+        "updated_at": "2026-10-30T17:26:35.063277+00:00",
+        "chunk_id": "298953df-eb85-588e-85b9-736d3e284541",
+        "anchor": "payment-run",
+        "heading": "Payment run",
+        "content": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

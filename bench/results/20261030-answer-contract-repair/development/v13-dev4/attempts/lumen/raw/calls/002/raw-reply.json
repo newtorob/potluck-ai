@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-97b968c9-03d6-4637-a3a9-0abaf4d64be3",
+  "object": "chat.completion",
+  "created": 1793382594,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\", \"S5\", \"S6\"], \"text\": \"Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours due to a Lumen service incident. Planned maintenance announced at least 48 hours in advance and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending. A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later. Billing applys\" , \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 688,
+    "completion_tokens": 230,
+    "total_tokens": 918
+  }
+}

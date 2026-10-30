@@ -1,0 +1,905 @@
+{
+  "id": "e59ee015-7d33-4921-8eae-ee91f13068b0",
+  "workspace": "pilot-eval",
+  "issue": "For Copper Wren, how much did median resolution time change in business days and percent from the before period to the after period, and what exactly was measured?",
+  "model_slug": "qwen3-8b-q4",
+  "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "status": "reviewed",
+  "brief": {
+    "questions": [
+      {
+        "id": "R1",
+        "text": "How much did median resolution time change in business days from the before period to the after period?"
+      },
+      {
+        "id": "R2",
+        "text": "What was the percent change in median resolution time from the before period to the after period?"
+      },
+      {
+        "id": "R3",
+        "text": "What exactly was measured, including population and exclusions?"
+      }
+    ],
+    "answers": [
+      {
+        "question_id": "R1",
+        "status": "supported",
+        "text": "Signed difference: 1.25 business day.",
+        "snippet_ids": [
+          "S4",
+          "S5"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "quote": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+          },
+          {
+            "snippet_id": "S5",
+            "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+            "quote": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort "
+          }
+        ],
+        "calculation": {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 1.25 business day.",
+          "formula": "after - before",
+          "result": "1.25",
+          "unit": "business day",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N2",
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "source_text": "3.75 business days",
+              "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+              "start": 65,
+              "end": 83,
+              "value": "3.75",
+              "unit": "business day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "source_text": "5 business days",
+              "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+              "start": 144,
+              "end": 159,
+              "value": "5",
+              "unit": "business day",
+              "dimension": "compound_day"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v4",
+          "normalized_inputs": [
+            {
+              "id": "N2",
+              "role": "before",
+              "value": "3.75",
+              "unit": "business day",
+              "original_value": "3.75",
+              "original_unit": "business day",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N3",
+              "role": "after",
+              "value": "5",
+              "unit": "business day",
+              "original_value": "5",
+              "original_unit": "business day",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "5 business day - 3.75 business day = 1.25 business day (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "minuend_id": "N3",
+            "subtrahend_id": "N2"
+          },
+          "known_input_snippet_ids": [
+            "S4",
+            "S5"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      },
+      {
+        "question_id": "R2",
+        "status": "supported",
+        "text": "Signed percent change: -25 %.",
+        "snippet_ids": [
+          "S4",
+          "S5"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "quote": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+          },
+          {
+            "snippet_id": "S5",
+            "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+            "quote": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort "
+          }
+        ],
+        "calculation": {
+          "request_id": "R2",
+          "operation": "percent_change",
+          "status": "computed",
+          "text": "Signed percent change: -25 %.",
+          "formula": "(after - before) / before × 100",
+          "result": "-25",
+          "unit": "%",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N3",
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "source_text": "5 business days",
+              "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+              "start": 144,
+              "end": 159,
+              "value": "5",
+              "unit": "business day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "source_text": "3.75 business days",
+              "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+              "start": 65,
+              "end": 83,
+              "value": "3.75",
+              "unit": "business day",
+              "dimension": "compound_day"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v4",
+          "normalized_inputs": [
+            {
+              "id": "N3",
+              "role": "before",
+              "value": "5",
+              "unit": "business day",
+              "original_value": "5",
+              "original_unit": "business day",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "3.75",
+              "unit": "business day",
+              "original_value": "3.75",
+              "original_unit": "business day",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "(3.75 business day - 5 business day) / 5 business day × 100 = -25 % (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "baseline_id": "N3",
+            "current_id": "N2"
+          },
+          "known_input_snippet_ids": [
+            "S4",
+            "S5"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      },
+      {
+        "question_id": "R3",
+        "status": "supported",
+        "text": "The measurement covers standard-priority support cases submitted by paying repair shops.\nIt excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff.\nEach observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent.\nThe team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends.",
+        "snippet_ids": [
+          "S12",
+          "S9"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S12",
+            "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+            "quote": "\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+          },
+          {
+            "snippet_id": "S9",
+            "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+            "quote": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, "
+          }
+        ],
+        "parts": [
+          {
+            "id": "R3P1",
+            "request_span": "What",
+            "status": "supported",
+            "text": "The measurement covers standard-priority support cases submitted by paying repair shops.",
+            "snippet_ids": [
+              "S12"
+            ],
+            "source_excerpts": [
+              {
+                "snippet_id": "S12",
+                "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+                "quote": "\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+              }
+            ]
+          },
+          {
+            "id": "R3P2",
+            "request_span": "exactly",
+            "status": "supported",
+            "text": "It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff.",
+            "snippet_ids": [
+              "S12"
+            ],
+            "source_excerpts": [
+              {
+                "snippet_id": "S12",
+                "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+                "quote": "\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+              }
+            ]
+          },
+          {
+            "id": "R3P3",
+            "request_span": "was",
+            "status": "supported",
+            "text": "Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent.",
+            "snippet_ids": [
+              "S9"
+            ],
+            "source_excerpts": [
+              {
+                "snippet_id": "S9",
+                "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+                "quote": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, "
+              }
+            ]
+          },
+          {
+            "id": "R3P4",
+            "request_span": "measured",
+            "status": "supported",
+            "text": "The team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends.",
+            "snippet_ids": [
+              "S9"
+            ],
+            "source_excerpts": [
+              {
+                "snippet_id": "S9",
+                "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+                "quote": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, "
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "facts": [],
+    "prior_fixes": [],
+    "hypotheses": [],
+    "recommended_checks": [],
+    "model_uncertainties": []
+  },
+  "evidence": [
+    {
+      "collection_id": "e64ec087-397f-431a-8b74-608848ba82c0",
+      "document_id": "716c34e0-aea2-5572-8ea3-184fadbecfd8",
+      "revision_id": "f9383749-cf30-5957-a015-cd906b2e0db4",
+      "relative_path": "sources/copper_wren/source-3.md",
+      "updated_at": "2026-10-30T18:10:03.840784+00:00",
+      "chunk_id": "0d46d96f-8b18-5af1-ab35-e05ebca1e9b0",
+      "anchor": "follow-up-support-report-march-2026-cohort",
+      "heading": "Follow-up support report — March 2026 cohort",
+      "content": "The report includes cases submitted from March 1 through March 31 and resolved by the reporting cutoff. Operations used the same version 3 definition and event-log extraction as for the January baseline. A new routing queue was introduced between the periods, but the comparison alone does not establish that the queue caused the observed change. Changes in the mix of customer questions, staffing, or the number of cases still open at cutoff may also influence the published median. The team maintained a separate table of open cases and did not assign those cases an artificial resolution duration. For this report, standard priority is the priority recorded at submission, so an agent's later change to a ticket's label does not retrospectively put it in or out of the cohort. Customers' names were removed from the aggregate report before the results were shared with the product team. Each report describes submitted cases from its own month, rather than the exact same tickets followed across both months. March is the after period in the improvement review.\n\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-30T18:10:03.840854+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+      "presented_content": "The report includes cases submitted from March 1 through March 31 and resolved by the reporting cutoff. Operations used the same version 3 definition and event-log extraction as for the January baseline. A new routing queue was introduced between the periods, but the comparison alone does not establish that the queue caused the observed change. Changes in the mix of customer questions, staffing, or the number of cases still open at cutoff may also influence the published median. The team maintained a separate table of open cases and did not assign those cases an artificial resolution duration. For this report, standard priority is the priority recorded at submission, so an agent's later change to a ticket's label does not retrospectively put it in or out of the cohort. Customers' names were removed from the aggregate report before the results were shared with the product team. Each report describes submitted cases from its own month, rather than the exact same tickets followed across both months. March is the after period in the improvement review.\n\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+    },
+    {
+      "collection_id": "e64ec087-397f-431a-8b74-608848ba82c0",
+      "document_id": "b14023ea-e62c-5e17-a860-73c7d5a4bd00",
+      "revision_id": "b2c185f3-a09a-570a-83bc-97407f268729",
+      "relative_path": "sources/copper_wren/source-2.md",
+      "updated_at": "2026-10-30T18:10:03.840168+00:00",
+      "chunk_id": "342eb522-8314-5bb6-a9cf-17b8b7d9623a",
+      "anchor": "baseline-support-report-january-2026-cohort",
+      "heading": "Baseline support report — January 2026 cohort",
+      "content": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort was not restricted to a single day of the week or to a single support agent, and it covers standard-priority cases from paying repair shops. The published value is a median across the qualifying individual cases. It is not a target or a guaranteed maximum for an individual customer. The report includes a separate open-case count, because excluding unresolved cases means the median does not describe how long those outstanding cases will eventually take. The team cautions against comparing this figure to an elapsed-clock-time metric without conversion. January is the before period in the improvement review.\n\nThe January cohort's median business time to first resolution was 5 business days. This baseline uses the same case definition as the later March cohort.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-30T18:10:03.840854+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+      "presented_content": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort was not restricted to a single day of the week or to a single support agent, and it covers standard-priority cases from paying repair shops. The published value is a median across the qualifying individual cases. It is not a target or a guaranteed maximum for an individual customer. The report includes a separate open-case count, because excluding unresolved cases means the median does not describe how long those outstanding cases will eventually take. The team cautions against comparing this figure to an elapsed-clock-time metric without conversion. January is the before period in the improvement review.\n\nThe January cohort's median business time to first resolution was 5 business days. This baseline uses the same case definition as the later March cohort."
+    },
+    {
+      "collection_id": "e64ec087-397f-431a-8b74-608848ba82c0",
+      "document_id": "e128badf-2e17-58c5-b998-1ad1fe937bbd",
+      "revision_id": "8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+      "relative_path": "sources/copper_wren/source-1.md",
+      "updated_at": "2026-10-30T18:10:03.839414+00:00",
+      "chunk_id": "632dd1c3-9d0d-513a-88c8-cce46b221277",
+      "anchor": "support-measurement-specification-version-3",
+      "heading": "Support measurement specification — version 3",
+      "content": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends. The median is calculated across case-level durations, not by taking the mean of daily medians. Cases are grouped by the month in which they were submitted, and the calculation is rerun after the follow-up period has ended so that late resolutions can be counted. Cases that remain unresolved at the cutoff are handled under a separate open-case report and do not enter the resolved-case median. This metric is intended to describe speed for this narrowly defined case population; it is not a measure of customer satisfaction or engineering delivery time.\n\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-30T18:10:03.840854+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+      "presented_content": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends. The median is calculated across case-level durations, not by taking the mean of daily medians. Cases are grouped by the month in which they were submitted, and the calculation is rerun after the follow-up period has ended so that late resolutions can be counted. Cases that remain unresolved at the cutoff are handled under a separate open-case report and do not enter the resolved-case median. This metric is intended to describe speed for this narrowly defined case population; it is not a measure of customer satisfaction or engineering delivery time.\n\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+    }
+  ],
+  "review": {
+    "reviewed_at": "2026-10-30T18:10:03.885867+00:00",
+    "decision": "correct",
+    "reviewer": "fixture-replay",
+    "reason": "Unchanged machine brief used only to test correction persistence and export; not owner approval.",
+    "corrected_brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How much did median resolution time change in business days from the before period to the after period?"
+        },
+        {
+          "id": "R2",
+          "text": "What was the percent change in median resolution time from the before period to the after period?"
+        },
+        {
+          "id": "R3",
+          "text": "What exactly was measured, including population and exclusions?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 1.25 business day.",
+          "snippet_ids": [
+            "S4",
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "quote": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+              "quote": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort "
+            }
+          ]
+        },
+        {
+          "question_id": "R2",
+          "status": "supported",
+          "text": "Signed percent change: -25 %.",
+          "snippet_ids": [
+            "S4",
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+              "quote": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+              "quote": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort "
+            }
+          ]
+        },
+        {
+          "question_id": "R3",
+          "status": "supported",
+          "text": "The measurement covers standard-priority support cases submitted by paying repair shops.\nIt excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff.\nEach observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent.\nThe team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends.",
+          "snippet_ids": [
+            "S12",
+            "S9"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S12",
+              "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+              "quote": "\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+              "quote": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    }
+  },
+  "outcome": null,
+  "created_at": "2026-10-30T18:10:03.858094+00:00",
+  "provenance": {
+    "schema_version": 2,
+    "retrieval_notices": [],
+    "template_version": "investigation-v13",
+    "citation_mapping": "request-local aliases",
+    "retrieval_query": "For Copper Wren, how much did median resolution time change in business days and percent from the before period to the after period, and what exactly was measured?",
+    "retrieval_version": "v2",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "generation_settings": {
+      "temperature": 0.7,
+      "max_tokens": 2000,
+      "timeout_seconds": 240,
+      "seed": 7,
+      "timeout_scope": "shared across planning and answer generation"
+    },
+    "elapsed_ms": 8,
+    "created_at": "2026-10-30T18:10:03.858094+00:00",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    },
+    "snippet_trace": {
+      "version": "paragraph-v2",
+      "max_snippets": 100,
+      "max_quote_length": 500,
+      "omitted_snippets": 0,
+      "omitted_characters": 0,
+      "whitespace_only_characters": 0,
+      "split_blocks": 6,
+      "truncated": false
+    },
+    "answer_coverage": {
+      "coverage_assessment": "Semantic request coverage is not verified."
+    },
+    "answer_part_plan": {
+      "R3": [
+        {
+          "id": "R3P1",
+          "request_span": "What"
+        },
+        {
+          "id": "R3P2",
+          "request_span": "exactly"
+        },
+        {
+          "id": "R3P3",
+          "request_span": "was"
+        },
+        {
+          "id": "R3P4",
+          "request_span": "measured"
+        }
+      ]
+    },
+    "answer_part_plan_origin": "planned_unreviewed",
+    "answer_part_planner_version": "request-spans-fallback-v1",
+    "answer_part_planner_settings": {
+      "max_tokens": 800,
+      "seed": 7
+    },
+    "answer_part_plan_validation": {
+      "R3": {
+        "mode": "request_spans",
+        "proposed_spans": [
+          "What",
+          "exactly",
+          "was",
+          "measured"
+        ],
+        "reason": null
+      }
+    },
+    "question_origin": "issue",
+    "original_questions": [
+      {
+        "id": "Q1",
+        "text": "For Copper Wren, how much did median resolution time change in business days and percent from the before period to the after period, and what exactly was measured?"
+      }
+    ],
+    "operation_plan": [
+      {
+        "id": "R1",
+        "question_id": "Q1",
+        "request": "How much did median resolution time change in business days from the before period to the after period?",
+        "operation": "difference"
+      },
+      {
+        "id": "R2",
+        "question_id": "Q1",
+        "request": "What was the percent change in median resolution time from the before period to the after period?",
+        "operation": "percent_change"
+      },
+      {
+        "id": "R3",
+        "question_id": "Q1",
+        "request": "What exactly was measured, including population and exclusions?",
+        "operation": "answer"
+      }
+    ],
+    "operation_plan_origin": "fixture_supplied",
+    "planner_version": null,
+    "snippet_catalog": [
+      {
+        "snippet_id": "S1",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "quote": "The report includes cases submitted from March 1 through March 31 and resolved by the reporting cutoff. Operations used the same version 3 definition and event-log extraction as for the January baseline. A new routing queue was introduced between the periods, but the comparison alone does not establish that the queue caused the observed change. Changes in the mix of customer questions, staffing, or the number of cases still open at cutoff may also influence the published median. The team "
+      },
+      {
+        "snippet_id": "S2",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "quote": "maintained a separate table of open cases and did not assign those cases an artificial resolution duration. For this report, standard priority is the priority recorded at submission, so an agent's later change to a ticket's label does not retrospectively put it in or out of the cohort. Customers' names were removed from the aggregate report before the results were shared with the product team. Each report describes submitted cases from its own month, rather than the exact same tickets followed "
+      },
+      {
+        "snippet_id": "S3",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "quote": "across both months. March is the after period in the improvement review.\n"
+      },
+      {
+        "snippet_id": "S4",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "quote": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline."
+      },
+      {
+        "snippet_id": "S5",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "quote": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort "
+      },
+      {
+        "snippet_id": "S6",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "quote": "was not restricted to a single day of the week or to a single support agent, and it covers standard-priority cases from paying repair shops. The published value is a median across the qualifying individual cases. It is not a target or a guaranteed maximum for an individual customer. The report includes a separate open-case count, because excluding unresolved cases means the median does not describe how long those outstanding cases will eventually take. The team cautions against comparing this "
+      },
+      {
+        "snippet_id": "S7",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "quote": "figure to an elapsed-clock-time metric without conversion. January is the before period in the improvement review.\n"
+      },
+      {
+        "snippet_id": "S8",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "quote": "\nThe January cohort's median business time to first resolution was 5 business days. This baseline uses the same case definition as the later March cohort."
+      },
+      {
+        "snippet_id": "S9",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "quote": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, "
+      },
+      {
+        "snippet_id": "S10",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "quote": "counting eight working hours per business day and excluding nights and weekends. The median is calculated across case-level durations, not by taking the mean of daily medians. Cases are grouped by the month in which they were submitted, and the calculation is rerun after the follow-up period has ended so that late resolutions can be counted. Cases that remain unresolved at the cutoff are handled under a separate open-case report and do not enter the resolved-case median. This metric is intended "
+      },
+      {
+        "snippet_id": "S11",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "quote": "to describe speed for this narrowly defined case population; it is not a measure of customer satisfaction or engineering delivery time.\n"
+      },
+      {
+        "snippet_id": "S12",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "quote": "\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+      }
+    ],
+    "quantity_catalog": [
+      {
+        "id": "N1",
+        "snippet_id": "S1",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "source_text": "31",
+        "snippet_text": "The report includes cases submitted from March 1 through March 31 and resolved by the reporting cutoff. Operations used the same version 3 definition and event-log extraction as for the January baseline. A new routing queue was introduced between the periods, but the comparison alone does not establish that the queue caused the observed change. Changes in the mix of customer questions, staffing, or the number of cases still open at cutoff may also influence the published median. The team ",
+        "start": 63,
+        "end": 65,
+        "value": "31",
+        "unit": "",
+        "dimension": "dimensionless"
+      },
+      {
+        "id": "N2",
+        "snippet_id": "S4",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "source_text": "3.75 business days",
+        "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+        "start": 65,
+        "end": 83,
+        "value": "3.75",
+        "unit": "business day",
+        "dimension": "compound_day"
+      },
+      {
+        "id": "N3",
+        "snippet_id": "S4",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "source_text": "5 business days",
+        "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+        "start": 144,
+        "end": 159,
+        "value": "5",
+        "unit": "business day",
+        "dimension": "compound_day"
+      },
+      {
+        "id": "N4",
+        "snippet_id": "S5",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "source_text": "31",
+        "snippet_text": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort ",
+        "start": 67,
+        "end": 69,
+        "value": "31",
+        "unit": "",
+        "dimension": "dimensionless"
+      },
+      {
+        "id": "N5",
+        "snippet_id": "S8",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "source_text": "5 business days",
+        "snippet_text": "\nThe January cohort's median business time to first resolution was 5 business days. This baseline uses the same case definition as the later March cohort.",
+        "start": 67,
+        "end": 82,
+        "value": "5",
+        "unit": "business day",
+        "dimension": "compound_day"
+      }
+    ],
+    "quantity_parser_version": "v4",
+    "extraction_notices": [
+      {
+        "snippet_id": "S1",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "source_text": "1 through March 31 and resolved by the re",
+        "start": 47,
+        "end": 88,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      },
+      {
+        "snippet_id": "S1",
+        "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+        "source_text": "3 definition and event-log extraction as ",
+        "start": 137,
+        "end": 178,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      },
+      {
+        "snippet_id": "S5",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "source_text": "1 through January 31 and resolved by the ",
+        "start": 49,
+        "end": 90,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      },
+      {
+        "snippet_id": "S5",
+        "citation_id": "source:342eb522-8314-5bb6-a9cf-17b8b7d9623a:b2c185f3-a09a-570a-83bc-97407f268729",
+        "source_text": "3 metric definition consistently to this ",
+        "start": 145,
+        "end": 186,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      },
+      {
+        "snippet_id": "S10",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "source_text": "eight working hours per business day and excl",
+        "start": 9,
+        "end": 54,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      },
+      {
+        "snippet_id": "S12",
+        "citation_id": "source:632dd1c3-9d0d-513a-88c8-cce46b221277:8fbf48c0-1b9b-51b0-bd43-b24f6e20b1ea",
+        "source_text": "eight working hours per business day.",
+        "start": 239,
+        "end": 276,
+        "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+      }
+    ],
+    "calculation_traces": [
+      {
+        "request_id": "R1",
+        "operation": "difference",
+        "status": "computed",
+        "text": "Signed difference: 1.25 business day.",
+        "formula": "after - before",
+        "result": "1.25",
+        "unit": "business day",
+        "reason": null,
+        "inputs": [
+          {
+            "id": "N2",
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "source_text": "3.75 business days",
+            "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+            "start": 65,
+            "end": 83,
+            "value": "3.75",
+            "unit": "business day",
+            "dimension": "compound_day"
+          },
+          {
+            "id": "N3",
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "source_text": "5 business days",
+            "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+            "start": 144,
+            "end": 159,
+            "value": "5",
+            "unit": "business day",
+            "dimension": "compound_day"
+          }
+        ],
+        "algorithm_version": "cited-calculations-v4",
+        "normalized_inputs": [
+          {
+            "id": "N2",
+            "role": "before",
+            "value": "3.75",
+            "unit": "business day",
+            "original_value": "3.75",
+            "original_unit": "business day",
+            "conversion_factor": "1"
+          },
+          {
+            "id": "N3",
+            "role": "after",
+            "value": "5",
+            "unit": "business day",
+            "original_value": "5",
+            "original_unit": "business day",
+            "conversion_factor": "1"
+          }
+        ],
+        "evaluated_expression": "5 business day - 3.75 business day = 1.25 business day (rounded)",
+        "rounding": {
+          "mode": "ROUND_HALF_UP",
+          "max_fractional_digits": 6
+        },
+        "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+        "operand_roles": {
+          "minuend_id": "N3",
+          "subtrahend_id": "N2"
+        },
+        "known_input_snippet_ids": [
+          "S4",
+          "S5"
+        ],
+        "competing_snippet_ids": [],
+        "limitation_snippet_ids": [],
+        "limitation_basis": null,
+        "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+      },
+      {
+        "request_id": "R2",
+        "operation": "percent_change",
+        "status": "computed",
+        "text": "Signed percent change: -25 %.",
+        "formula": "(after - before) / before × 100",
+        "result": "-25",
+        "unit": "%",
+        "reason": null,
+        "inputs": [
+          {
+            "id": "N3",
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "source_text": "5 business days",
+            "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+            "start": 144,
+            "end": 159,
+            "value": "5",
+            "unit": "business day",
+            "dimension": "compound_day"
+          },
+          {
+            "id": "N2",
+            "snippet_id": "S4",
+            "citation_id": "source:0d46d96f-8b18-5af1-ab35-e05ebca1e9b0:f9383749-cf30-5957-a015-cd906b2e0db4",
+            "source_text": "3.75 business days",
+            "snippet_text": "\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+            "start": 65,
+            "end": 83,
+            "value": "3.75",
+            "unit": "business day",
+            "dimension": "compound_day"
+          }
+        ],
+        "algorithm_version": "cited-calculations-v4",
+        "normalized_inputs": [
+          {
+            "id": "N3",
+            "role": "before",
+            "value": "5",
+            "unit": "business day",
+            "original_value": "5",
+            "original_unit": "business day",
+            "conversion_factor": "1"
+          },
+          {
+            "id": "N2",
+            "role": "after",
+            "value": "3.75",
+            "unit": "business day",
+            "original_value": "3.75",
+            "original_unit": "business day",
+            "conversion_factor": "1"
+          }
+        ],
+        "evaluated_expression": "(3.75 business day - 5 business day) / 5 business day × 100 = -25 % (rounded)",
+        "rounding": {
+          "mode": "ROUND_HALF_UP",
+          "max_fractional_digits": 6
+        },
+        "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+        "operand_roles": {
+          "baseline_id": "N3",
+          "current_id": "N2"
+        },
+        "known_input_snippet_ids": [
+          "S4",
+          "S5"
+        ],
+        "competing_snippet_ids": [],
+        "limitation_snippet_ids": [],
+        "limitation_basis": null,
+        "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+      }
+    ],
+    "generation_profile": {
+      "name": "qwen3-non-thinking",
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0.0,
+      "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+      "backend": "llama-cpp-python",
+      "enable_thinking": false,
+      "repeat_penalty": 1.0
+    }
+  },
+  "retrieval_notices": [],
+  "collection_ids": [
+    "e64ec087-397f-431a-8b74-608848ba82c0"
+  ]
+}

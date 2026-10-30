@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4a058827-046c-41c6-984c-1d589954b47f",
+  "object": "chat.completion",
+  "created": 1793381334,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Eligibility rules for Lumen’s customer credit\", \"Process for applying for Lumen’s customer credit\", \"How Lumen applies customer credit\", \"How Lumen tracks customer credit\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 107,
+    "completion_tokens": 43,
+    "total_tokens": 150
+  }
+}

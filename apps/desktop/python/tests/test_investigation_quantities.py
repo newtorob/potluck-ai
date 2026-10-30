@@ -65,7 +65,7 @@ def test_v2_rejects_tampering_and_bad_version():
     with pytest.raises(ValueError):
         calculate('difference', ['N1', 'N2'], q, version='v2')
     with pytest.raises(ValueError):
-        quantity_catalog([], version='v4')
+        quantity_catalog([], version='v5')
 
 
 def test_unsupported_word_number_has_source_local_notice():
@@ -146,3 +146,60 @@ def test_compound_extraction_does_not_merge_across_common_clause_words():
     'one dozen and five support tickets', '4 billing accounts\nreceivable'])
 def test_v3_does_not_extract_partial_scales_or_long_units(source):
     assert quantity_catalog(snippets(source), version='v3') == []
+
+
+def test_v4_compound_days_support_both_requested_operations():
+    source = '20 calendar days. 15 calendar days.'
+    s = snippets(source)
+    q = quantity_catalog(s, source_context={'C1': source}, version='v4')
+    assert [(v['source_text'], v['unit']) for v in q] == [
+        ('20 calendar days', 'calendar day'), ('15 calendar days', 'calendar day')]
+    difference = calculate('difference', ['N1', 'N2'], q, version='v4')
+    change = calculate('percent_change', ['N1', 'N2'], q, version='v4')
+    assert (difference['result'], difference['unit']) == ('-5', 'calendar day')
+    assert (change['result'], change['unit']) == ('-25', '%')
+    assert extraction_notices(s, q, source_context={'C1': source}, version='v4') == []
+    assert quantity_catalog(s, source_context={'C1': source}, version='v3') == []
+
+
+@pytest.mark.parametrize('unit', ['business days', 'working days'])
+def test_v4_compound_days_do_not_mix(unit):
+    q = quantity_catalog(snippets(f'20 calendar days. 15 {unit}.'), version='v4')
+    assert calculate('difference', ['N1', 'N2'], q, version='v4')['status'] == 'unknown'
+
+
+@pytest.mark.parametrize('source', [
+    'between 10 and 20 calendar days', '10-20 calendar days',
+    'not 20 calendar days', 'at least 20 calendar days',
+    '20 calendar days per month', '20 calendar days remaining',
+])
+def test_v4_compound_days_reject_ambiguous_forms(source):
+    assert quantity_catalog(snippets(source), version='v4') == []
+
+
+def test_v4_shared_compound_and_source_prefix_boundaries():
+    source = 'from 20 to 15 calendar days.'
+    q = quantity_catalog(snippets(source), source_context={'C1': source}, version='v4')
+    assert [item['value'] for item in q] == ['20', '15']
+    assert quantity_catalog(snippets(source[:-5]), source_context={'C1': source}, version='v4') == []
+    with pytest.raises(ValueError, match='source context'):
+        quantity_catalog(snippets('20 calendar days'), source_context={'C1': '15 calendar days'}, version='v4')
+
+
+@pytest.mark.parametrize('source', [
+    'The duration was not exactly 5 calendar days.',
+    'The duration did not change from 20 to 15 calendar days.',
+    'The duration was approximately equal to 5 calendar days.',
+])
+def test_v4_compound_days_reject_qualified_clause_and_report_notice(source):
+    s = snippets(source)
+    q = quantity_catalog(s, source_context={'C1': source}, version='v4')
+    assert q == []
+    notices = extraction_notices(s, q, source_context={'C1': source}, version='v4')
+    assert notices and all(n['citation_id'] == 'C1' for n in notices)
+
+
+def test_v4_qualified_clause_guard_does_not_cross_sentence():
+    source = 'This was not measured. The duration was 5 calendar days.'
+    q = quantity_catalog(snippets(source), version='v4')
+    assert [v['source_text'] for v in q] == ['5 calendar days']

@@ -1,0 +1,52 @@
+{
+  "semantic_assessment": false,
+  "snapshot": {
+    "manifest_hash_matches": true,
+    "code_identity_matches": true,
+    "mismatched_files": []
+  },
+  "fixture": {
+    "source_hashes_match": true,
+    "checksum_inventory_sha256": "182cb4fac530d71f43b8b4dcc064959a7fe1668c7015429610ef954115a4bc24"
+  },
+  "cases": {
+    "harbor": {
+      "status": "pending",
+      "checks": {
+        "registered_allowed": true,
+        "canary_excluded_scope": true,
+        "canary_absent_retrieval-001.json": true,
+        "retrieval_scope_retrieval-001.json": true,
+        "canary_absent_calls/001/request.json": true,
+        "canary_absent_calls/002/request.json": true,
+        "canary_absent_calls/001/raw-reply.json": true
+      },
+      "errors": []
+    },
+    "orchard": {
+      "status": "pending",
+      "checks": {},
+      "errors": []
+    },
+    "lumen": {
+      "status": "pending",
+      "checks": {},
+      "errors": []
+    },
+    "cedar": {
+      "status": "pending",
+      "checks": {},
+      "errors": []
+    },
+    "maple": {
+      "status": "pending",
+      "checks": {},
+      "errors": []
+    },
+    "quartz": {
+      "status": "pending",
+      "checks": {},
+      "errors": []
+    }
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "denominator": 6,
+  "basis": "Strict original rubric; claims must appear in answer and have attached relevant support. Status labels reported separately. Pending cases are not successes.",
+  "cases": {
+    "harbor": {
+      "status": "success",
+      "ready": false,
+      "labels": [
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "Completed orders CSV, paid workspaces and administrator stated; S1 guide supports."
+        },
+        {
+          "pass": true,
+          "reason": "Five, daily maximum, pending and cancelled exclusions stated; S3 limits supports."
+        },
+        {
+          "pass": true,
+          "reason": "Weekly/monthly and cancelled filter stated planned and not shipped; S5 roadmap supports."
+        },
+        {
+          "pass": false,
+          "reason": "API undecided and unscheduled not mentioned, though attached S5 states no decision or target date."
+        }
+      ]
+    },
+    "orchard": {
+      "status": "success",
+      "ready": false,
+      "labels": [
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Receipt and checks stated, but no routing to budget owner; S2 receipt supports routing but answer omits it."
+        },
+        {
+          "pass": false,
+          "reason": "Approval checks stated; mismatch sentence ends at “for” and does not state investigation; S3 supports it."
+        },
+        {
+          "pass": true,
+          "reason": "Treasury Thursday, due in fourteen days, payment and reference stated; S5 payment supports."
+        }
+      ]
+    },
+    "lumen": {
+      "status": "success",
+      "ready": false,
+      "labels": [
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Paid, >4 hours and 10% stated, but exclusions and 30-day window omitted despite support in S1/S2."
+        },
+        {
+          "pass": false,
+          "reason": "Portal and verification stated but answer cuts off before support decision; S3 provides decision."
+        },
+        {
+          "pass": false,
+          "reason": "Invoice and no cash stated but tracking sentence incomplete and carryforward omitted; S5/S6 support omitted facts."
+        }
+      ]
+    },
+    "cedar": {
+      "status": "success",
+      "ready": false,
+      "labels": [
+        "conflicting",
+        "conflicting",
+        "conflicting",
+        "conflicting"
+      ],
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "Conflicting October 18/25 targets, no final decision; S1/S5 support."
+        },
+        {
+          "pass": true,
+          "reason": "Mira Chen is readiness coordinator; S1/S5 support."
+        },
+        {
+          "pass": true,
+          "reason": "Case viewing and contact updates confirmed; S3 supports."
+        },
+        {
+          "pass": false,
+          "reason": "Employee preview asserted without the attached launch note excerpt; S1/S5 contain no preview. Additionally wrongly attributes preview to product update."
+        }
+      ]
+    },
+    "maple": {
+      "status": "success",
+      "ready": true,
+      "labels": [
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown"
+      ],
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "Retention unavailable with no customer count or definition; S1 snapshot and S4 process support."
+        },
+        {
+          "pass": true,
+          "reason": "12 expiring contracts, 8 renewed, 2 not and 2 in negotiation; S5 pipeline supports."
+        },
+        {
+          "pass": true,
+          "reason": "Contract count is not individual customer organizations; S5/S6 pipeline support."
+        }
+      ]
+    },
+    "quartz": {
+      "status": "success",
+      "ready": false,
+      "labels": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Signed difference says +5 calendar days despite 20 to 15; percent is −25%. S1/S3 support the opposite direction."
+        },
+        {
+          "pass": false,
+          "reason": "Factual answer says agreement to completed setup, but omits signed and cites only S5 context; S1/S3 are attached to separate calculations."
+        },
+        {
+          "pass": true,
+          "reason": "No cause is claimed; context S5 is cited."
+        }
+      ]
+    }
+  },
+  "ready_count": 1
+}

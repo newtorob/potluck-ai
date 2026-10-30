@@ -1,0 +1,17 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Investigation inference failed"
+  },
+  "failure_stage": "inference_or_validation",
+  "latency_seconds": 0.010048458352684975,
+  "setup_seconds": 0.018646417185664177,
+  "attempt_total_seconds": 0.02869487553834915,
+  "finished_at": "2026-10-30T18:09:10.634871+00:00"
+}

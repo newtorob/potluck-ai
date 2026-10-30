@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "50fce20c-ab06-44da-913b-fd663172661f"
+  ],
+  "query": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "50fce20c-ab06-44da-913b-fd663172661f"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "50fce20c-ab06-44da-913b-fd663172661f",
+        "document_id": "3944e07b-1f24-51a4-9854-cd3ee275ce08",
+        "revision_id": "aefb9e42-b7a4-584f-97cf-f3f6c981b686",
+        "relative_path": "sources/harbor_guide.md",
+        "updated_at": "2026-10-30T17:38:33.403943+00:00",
+        "chunk_id": "fe9d8da0-eb02-5866-b412-8acb102c956f",
+        "anchor": "harbor-export-scheduling",
+        "heading": "Harbor export scheduling",
+        "content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:38:33.405397+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:fe9d8da0-eb02-5866-b412-8acb102c956f:aefb9e42-b7a4-584f-97cf-f3f6c981b686"
+      },
+      {
+        "collection_id": "50fce20c-ab06-44da-913b-fd663172661f",
+        "document_id": "7a79c876-d8f8-5de0-98d5-6046272650d6",
+        "revision_id": "1c59b3ab-f540-5b56-a1e1-9278b9ff03f2",
+        "relative_path": "sources/harbor_limits.md",
+        "updated_at": "2026-10-30T17:38:33.404782+00:00",
+        "chunk_id": "538655d8-443d-5322-866b-a2c6dede2515",
+        "anchor": "operational-limits",
+        "heading": "Operational limits",
+        "content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:38:33.405397+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:538655d8-443d-5322-866b-a2c6dede2515:1c59b3ab-f540-5b56-a1e1-9278b9ff03f2"
+      },
+      {
+        "collection_id": "50fce20c-ab06-44da-913b-fd663172661f",
+        "document_id": "c8ce00dd-8396-5707-9ee6-2f470d284c58",
+        "revision_id": "a2ea0e5a-27c3-5266-a7ff-cf14aefb352f",
+        "relative_path": "sources/harbor_roadmap.md",
+        "updated_at": "2026-10-30T17:38:33.405320+00:00",
+        "chunk_id": "217aa4d3-030f-5401-af58-d02079590aff",
+        "anchor": "reporting-work-planned",
+        "heading": "Reporting work planned",
+        "content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:38:33.405397+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:217aa4d3-030f-5401-af58-d02079590aff:a2ea0e5a-27c3-5266-a7ff-cf14aefb352f"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

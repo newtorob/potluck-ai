@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "c152950d-f03a-4a83-808b-22935611a7d1",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/fresh-v13/attempts/cedar_lantern/raw/allowed",
+  "files": {
+    "sources/cedar_lantern/source-1.md": "391e59be800a7f54684f42e457423c504a7e7221fc1c23cde8e93062e9cda760",
+    "sources/cedar_lantern/source-2.md": "6247a847b26fc48cae8a4b8e6382ae69187c5e209559078563cae1fab2b0a925",
+    "sources/cedar_lantern/source-3.md": "cd012cdecfa3988f44b10034caf633f3b2b607931fd2de697bc2252d5c585a69"
+  },
+  "scan": {
+    "collection_id": "c152950d-f03a-4a83-808b-22935611a7d1",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "c152950d-f03a-4a83-808b-22935611a7d1"
+  ],
+  "excluded_canary": {
+    "collection_id": "d27febe6-ab45-46d2-ab3f-3242ccb2cc22",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/fresh-v13/attempts/cedar_lantern/raw/excluded",
+    "file": "excluded-canary.md",
+    "sha256": "899deadea82173a75c0cac4bf7cae07aaabc410bc0d3dca295cedc1da5ceb6da",
+    "scan": {
+      "collection_id": "d27febe6-ab45-46d2-ab3f-3242ccb2cc22",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

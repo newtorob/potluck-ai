@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "ffae7991-4a99-4647-99ba-14583be363d4",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/cedar/raw/allowed",
+  "files": {
+    "sources/cedar_launch_note.md": "88044628fc66ee5efdfd8b57145307f5b6eb73cace809cbad45d18a7f71ea820",
+    "sources/cedar_product_update.md": "9ed9fb5bec751d6eeea34d4e117eee13f69bb2e7fb102514960b5b0f8b6e785c",
+    "sources/cedar_operations_update.md": "ef9301212482e44747f97128ada95dbe5ba3e948c0279264c3172bc48a98d418"
+  },
+  "scan": {
+    "collection_id": "ffae7991-4a99-4647-99ba-14583be363d4",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "ffae7991-4a99-4647-99ba-14583be363d4"
+  ],
+  "excluded_canary": {
+    "collection_id": "f52810a2-de90-43e1-a2ff-742046feb9f6",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/cedar/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "f52810a2-de90-43e1-a2ff-742046feb9f6",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

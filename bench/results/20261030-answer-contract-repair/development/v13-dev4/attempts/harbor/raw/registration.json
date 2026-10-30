@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "08422e53-4584-4708-962b-d9ffcf09acf5",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/harbor/raw/allowed",
+  "files": {
+    "sources/harbor_guide.md": "33e9a4af8a73233cec5f57d6ba8e95cf951adbf1fdd4fa846ecd5ab0b98ab1ec",
+    "sources/harbor_limits.md": "1d7732b2655cd4937e6b963c2a4122709f549b8ba06c16b381bfea3d306de754",
+    "sources/harbor_roadmap.md": "1e445f6c1f48d0bf839af753958312580c2ad0e5e0ee1037f90db82d14dc3777"
+  },
+  "scan": {
+    "collection_id": "08422e53-4584-4708-962b-d9ffcf09acf5",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "08422e53-4584-4708-962b-d9ffcf09acf5"
+  ],
+  "excluded_canary": {
+    "collection_id": "562bad39-218e-4d09-83da-dda069fe8f36",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/harbor/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "562bad39-218e-4d09-83da-dda069fe8f36",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

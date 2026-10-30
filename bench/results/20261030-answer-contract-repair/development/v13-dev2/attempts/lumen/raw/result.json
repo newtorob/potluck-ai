@@ -1,0 +1,404 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "51c6a755-a9e8-45d7-9ab1-fd11605eb253",
+    "workspace": "pilot-eval",
+    "issue": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.\nA customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later.\nBilling applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.\nA customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+              "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+              "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+              "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+              "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+            }
+          ],
+          "parts": [
+            {
+              "id": "R1P1",
+              "label": "Eligibility rules for Lumen’s customer credit",
+              "status": "supported",
+              "text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.",
+              "snippet_ids": [
+                "S1",
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                  "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                  "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+                }
+              ]
+            },
+            {
+              "id": "R1P2",
+              "label": "Process for applying for Lumen’s customer credit",
+              "status": "supported",
+              "text": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later.",
+              "snippet_ids": [
+                "S3",
+                "S4"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                  "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                  "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+                }
+              ]
+            },
+            {
+              "id": "R1P3",
+              "label": "How Lumen applies customer credit",
+              "status": "supported",
+              "text": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+              "snippet_ids": [
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+                }
+              ]
+            },
+            {
+              "id": "R1P4",
+              "label": "How Lumen tracks customer credit",
+              "status": "supported",
+              "text": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+              "snippet_ids": [
+                "S3",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                  "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+        "document_id": "1d73b7d7-451c-5b25-b8d1-eb4246497a29",
+        "revision_id": "03783f97-ce92-56e6-89a7-2b74498ecda9",
+        "relative_path": "sources/lumen_policy.md",
+        "updated_at": "2026-10-30T17:28:54.967110+00:00",
+        "chunk_id": "56cab1d3-b843-56fb-93e8-9bb07b5dbe81",
+        "anchor": "service-credit-eligibility",
+        "heading": "Service credit eligibility",
+        "content": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+        "presented_content": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+      },
+      {
+        "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+        "document_id": "b71cf48e-4fe7-5aff-8838-8518e4446dfb",
+        "revision_id": "ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+        "relative_path": "sources/lumen_process.md",
+        "updated_at": "2026-10-30T17:28:54.967683+00:00",
+        "chunk_id": "2a92562a-4f60-5115-8578-b351001f1195",
+        "anchor": "credit-request-handling",
+        "heading": "Credit request handling",
+        "content": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+        "presented_content": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+      },
+      {
+        "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+        "document_id": "58be3f63-37b8-5c19-9e13-eb2ecca151a3",
+        "revision_id": "7aaddedd-9ab2-5fb4-839c-d846135cff44",
+        "relative_path": "sources/lumen_billing.md",
+        "updated_at": "2026-10-30T17:28:54.966358+00:00",
+        "chunk_id": "2a1cbaf6-9374-5c2e-b53c-434fff49ff76",
+        "anchor": "applying-an-approved-credit",
+        "heading": "Applying an approved credit",
+        "content": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+        "presented_content": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T17:31:26.125601+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 151144,
+      "created_at": "2026-10-30T17:31:26.125601+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "label": "Eligibility rules for Lumen’s customer credit"
+          },
+          {
+            "id": "R1P2",
+            "label": "Process for applying for Lumen’s customer credit"
+          },
+          {
+            "id": "R1P3",
+            "label": "How Lumen applies customer credit"
+          },
+          {
+            "id": "R1P4",
+            "label": "How Lumen tracks customer credit"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "deliverable-labels-v1",
+      "answer_part_unmatched_text": {},
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+          "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+          "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+          "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+          "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "source_text": "48 hours",
+          "snippet_text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n",
+          "start": 202,
+          "end": 210,
+          "value": "48",
+          "unit": "h",
+          "dimension": "time"
+        }
+      ],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "source_text": "four consecutive hours because of a Lumen se",
+          "start": 103,
+          "end": 147,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "source_text": "ten percent of that workspace's monthly sub",
+          "start": 307,
+          "end": 350,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+          "source_text": "thirty days of the incident ending.",
+          "start": 128,
+          "end": 163,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b"
+    ]
+  },
+  "latency_seconds": 151.15481774974614,
+  "setup_seconds": 0.028613165952265263,
+  "attempt_total_seconds": 151.1834309156984,
+  "finished_at": "2026-10-30T17:31:26.131722+00:00"
+}

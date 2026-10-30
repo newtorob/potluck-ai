@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/orchard/raw/allowed",
+  "files": {
+    "sources/orchard_receipt.md": "d77fdd7eaaee65877cdf950087c621200e116bf530370fab0294293f5f6efcc1",
+    "sources/orchard_approval.md": "98755280155beb55e9bedde5c99466c35df6457a56771f809ab9ad7feccacc5d",
+    "sources/orchard_payment.md": "2065243c041c3de3bbc0ada1cc37bf6e1176c95aff73b562f03c856a451cf9fd"
+  },
+  "scan": {
+    "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "95cdba41-aff2-4a9d-ac22-68bb78d2af1b"
+  ],
+  "excluded_canary": {
+    "collection_id": "c779cfa8-2220-4ecf-ad1c-d1c0d9be9445",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/orchard/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "c779cfa8-2220-4ecf-ad1c-d1c0d9be9445",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

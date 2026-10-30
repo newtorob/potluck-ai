@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ff5a8885-494e-43b5-ae74-54a6307a3987",
+  "object": "chat.completion",
+  "created": 1793383060,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\", \"S5\", \"S6\", \"S7\", \"S8\"], \"text\": \"Harbor Rivet handles a supplier safety incident from intake through closure by following a structured process. The intake stage involves the person receiving the report recording the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from various sources, including project sites, suppliers, the quality lab, or warehouse workers. The intake coordinator opens the incident record and places the affected shipment on hold, then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment but does not automatically recall items already installed. After intake, the quality lead checks the affected lot against receiving records, identifies whether other shipments may contain the same material, and may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot\", \"status\": \"supported\"}, \"R1P2\": {\"snippet_ids\": [\"S4\", \"S5\", \"S6\", \"S7\", \"S8\", \"S9\", \"S10\", \"S11\"], \"text\": \"who owns each stage and handoff. The intake coordinator owns the intake stage and hands off the incident record and evidence to the quality lead. The quality lead owns the assessment stage, checking the affected lot against receiving records and identifying other shipments. The quality lead also owns the decision about the affected scope and hands off the scoped list to the field safety manager to coordinate site action. The field safety manager owns the action and closure stage, contacting affected project sites and coordinating containment actions. The field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead, who closes the incident after verifying actions and documenting follow-up. The quality lead owns the closure stage, ensuring that all actions are verified and documented.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1497,
+    "completion_tokens": 427,
+    "total_tokens": 1924
+  }
+}

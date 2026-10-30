@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fec8bef7-4e99-430c-87ba-0d69d7e2294a",
+  "object": "chat.completion",
+  "created": 1793380696,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S5\"], \"text\": \"Maple's enterprise customer retention rate last quarter is not explicitly provided, but it is known that eight out of twelve enterprise contracts were renewed, and two were not renewed, with two remaining in negotiation.\",\"status\": \"unknown\"}, \"R1P2\": {\"snippet_ids\": [\"S5\", \"S6\"], \"text\": \"Enterprise renewals details include that eight contracts were renewed, two were not, and two were still being negotiated. The count refers to contracts rather than individual customer organizations, and a customer can have more than one enterprise\\n\",\"status\": \"unknown\"}, \"R1P3\": {\"snippet_ids\": [\"S1\", \"S4\"], \"text\": \"Retention rate data is not available, as the commercial operations snapshot does not provide a customer-level retention rate or an approved definition for customer retention. The renewal process does not define a customer retention metric or how\\n\",\"status\": \"unknown\"}, \"R1P4\": {\"snippet_ids\": [\"S5\", \"S6\"], \"text\": \"Renewals statistics indicate that eight out of twelve enterprise contracts were renewed, two were not, and two were still in negotiation. The count refers to contracts rather than individual customer organizations, and a customer can have more than\" ,\"status\": \"unknown\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 727,
+    "completion_tokens": 282,
+    "total_tokens": 1009
+  }
+}

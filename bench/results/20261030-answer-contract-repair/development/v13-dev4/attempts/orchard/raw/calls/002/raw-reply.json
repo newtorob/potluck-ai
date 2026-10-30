@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bbd73aeb-5771-4bf1-b38e-ade27f9e7e03",
+  "object": "chat.completion",
+  "created": 1793382404,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected. For invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order.\", \"status\": \"supported\"}, \"R1P2\": {\"snippet_ids\": [\"S3\", \"S4\"], \"text\": \"The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically. Approval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision.\", \"status\": \"supported\"}, \"R1P3\": {\"snippet_ids\": [\"S5\"], \"text\": \"The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\", \"status\": \"supported\"}, \"R1P4\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\"], \"text\": \"At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected. For invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order. The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically. Approval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but it\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 751,
+    "completion_tokens": 536,
+    "total_tokens": 1287
+  }
+}

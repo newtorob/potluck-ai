@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-652b94b3-2992-435e-b1b0-487f9774205c",
+  "object": "chat.completion",
+  "created": 1793381486,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Launch date of Cedar’s new customer portal\", \"Owner of the launch\", \"Confirmed scope of the customer portal\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 106,
+    "completion_tokens": 28,
+    "total_tokens": 134
+  }
+}

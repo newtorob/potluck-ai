@@ -1,0 +1,11 @@
+# Independent fixture review
+
+Status: accepted for freezing with the limits below. The author added the missing warehouse branch to the Harbor rubric and changed Copper to business-day values. This review used the draft sources and rubric only; no candidate outputs or model runs were inspected.
+
+All 12 listed source hashes match `sources.json`; the excluded canary is not among the source lists. Each case lists exactly three sources, with combined sizes of 4,176, 4,253, 3,916, and 4,078 bytes. Each rubric support quote occurs in a listed source. The Harbor rubric now covers quality's coordination with warehouse operations, as well as the delivered-material branch and closure.
+
+Copper asks separately for the difference, percent change, and measurement definition; its three plan operations cover these requests. The cited 5 and 3.75 business days support a decrease of 1.25 business days and 25%. In a direct source-to-snippet/catalog check, v4 extracted both values with business-day units. The measurement and exclusions are supported by the specification. The Osprey rubric requires an evidence-supported description of a conflict and unidentified authority, without requiring an invented resolution.
+
+Cedar contains a whitespace-only line followed by list items. Material required facts occur beyond character 500 in each case. The sources contain contextual prose, but are synthetic and do not establish performance on actual documents. Quotes are supporting examples, not a requirement for exact wording. Semantic coverage, entailment, and evaluation fairness cannot be guaranteed by the structural checks alone.
+
+The earlier v4 negation examples now return no quantities, while the corresponding positive shared range and `20 calendar days after approval` extract. This is a narrow lexical check, not proof of general negation handling.

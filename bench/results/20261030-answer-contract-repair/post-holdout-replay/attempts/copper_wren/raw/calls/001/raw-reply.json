@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-53ac8051-22a4-48b3-a18d-6d08f6765415",
+  "object": "chat.completion",
+  "created": 1793383433,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R3\": [\"What\", \"exactly\", \"was\", \"measured\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 18,
+    "total_tokens": 113
+  }
+}

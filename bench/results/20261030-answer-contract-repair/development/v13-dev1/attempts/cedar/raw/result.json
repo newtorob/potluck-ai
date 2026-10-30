@@ -1,0 +1,382 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "747a808b-42de-4440-8cb3-6b5082db0ee7",
+    "workspace": "pilot-eval",
+    "issue": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "conflicting",
+          "text": "The operations update lists October 25 as the customer portal launch target, while the product update mentions October 18 as the target. However, neither document confirms the final launch date, as the updates do not record a final launch decision.\nMira Chen is named as the launch readiness coordinator in both the operations update and the product update, indicating she is responsible for the launch.\nThe Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release.\nThe operations update mentions October 25 as the launch target, while the product update lists October 18 as the target. The product update also mentions an internal preview running with employees, which is not evidence of a customer launch.",
+          "snippet_ids": [
+            "S1",
+            "S5",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+              "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+              "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+              "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+            }
+          ],
+          "parts": [
+            {
+              "id": "R1P1",
+              "label": "Launch Date Confirmation",
+              "status": "conflicting",
+              "text": "The operations update lists October 25 as the customer portal launch target, while the product update mentions October 18 as the target. However, neither document confirms the final launch date, as the updates do not record a final launch decision.",
+              "snippet_ids": [
+                "S1",
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+                  "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+                  "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                }
+              ]
+            },
+            {
+              "id": "R1P2",
+              "label": "Ownership Responsibility",
+              "status": "conflicting",
+              "text": "Mira Chen is named as the launch readiness coordinator in both the operations update and the product update, indicating she is responsible for the launch.",
+              "snippet_ids": [
+                "S1",
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+                  "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+                  "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                }
+              ]
+            },
+            {
+              "id": "R1P3",
+              "label": "Scope Confirmation",
+              "status": "conflicting",
+              "text": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release.",
+              "snippet_ids": [
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+                  "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+                }
+              ]
+            },
+            {
+              "id": "R1P4",
+              "label": "Timeline Details",
+              "status": "conflicting",
+              "text": "The operations update mentions October 25 as the launch target, while the product update lists October 18 as the target. The product update also mentions an internal preview running with employees, which is not evidence of a customer launch.",
+              "snippet_ids": [
+                "S1",
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+                  "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+                  "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "0cf5c81c-08ee-4641-a499-484857e2d743",
+        "document_id": "752bf63f-4555-5be5-9674-6626dc971447",
+        "revision_id": "f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+        "relative_path": "sources/cedar_operations_update.md",
+        "updated_at": "2026-10-30T17:17:15.448328+00:00",
+        "chunk_id": "4bb60c6b-2306-561c-8119-f8dbbbbb7d6a",
+        "anchor": "operations-update",
+        "heading": "Operations update",
+        "content": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:17:15.448987+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+        "presented_content": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched."
+      },
+      {
+        "collection_id": "0cf5c81c-08ee-4641-a499-484857e2d743",
+        "document_id": "891d6257-92b9-58ce-8c29-1c1755edf75e",
+        "revision_id": "fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+        "relative_path": "sources/cedar_launch_note.md",
+        "updated_at": "2026-10-30T17:17:15.447606+00:00",
+        "chunk_id": "45571a30-faac-55bf-81da-bf0f6b487000",
+        "anchor": "portal-launch-note",
+        "heading": "Portal launch note",
+        "content": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:17:15.448987+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+        "presented_content": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision."
+      },
+      {
+        "collection_id": "0cf5c81c-08ee-4641-a499-484857e2d743",
+        "document_id": "77031ba5-1a5f-517b-b18c-38d2ef542be5",
+        "revision_id": "ed7afde7-4942-5460-9dcb-c66532f5b39a",
+        "relative_path": "sources/cedar_product_update.md",
+        "updated_at": "2026-10-30T17:17:15.448916+00:00",
+        "chunk_id": "24bda1d7-0e58-5ad0-95e5-1cfa65558ab1",
+        "anchor": "product-update",
+        "heading": "Product update",
+        "content": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:17:15.448987+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+        "presented_content": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T17:18:07.931690+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 52472,
+      "created_at": "2026-10-30T17:18:07.931690+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "label": "Launch Date Confirmation"
+          },
+          {
+            "id": "R1P2",
+            "label": "Ownership Responsibility"
+          },
+          {
+            "id": "R1P3",
+            "label": "Scope Confirmation"
+          },
+          {
+            "id": "R1P4",
+            "label": "Timeline Details"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "deliverable-labels-v1",
+      "answer_part_unmatched_text": {},
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+          "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+          "quote": "\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+          "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+          "quote": "\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+          "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+          "quote": "\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+          "source_text": "25",
+          "snippet_text": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n",
+          "start": 36,
+          "end": 38,
+          "value": "25",
+          "unit": "",
+          "dimension": "dimensionless"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S3",
+          "citation_id": "source:45571a30-faac-55bf-81da-bf0f6b487000:fe6f2dbb-1197-5af1-9923-de11f23d04b6",
+          "source_text": "two capabilities",
+          "snippet_text": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n",
+          "start": 152,
+          "end": 168,
+          "value": "2",
+          "unit": "capabilities",
+          "dimension": "count"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S5",
+          "citation_id": "source:24bda1d7-0e58-5ad0-95e5-1cfa65558ab1:ed7afde7-4942-5460-9dcb-c66532f5b39a",
+          "source_text": "18",
+          "snippet_text": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n",
+          "start": 75,
+          "end": 77,
+          "value": "18",
+          "unit": "",
+          "dimension": "dimensionless"
+        }
+      ],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:4bb60c6b-2306-561c-8119-f8dbbbbb7d6a:f76a9975-b54e-5dd2-a0b9-f3f8afdeb2bd",
+          "source_text": "18 target in the product update.\n",
+          "start": 202,
+          "end": 235,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "0cf5c81c-08ee-4641-a499-484857e2d743"
+    ]
+  },
+  "latency_seconds": 52.48629654292017,
+  "setup_seconds": 0.02801249921321869,
+  "attempt_total_seconds": 52.51430904213339,
+  "finished_at": "2026-10-30T17:18:07.941468+00:00"
+}

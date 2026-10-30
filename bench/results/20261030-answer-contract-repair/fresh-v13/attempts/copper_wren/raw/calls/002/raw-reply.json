@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-d577f849-4832-45ce-8bba-a43186151795",
+  "object": "chat.completion",
+  "created": 1793383460,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The median resolution time for the March cohort was 3.75 business days, and for the January cohort was 5 business days. The difference is 5 - 3.75 = 1.25 business days.\", \"minuend_id\": \"N3\", \"subtrahend_id\": \"N2\", \"known_input_snippet_ids\": [\"S4\", \"S5\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R2\": {\"status\": \"ready\", \"reason\": \"The percent change in median resolution time from the before period (January) to the after period (March) is calculated as ((3.75 - 5) / 5) * 100 = -25%. The negative sign indicates a decrease.\", \"baseline_id\": \"N3\", \"current_id\": \"N2\", \"known_input_snippet_ids\": [\"S4\", \"S5\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R3\": {\"R3P1\": {\"snippet_ids\": [\"S12\"], \"text\": \"The measurement covers standard-priority support cases submitted by paying repair shops.\" , \"status\": \"supported\"}, \"R3P2\": {\"snippet_ids\": [\"S12\"], \"text\": \"It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff.\", \"status\": \"supported\"}, \"R3P3\": {\"snippet_ids\": [\"S9\"], \"text\": \"Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent.\", \"status\": \"supported\"}, \"R3P4\": {\"snippet_ids\": [\"S9\"], \"text\": \"The team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2966,
+    "completion_tokens": 430,
+    "total_tokens": 3396
+  }
+}

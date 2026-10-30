@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-891adc0f-931a-4515-81c7-fec41330ebcf",
+  "object": "chat.completion",
+  "created": 1793380635,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Launch Date Confirmation\", \"Ownership Responsibility\", \"Scope Confirmation\", \"Timeline Details\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 21,
+    "total_tokens": 121
+  }
+}

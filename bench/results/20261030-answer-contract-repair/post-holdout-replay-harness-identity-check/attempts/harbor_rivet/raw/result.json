@@ -1,0 +1,449 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b95c2e22-5f9e-4e2c-ac8f-186f9ce7415a",
+    "workspace": "pilot-eval",
+    "issue": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Harbor Rivet handles a supplier safety incident from intake through closure by following a structured process. The intake stage involves the person receiving the report recording the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from various sources, including project sites, suppliers, the quality lab, or warehouse workers. The intake coordinator opens the incident record and places the affected shipment on hold, then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment but does not automatically recall items already installed. After intake, the quality lead checks the affected lot against receiving records, identifies whether other shipments may contain the same material, and may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot\nwho owns each stage and handoff. The intake coordinator owns the intake stage and hands off the incident record and evidence to the quality lead. The quality lead owns the assessment stage, checking the affected lot against receiving records and identifying other shipments. The quality lead also owns the decision about the affected scope and hands off the scoped list to the field safety manager to coordinate site action. The field safety manager owns the action and closure stage, contacting affected project sites and coordinating containment actions. The field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead, who closes the incident after verifying actions and documenting follow-up. The quality lead owns the closure stage, ensuring that all actions are verified and documented.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8",
+            "S9",
+            "S10",
+            "S11"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+              "quote": "Harbor Rivet buys fabricated metal fittings for commercial building projects. An incident is any report that a delivered fitting may create a safety risk, including a suspected material mix-up, an incomplete inspection record, or a physical failure in a field installation. The person receiving the report records the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from a project site, a supplier, the quality lab, or a warehouse worker. A "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+              "quote": "report does not need a confirmed failure before it enters the register. The intake team avoids asking a field worker to remove a fitted part until site safety has assessed whether it is safe to do so. If there is a risk of immediate injury, the site follows its normal emergency procedure in parallel. The register should capture the first notification time and any gaps in shipment identification so that quality can request the missing information later. Customer names are recorded in the "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+              "quote": "restricted register, not in the general supplier channel.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+              "quote": "\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+              "quote": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+              "quote": "still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps "
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+              "quote": "unrelated reports separate unless a real common cause is established.\n"
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+              "quote": "\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator."
+            },
+            {
+              "snippet_id": "S9",
+              "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+              "quote": "The field safety manager contacts the affected project sites identified by quality and agrees safe inspection or containment actions with the responsible site contacts. For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing. Site actions should record who was contacted, the date of contact, and whether a site has acknowledged the proposed action. A site may need additional time to obtain access or a specialist inspection, so "
+            },
+            {
+              "snippet_id": "S10",
+              "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+              "quote": "contact alone is not the same as completed containment. The manager flags unresponsive sites to the incident review meeting rather than assuming that the work is complete. Supporting material is retained in the restricted register and any corrections to a lot identifier are explained in the record. Supplier response documents are attached with their date, and any open technical question remains visible to the quality lead. The company does not require removal of every delivered part when "
+            },
+            {
+              "snippet_id": "S11",
+              "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+              "quote": "assessment supports a narrower response.\n"
+            }
+          ],
+          "parts": [
+            {
+              "id": "R1P1",
+              "request_span": "Harbor Rivet handle a supplier safety incident from intake through closure",
+              "status": "supported",
+              "text": "Harbor Rivet handles a supplier safety incident from intake through closure by following a structured process. The intake stage involves the person receiving the report recording the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from various sources, including project sites, suppliers, the quality lab, or warehouse workers. The intake coordinator opens the incident record and places the affected shipment on hold, then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment but does not automatically recall items already installed. After intake, the quality lead checks the affected lot against receiving records, identifies whether other shipments may contain the same material, and may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6",
+                "S7",
+                "S8"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+                  "quote": "Harbor Rivet buys fabricated metal fittings for commercial building projects. An incident is any report that a delivered fitting may create a safety risk, including a suspected material mix-up, an incomplete inspection record, or a physical failure in a field installation. The person receiving the report records the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from a project site, a supplier, the quality lab, or a warehouse worker. A "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+                  "quote": "report does not need a confirmed failure before it enters the register. The intake team avoids asking a field worker to remove a fitted part until site safety has assessed whether it is safe to do so. If there is a risk of immediate injury, the site follows its normal emergency procedure in parallel. The register should capture the first notification time and any gaps in shipment identification so that quality can request the missing information later. Customer names are recorded in the "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+                  "quote": "restricted register, not in the general supplier channel.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+                  "quote": "\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed."
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items "
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps "
+                },
+                {
+                  "snippet_id": "S7",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "unrelated reports separate unless a real common cause is established.\n"
+                },
+                {
+                  "snippet_id": "S8",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator."
+                }
+              ]
+            },
+            {
+              "id": "R1P2",
+              "request_span": "who owns each stage and handoff?",
+              "status": "supported",
+              "text": "who owns each stage and handoff. The intake coordinator owns the intake stage and hands off the incident record and evidence to the quality lead. The quality lead owns the assessment stage, checking the affected lot against receiving records and identifying other shipments. The quality lead also owns the decision about the affected scope and hands off the scoped list to the field safety manager to coordinate site action. The field safety manager owns the action and closure stage, contacting affected project sites and coordinating containment actions. The field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead, who closes the incident after verifying actions and documenting follow-up. The quality lead owns the closure stage, ensuring that all actions are verified and documented.",
+              "snippet_ids": [
+                "S4",
+                "S5",
+                "S6",
+                "S7",
+                "S8",
+                "S9",
+                "S10",
+                "S11"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+                  "quote": "\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed."
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items "
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps "
+                },
+                {
+                  "snippet_id": "S7",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "unrelated reports separate unless a real common cause is established.\n"
+                },
+                {
+                  "snippet_id": "S8",
+                  "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+                  "quote": "\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator."
+                },
+                {
+                  "snippet_id": "S9",
+                  "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+                  "quote": "The field safety manager contacts the affected project sites identified by quality and agrees safe inspection or containment actions with the responsible site contacts. For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing. Site actions should record who was contacted, the date of contact, and whether a site has acknowledged the proposed action. A site may need additional time to obtain access or a specialist inspection, so "
+                },
+                {
+                  "snippet_id": "S10",
+                  "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+                  "quote": "contact alone is not the same as completed containment. The manager flags unresponsive sites to the incident review meeting rather than assuming that the work is complete. Supporting material is retained in the restricted register and any corrections to a lot identifier are explained in the record. Supplier response documents are attached with their date, and any open technical question remains visible to the quality lead. The company does not require removal of every delivered part when "
+                },
+                {
+                  "snippet_id": "S11",
+                  "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+                  "quote": "assessment supports a narrower response.\n"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "e8cad347-8310-4e02-a65f-d11b706e259c",
+        "document_id": "9a9aaa06-da11-506d-b882-e03d61ce1670",
+        "revision_id": "ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+        "relative_path": "sources/harbor_rivet/source-1.md",
+        "updated_at": "2026-10-30T18:09:10.557744+00:00",
+        "chunk_id": "c7cb6fb4-8e9a-5065-83c2-08c81bd42af6",
+        "anchor": "supplier-incident-playbook-section-1-intake",
+        "heading": "Supplier incident playbook — section 1: intake",
+        "content": "Harbor Rivet buys fabricated metal fittings for commercial building projects. An incident is any report that a delivered fitting may create a safety risk, including a suspected material mix-up, an incomplete inspection record, or a physical failure in a field installation. The person receiving the report records the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from a project site, a supplier, the quality lab, or a warehouse worker. A report does not need a confirmed failure before it enters the register. The intake team avoids asking a field worker to remove a fitted part until site safety has assessed whether it is safe to do so. If there is a risk of immediate injury, the site follows its normal emergency procedure in parallel. The register should capture the first notification time and any gaps in shipment identification so that quality can request the missing information later. Customer names are recorded in the restricted register, not in the general supplier channel.\n\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.559179+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+        "presented_content": "Harbor Rivet buys fabricated metal fittings for commercial building projects. An incident is any report that a delivered fitting may create a safety risk, including a suspected material mix-up, an incomplete inspection record, or a physical failure in a field installation. The person receiving the report records the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from a project site, a supplier, the quality lab, or a warehouse worker. A report does not need a confirmed failure before it enters the register. The intake team avoids asking a field worker to remove a fitted part until site safety has assessed whether it is safe to do so. If there is a risk of immediate injury, the site follows its normal emergency procedure in parallel. The register should capture the first notification time and any gaps in shipment identification so that quality can request the missing information later. Customer names are recorded in the restricted register, not in the general supplier channel.\n\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed."
+      },
+      {
+        "collection_id": "e8cad347-8310-4e02-a65f-d11b706e259c",
+        "document_id": "30e9c77b-a718-5eb2-836e-840dd4cae1c7",
+        "revision_id": "1142d277-1080-5cfb-a28f-2d0826b281f7",
+        "relative_path": "sources/harbor_rivet/source-2.md",
+        "updated_at": "2026-10-30T18:09:10.558430+00:00",
+        "chunk_id": "212d5d02-5b77-5d19-ab50-4ca62ce3f3e3",
+        "anchor": "supplier-incident-playbook-section-2-assessment",
+        "heading": "Supplier incident playbook — section 2: assessment",
+        "content": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps unrelated reports separate unless a real common cause is established.\n\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.559179+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+        "presented_content": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps unrelated reports separate unless a real common cause is established.\n\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator."
+      },
+      {
+        "collection_id": "e8cad347-8310-4e02-a65f-d11b706e259c",
+        "document_id": "e3033d25-ed68-56fb-a820-a7058340edc7",
+        "revision_id": "04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+        "relative_path": "sources/harbor_rivet/source-3.md",
+        "updated_at": "2026-10-30T18:09:10.559099+00:00",
+        "chunk_id": "b5ca4acc-b5df-506f-99da-b5ab3df23d50",
+        "anchor": "supplier-incident-playbook-section-3-action-and-closure",
+        "heading": "Supplier incident playbook — section 3: action and closure",
+        "content": "The field safety manager contacts the affected project sites identified by quality and agrees safe inspection or containment actions with the responsible site contacts. For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing. Site actions should record who was contacted, the date of contact, and whether a site has acknowledged the proposed action. A site may need additional time to obtain access or a specialist inspection, so contact alone is not the same as completed containment. The manager flags unresponsive sites to the incident review meeting rather than assuming that the work is complete. Supporting material is retained in the restricted register and any corrections to a lot identifier are explained in the record. Supplier response documents are attached with their date, and any open technical question remains visible to the quality lead. The company does not require removal of every delivered part when assessment supports a narrower response.\n\nThe field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead. The quality lead closes the incident only after verifying the actions and documenting any remaining follow-up owner. Closing the register entry is an administrative decision and does not erase the evidence.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.559179+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+        "presented_content": "The field safety manager contacts the affected project sites identified by quality and agrees safe inspection or containment actions with the responsible site contacts. For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing. Site actions should record who was contacted, the date of contact, and whether a site has acknowledged the proposed action. A site may need additional time to obtain access or a specialist inspection, so contact alone is not the same as completed containment. The manager flags unresponsive sites to the incident review meeting rather than assuming that the work is complete. Supporting material is retained in the restricted register and any corrections to a lot identifier are explained in the record. Supplier response documents are attached with their date, and any open technical question remains visible to the quality lead. The company does not require removal of every delivered part when assessment supports a narrower response.\n\nThe field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead. The quality lead closes the incident only after verifying the actions and documenting any remaining follow-up owner. Closing the register entry is an administrative decision and does not erase the evidence."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T18:09:10.572591+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 5,
+      "created_at": "2026-10-30T18:09:10.572591+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 6,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R1": [
+          {
+            "id": "R1P1",
+            "request_span": "Harbor Rivet handle a supplier safety incident from intake through closure"
+          },
+          {
+            "id": "R1P2",
+            "request_span": "who owns each stage and handoff?"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "request-spans-fallback-v1",
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "answer_part_plan_validation": {
+        "R1": {
+          "mode": "request_spans",
+          "proposed_spans": [
+            "Harbor Rivet handle a supplier safety incident from intake through closure",
+            "who owns each stage and handoff?"
+          ],
+          "reason": null
+        }
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+          "quote": "Harbor Rivet buys fabricated metal fittings for commercial building projects. An incident is any report that a delivered fitting may create a safety risk, including a suspected material mix-up, an incomplete inspection record, or a physical failure in a field installation. The person receiving the report records the supplier, shipment identifiers, site, and available photographs in the incident register. Reports may come from a project site, a supplier, the quality lab, or a warehouse worker. A "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+          "quote": "report does not need a confirmed failure before it enters the register. The intake team avoids asking a field worker to remove a fitted part until site safety has assessed whether it is safe to do so. If there is a risk of immediate injury, the site follows its normal emergency procedure in parallel. The register should capture the first notification time and any gaps in shipment identification so that quality can request the missing information later. Customer names are recorded in the "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+          "quote": "restricted register, not in the general supplier channel.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:c7cb6fb4-8e9a-5065-83c2-08c81bd42af6:ced7e22b-ffe1-5121-8f76-0d4b9fd9b276",
+          "quote": "\nThe intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment. A hold prevents further release of that shipment; it does not automatically recall items already installed."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+          "quote": "After intake, the quality lead checks the affected lot against the receiving records and identifies whether other shipments may contain the same material. The lead may request lab measurements or inspection certificates from the supplier. Missing certificates are logged as gaps rather than treated as proof that a part failed. When a lot cannot be identified, the lead records the uncertainty and asks the warehouse to preserve the relevant delivery records. The assessment distinguishes items "
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+          "quote": "still in Harbor Rivet custody from items already delivered to a project site; these groups need different follow-up. Quality records its reasoning and any unresolved evidence in the same restricted incident register. A hold stays in place during assessment unless an authorized quality decision changes it. The supplier can supply evidence, but its proposed interpretation does not by itself release material. The lead also checks whether a similar report exists for a different supplier and keeps "
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+          "quote": "unrelated reports separate unless a real common cause is established.\n"
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:212d5d02-5b77-5d19-ab50-4ca62ce3f3e3:1142d277-1080-5cfb-a28f-2d0826b281f7",
+          "quote": "\nThe quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action. The decision about a customer site is not delegated to the intake coordinator."
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+          "quote": "The field safety manager contacts the affected project sites identified by quality and agrees safe inspection or containment actions with the responsible site contacts. For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing. Site actions should record who was contacted, the date of contact, and whether a site has acknowledged the proposed action. A site may need additional time to obtain access or a specialist inspection, so "
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+          "quote": "contact alone is not the same as completed containment. The manager flags unresponsive sites to the incident review meeting rather than assuming that the work is complete. Supporting material is retained in the restricted register and any corrections to a lot identifier are explained in the record. Supplier response documents are attached with their date, and any open technical question remains visible to the quality lead. The company does not require removal of every delivered part when "
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+          "quote": "assessment supports a narrower response.\n"
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:b5ca4acc-b5df-506f-99da-b5ab3df23d50:04dacec4-cb8b-587f-b75b-4f5198c87ed7",
+          "quote": "\nThe field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead. The quality lead closes the incident only after verifying the actions and documenting any remaining follow-up owner. Closing the register entry is an administrative decision and does not erase the evidence."
+        }
+      ],
+      "quantity_catalog": [],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "e8cad347-8310-4e02-a65f-d11b706e259c"
+    ]
+  },
+  "latency_seconds": 0.011958791874349117,
+  "setup_seconds": 0.019261792302131653,
+  "attempt_total_seconds": 0.03122058417648077,
+  "finished_at": "2026-10-30T18:09:10.575873+00:00"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f289abdb-08a9-41fd-b0df-b6d468ee2de7",
+  "object": "chat.completion",
+  "created": 1793381492,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S1\", \"S5\"], \"text\": \"The operations update lists October 25 as the customer portal launch target. The product update says the customer portal launch is targeted for October 18. There is a discrepancy between the two dates, and neither source confirms a final launch decision. The operations update mentions October 25 as the target, while the product update lists October 18 as the target. The update does not record a final launch decision.\", \"status\": \"unknown\"}, \"R1P2\": {\"snippet_ids\": [\"S1\", \"S5\"], \"text\": \"The operations update names Mira Chen as launch readiness coordinator. The product update names Mira Chen, the product lead, as the person coordinating launch readiness. Both sources agree that Mira Chen is the owner of the launch.\", \"status\": \"supported\"}, \"R1P3\": {\"snippet_ids\": [\"S3\"], \"text\": \"The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 710,
+    "completion_tokens": 271,
+    "total_tokens": 981
+  }
+}

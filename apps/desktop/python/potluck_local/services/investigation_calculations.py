@@ -184,9 +184,12 @@ def quantity_catalog(
     of its full source. Only spans wholly contained in one snippet are emitted.
     Full context is used solely for validation and is never included in output.
     """
-    if version not in ('v1', 'v2', 'v3'):
+    if version not in ('v1', 'v2', 'v3', 'v4'):
         raise ValueError('invalid calculation version')
-    if version == 'v3':
+    if version == 'v4':
+        from .investigation_quantities_v4 import source_matches_v4
+        source_matches = source_matches_v4
+    elif version == 'v3':
         from .investigation_quantities_v3 import source_matches_v3
         source_matches = source_matches_v3
     elif version == 'v2':
@@ -265,7 +268,10 @@ def quantity_catalog(
 def _validate_catalog(quantities: list[dict[str, Any]], version: str = 'v1') -> dict[str, dict[str, Any]]:
     if not isinstance(quantities, list) or len(quantities) > 1000:
         raise ValueError('invalid quantity catalog')
-    if version == 'v3':
+    if version == 'v4':
+        from .investigation_quantities_v4 import source_matches_v4
+        source_matches = source_matches_v4
+    elif version == 'v3':
         from .investigation_quantities_v3 import source_matches_v3
         source_matches = source_matches_v3
     elif version == 'v2':
@@ -309,7 +315,7 @@ def _decimal_text(value: Decimal) -> str:
 def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str, Any]], *,
               version: str = 'v1') -> dict[str, Any]:
     """Compute a fixed operation, or return a reason it cannot be computed."""
-    if version not in ('v1', 'v2', 'v3'):
+    if version not in ('v1', 'v2', 'v3', 'v4'):
         raise ValueError('invalid calculation version')
     if operation not in _OPERATIONS or not isinstance(operand_ids, list) or len(operand_ids) > 2:
         raise ValueError('invalid operation or operand count')
@@ -335,7 +341,7 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
     if len(inputs) != 2:
         return unknown('Two distinct cited inputs are required.')
     first, second = inputs
-    if first['dimension'] != second['dimension'] or (first['dimension'] == 'count' and first['unit'] != second['unit']):
+    if first['dimension'] != second['dimension'] or (first['dimension'] in ('count', 'compound_day') and first['unit'] != second['unit']):
         return unknown('Inputs have incompatible units.')
     if operation == 'percentage_point_difference' and first['dimension'] != 'percent':
         return unknown('Percentage-point difference requires percent inputs.')
@@ -395,6 +401,9 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
 def extraction_notices(snippets: list[dict[str, Any]], quantities: list[dict[str, Any]], *,
                        source_context: dict[str, str] | None = None, version: str = 'v2') -> list[dict[str, Any]]:
     """Report bounded source-local number-like spans not extracted by v2."""
+    if version == 'v4':
+        from .investigation_quantities_v4 import extraction_notices_v4
+        return extraction_notices_v4(snippets, quantities, source_context=source_context)
     if version == 'v3':
         from .investigation_quantities_v3 import extraction_notices_v3
         return extraction_notices_v3(snippets, quantities, source_context=source_context)

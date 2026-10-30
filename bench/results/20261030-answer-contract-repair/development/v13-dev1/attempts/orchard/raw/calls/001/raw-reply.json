@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-478845e3-4d90-4074-b3f3-f450a9510398",
+  "object": "chat.completion",
+  "created": 1793380497,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Invoice Receipt Process\", \"Invoice Approval Ownership\", \"Invoice Payment Process\", \"Stage Ownership Overview\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 98,
+    "completion_tokens": 24,
+    "total_tokens": 122
+  }
+}

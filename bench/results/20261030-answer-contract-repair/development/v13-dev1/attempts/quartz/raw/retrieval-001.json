@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "3f230bdd-0659-46b6-86a2-299824900fca"
+  ],
+  "query": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "3f230bdd-0659-46b6-86a2-299824900fca"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "3f230bdd-0659-46b6-86a2-299824900fca",
+        "document_id": "5b55e8fc-ba31-5171-9126-aa47eef7d03e",
+        "revision_id": "cc7b90c5-8720-5bb7-b217-99cde5081b4a",
+        "relative_path": "sources/quartz_first.md",
+        "updated_at": "2026-10-30T17:19:56.746018+00:00",
+        "chunk_id": "61594e7c-5b11-5117-a97b-880558422398",
+        "anchor": "first-measurement-period",
+        "heading": "First measurement period",
+        "content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:19:56.746699+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:61594e7c-5b11-5117-a97b-880558422398:cc7b90c5-8720-5bb7-b217-99cde5081b4a"
+      },
+      {
+        "collection_id": "3f230bdd-0659-46b6-86a2-299824900fca",
+        "document_id": "9e4f1e8b-13fe-5752-95f8-228be86cd7bc",
+        "revision_id": "e0701a1d-06ff-50fa-a40e-868ada0455c2",
+        "relative_path": "sources/quartz_second.md",
+        "updated_at": "2026-10-30T17:19:56.746616+00:00",
+        "chunk_id": "0df69261-a174-5f30-9dd5-a7a9ce443417",
+        "anchor": "second-measurement-period",
+        "heading": "Second measurement period",
+        "content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:19:56.746699+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0df69261-a174-5f30-9dd5-a7a9ce443417:e0701a1d-06ff-50fa-a40e-868ada0455c2"
+      },
+      {
+        "collection_id": "3f230bdd-0659-46b6-86a2-299824900fca",
+        "document_id": "c87bdb49-30d7-5ef1-be53-2ab212b45acf",
+        "revision_id": "29ea5edd-4c4c-5e58-9753-0523081a5921",
+        "relative_path": "sources/quartz_context.md",
+        "updated_at": "2026-10-30T17:19:56.745160+00:00",
+        "chunk_id": "062ba791-8d08-5454-b073-a3333af8317a",
+        "anchor": "measurement-context",
+        "heading": "Measurement context",
+        "content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:19:56.746699+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:062ba791-8d08-5454-b073-a3333af8317a:29ea5edd-4c4c-5e58-9753-0523081a5921"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

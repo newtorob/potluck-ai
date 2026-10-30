@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-8d5a2553-7f22-4fa9-af02-9ea2cf933e4c",
+  "object": "chat.completion",
+  "created": 1793380806,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The average onboarding time in the first period was 20 calendar days and in the second period was 15 calendar days. The difference is 5 calendar days.\", \"minuend_id\": \"N1\", \"subtrahend_id\": \"N3\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R2\": {\"status\": \"ready\", \"reason\": \"The percentage change in the average onboarding time from the first period to the second period is calculated as (15 - 20) / 20 * 100 = -25%. This indicates a 25% decrease.\", \"baseline_id\": \"N1\", \"current_id\": \"N3\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R3\": {\"R3P1\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on平均.\",\"status\": \"supported\"}, \"R3P2\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on平均.\", \"status\": \"supported\"}, \"R3P3\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on平均.\", \"status\": \"supported\"}, \"R3P4\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on平均.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1285,
+    "completion_tokens": 507,
+    "total_tokens": 1792
+  }
+}

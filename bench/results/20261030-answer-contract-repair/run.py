@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Frozen six-case local diagnostic. No retries, no assessments, no remote inference."""
+import argparse, asyncio, hashlib, json, os, shutil, sys, time
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+FIXTURES = Path('/Users/rob/Documents/potluck/apps/desktop/python/evals/company_brain/planned_answers_v1')
+FROZEN_SUMS_SHA256 = None
+def sha(path):
+    with path.open('rb') as f: return hashlib.file_digest(f, 'sha256').hexdigest()
+def utc(): return datetime.now(timezone.utc).isoformat()
+
+def load_frozen(fixture_dir):
+    global FIXTURES
+    FIXTURES = fixture_dir.resolve(strict=True)
+    if sha(FIXTURES/'SHA256SUMS') != FROZEN_SUMS_SHA256: raise ValueError('Fixture checksum manifest mismatch')
+    entries = {}
+    for line in (FIXTURES/'SHA256SUMS').read_text().splitlines():
+        digest, name = line.split('  ', 1)
+        p = (FIXTURES/name).resolve(strict=True)
+        if not p.is_relative_to(FIXTURES.resolve()) or sha(p) != digest or name in entries:
+            raise ValueError('Invalid frozen file/hash: '+name)
+        entries[name] = p
+    manifest = json.loads(entries['manifest.json'].read_bytes())
+    rubric = json.loads(entries['rubric.json'].read_bytes())
+    metadata = json.loads(entries['sources.json'].read_bytes())
+    cases = manifest['cases']
+    ids = [c['id'] for c in cases]
+    if not 1 <= len(ids) <= 8 or len(set(ids)) != len(ids) or set(ids) != set(rubric['cases']): raise ValueError('Invalid case IDs')
+    source_meta = {x['file']:x for x in metadata['sources']}
+    if len(source_meta) != len(metadata['sources']): raise ValueError('Duplicate source metadata')
+    canary = metadata['excluded_canary']
+    if canary not in entries or canary in source_meta: raise ValueError('Invalid excluded canary')
+    if {x for x in entries if x.startswith('sources/') or x == canary} != set(source_meta) | {canary}: raise ValueError('Source inventory mismatch')
+    for c in cases:
+        if not all(ch in 'abcdefghijklmnopqrstuvwxyz0123456789-_' for ch in c['id']): raise ValueError('Invalid case ID')
+        if not 1 <= len(c['plan']) <= 8 or any(row['operation'] not in ('answer','difference','percent_change','percentage') for row in c['plan']): raise ValueError('Invalid plan')
+        if len(c['sources']) != len(set(c['sources'])) or canary in c['sources']: raise ValueError('Duplicate source or canary in scope')
+        for name in c['sources']:
+            if name not in entries or name not in source_meta or sha(entries[name]) != source_meta[name]['sha256']: raise ValueError('Invalid source '+name)
+    return entries, manifest, canary
+
+def validate_snapshot(snapshot, manifest_path=None):
+    snapshot = snapshot.resolve(strict=True)
+    if manifest_path is None:
+        raise ValueError('Snapshot manifest is required')
+    manifest_path = manifest_path.resolve(strict=True)
+    root = snapshot.parent.parent.parent
+    if manifest_path.parent != root: raise ValueError('Snapshot manifest must be at snapshot root')
+    data = json.loads(manifest_path.read_bytes())
+    if data.get('base_head') != '2829116b7d4242f5fc5c9f7d2a7034357fdd859a': raise ValueError('Unexpected snapshot base')
+    hashes = data['production_hashes']
+    if not isinstance(hashes, dict) or len(hashes) < 150: raise ValueError('Snapshot manifest has fewer than 150 hashes')
+    for name, digest in hashes.items():
+        path = (root/name).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file() or sha(path) != digest: raise ValueError('Snapshot hash mismatch: '+name)
+    expected = {name for name in hashes if name.startswith('apps/desktop/python/potluck_local/') and name.endswith('.py')}
+    actual = {str(path.relative_to(root)) for path in (snapshot/'potluck_local').rglob('*.py') if path.is_file()}
+    if actual != expected: raise ValueError('Snapshot Python inventory differs from manifest')
+    return {'manifest':str(manifest_path),'manifest_sha256':sha(manifest_path),'hashes_checked':len(hashes),'python_files_checked':len(actual),'checked':True}
+
+async def run(args):
+    global FROZEN_SUMS_SHA256
+    FROZEN_SUMS_SHA256=args.fixture_sha
+    entries, manifest, canary = load_frozen(args.fixture_dir)
+    if args.plan_overrides:
+        overrides=json.loads(args.plan_overrides.read_bytes())
+        if set(overrides) - {c['id'] for c in manifest['cases']}: raise ValueError('Unknown override case')
+        manifest={**manifest,'cases':[{**c,'plan':overrides.get(c['id'],c['plan'])} for c in manifest['cases']]}
+    if args.case_id:
+        manifest={**manifest,'cases':[c for c in manifest['cases'] if c['id'] == args.case_id]}
+        if not manifest['cases']: raise ValueError('Unknown case')
+    if args.offline_check:
+        print(json.dumps({'cases':len(manifest['cases']),'sources':sum(1 for k in entries if k.startswith('sources/') or k == canary),'fixture_sums_sha256':sha(FIXTURES/'SHA256SUMS'),'snapshot': validate_snapshot(args.snapshot, args.snapshot_manifest) if args.snapshot else None}))
+        return
+    if args.backend != 'python': raise ValueError('Only CPU-only python backend is permitted')
+    if not args.snapshot or not args.model or not args.sha256 or not args.output or not args.version: raise ValueError('Snapshot, model, sha256, version and output required')
+    if not args.model.is_file() or args.model.is_symlink() or sha(args.model) != args.sha256.lower(): raise ValueError('Model hash mismatch or invalid file')
+    snapshot = args.snapshot.resolve(strict=True)
+    if not (snapshot/'potluck_local/services/company_brain_eval_runner.py').is_file(): raise ValueError('Snapshot must be Python engine directory')
+    snapshot_hashes = validate_snapshot(snapshot, args.snapshot_manifest)
+    sys.path.insert(0, str(snapshot))
+    from potluck_local.services import company_brain_eval_runner as base, investigations, investigation_profiles, investigation_reviewed_operations
+    from potluck_local.services.evidence_lookup import EvidenceScope
+    from potluck_local.services.memory_db import init_memory_db
+    from potluck_local.services.runtime import get_runtime
+    from potluck_local.services.source_collections import register_collection, scan_collection
+    # Validate before touching output/model; snapshot must expose its own implementation in snapshot.
+    plans = {c['id']: investigation_reviewed_operations.validate_rows([{k:r[k] for k in ('request','operation')} for r in c['plan']]) for c in manifest['cases']}
+    out = args.output.absolute(); out = out.parent.resolve(strict=True)/out.name
+    out.mkdir(mode=0o700, exist_ok=False); (out/'data').mkdir(mode=0o700); (out/'frozen').mkdir()
+    for name,p in entries.items():
+        target=out/'frozen'/name; target.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(p,target)
+    shutil.copyfile(FIXTURES/'SHA256SUMS',out/'frozen'/'SHA256SUMS')
+    settings=({'n_ctx':8192,'n_threads':8,'n_gpu_layers':0,'cpu_only':True,'rpc_servers':None} if args.backend == 'python' else {'n_ctx':8192,'n_threads':8,'n_gpu_layers':10,'cache_mib':0})
+    bundle_info = None
+    base.write_new(out/'run-metadata.json',{'runner_sha256':sha(Path(__file__)),'started_at':utc(),'template_version':'investigation-'+args.version,'plan_origin':'fixture_supplied','seed':7,'generation_profile':investigation_profiles.resolve_profile('qwen3-non-thinking').metadata(),'model_path':str(args.model),'model_sha256':args.sha256.lower(),'settings':settings,'backend':args.backend,'native_bundle':bundle_info,'mode':'preflight' if args.preflight_only else 'cases','snapshot':str(snapshot),'snapshot_validation':snapshot_hashes,'code_identity':base.identity(),'fixture_sha256s':{k:sha(v) for k,v in entries.items()},'retries':0,'assessment':None,'evaluation_purpose':args.purpose,'effective_plans':plans,'plan_overrides_sha256':sha(args.plan_overrides) if args.plan_overrides else None,'retrieval_limitation':'Normal scoped lexical retrieval, context and result limits apply; no evidence is inserted or forced.'})
+    with base.isolated_environment(POTLUCK_DATA_DIR=str(out/'data')):
+        runtime=get_runtime()
+        try:
+            if args.backend == 'native':
+                from potluck_local.services import local_server
+                root, native_manifest = local_server.bundle()
+                bundle_info = {'root':str(root), 'manifest':native_manifest, 'files_sha256':{str(p.relative_to(root)):sha(p) for p in sorted(root.rglob('*')) if p.is_file() and not p.is_symlink()}}
+                base.write_new(out/'native-bundle.json',bundle_info)
+            report=(runtime.load_model(str(args.model),**settings) if args.backend == 'python' else runtime._load_local_server(str(args.model),**settings,expected_model_sha256=args.sha256.lower()))
+            base.write_new(out/'model-load.json',{'report':report,'inference_summary':runtime.inference_summary(),'actual_placement_note':'Native process discards engine logs; effective GPU placement is not independently observable here.' if args.backend == 'native' else 'See runtime report.'})
+            if runtime.current_model_sha256()!=args.sha256.lower(): raise ValueError('Loaded model identity mismatch')
+            model=runtime.current_model_id(); outputs={}
+            if args.preflight_only:
+                folder=out/'preflight'; folder.mkdir()
+                base.write_new(folder/'started.json',{'started_at':utc()})
+                schema={'type':'object','properties':{'status':{'type':'string','enum':['READY']},'note':{'type':'null'}},'required':['status','note'],'additionalProperties':False}
+                messages=[{'role':'system','content':'Return the requested JSON.'},{'role':'user','content':'Set status to READY and note to null.'}]
+                capture=base.CaptureRuntime(runtime,folder,{'purpose':'non-task schema/profile capability check'})
+                start=time.monotonic()
+                try:
+                    reply=await capture.chat(messages,expected_model=model,expected_sha256=args.sha256.lower(),max_tokens=128,temperature=0,response_format={'type':'json_object','schema':schema},bounded_generation=True,generation_profile='qwen3-non-thinking',seed=7)
+                    raw=reply['choices'][0]['message']['content']; parsed=json.loads(raw)
+                    ok=parsed == {'status':'READY','note':None} and reply['choices'][0].get('finish_reason') != 'length'
+                    base.write_new(folder/'result.json',{'status':'success' if ok else 'invalid_response','parsed':parsed,'finished_at':utc(),'elapsed_seconds':time.monotonic()-start})
+                except Exception as e:
+                    base.write_new(folder/'result.json',{'status':'error','error':{'type':type(e).__name__,'message':str(e)},'finished_at':utc(),'elapsed_seconds':time.monotonic()-start})
+                return
+            for case in manifest['cases']:
+                folder=out/'attempts'/case['id']/'raw'; folder.mkdir(parents=True)
+                base.write_new(folder/'started.json',{'case_id':case['id'],'started_at':utc()})
+                started=time.monotonic(); investigation_start=None
+                result={k:None for k in ('citation_validity','semantic_support','unsupported_answer','correction','time_to_accepted_seconds')}
+                with base.isolated_environment(POTLUCK_MEMORY_DB_PATH=str(folder/'isolated.sqlite')):
+                    try:
+                        await init_memory_db(); allowed=folder/'allowed'; allowed.mkdir()
+                        for name in case['sources']:
+                            target=allowed/name; target.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(entries[name],target)
+                            if sha(target)!=sha(entries[name]): raise ValueError('Copied source mismatch')
+                        workspace='pilot-eval'; cid=await register_collection(workspace,'frozen',allowed); scan=await scan_collection(workspace,cid)
+                        excluded=folder/'excluded'; excluded.mkdir()
+                        canary_target=excluded/canary; canary_target.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(entries[canary],canary_target)
+                        excluded_id=await register_collection(workspace,'excluded-canary',excluded); excluded_scan=await scan_collection(workspace,excluded_id)
+                        if excluded_id == cid: raise ValueError('Excluded collection overlaps allowed scope')
+                        scope=EvidenceScope(workspace,(cid,))
+                        base.write_new(folder/'registration.json',{'workspace':workspace,'collection_id':cid,'root':str(allowed),'files':{n:sha(allowed/n) for n in case['sources']},'scan':asdict(scan),'evidence_scope_collection_ids':list(scope.collection_ids),'excluded_canary':{'collection_id':excluded_id,'root':str(excluded),'file':canary,'sha256':sha(canary_target),'scan':asdict(excluded_scan)}})
+                        original_runtime,original_lookup=investigations.get_runtime,investigations.lookup_evidence
+                        count=0
+                        async def capture(scope_arg,query,limit,**kwargs):
+                            nonlocal count
+                            count+=1; target=folder/f'retrieval-{count:03d}.json'
+                            try:
+                                value=await original_lookup(scope_arg,query,limit,**kwargs)
+                                base.write_new(target,{'workspace':scope_arg.workspace,'collection_ids':list(scope_arg.collection_ids),'query':query,'limit':limit,'kwargs':kwargs,'result':value})
+                                return value
+                            except Exception as e:
+                                base.write_new(target,{'workspace':scope_arg.workspace,'collection_ids':list(scope_arg.collection_ids),'query':query,'limit':limit,'kwargs':kwargs,'error':{'type':type(e).__name__,'message':str(e)}}); raise
+                        investigations.get_runtime=lambda: base.CaptureRuntime(runtime,folder,{'operation_mode':'fixture_supplied','plan_origin':'fixture_supplied'})
+                        investigations.lookup_evidence=capture
+                        try:
+                            investigation_start=time.monotonic()
+                            item=await investigations.create_investigation(scope,case['question'],case['question'],model,template_version='investigation-'+args.version,generation_profile='qwen3-non-thinking',seed=7,reviewed_operations=plans[case['id']],reviewed_plan_origin='fixture_supplied')
+                        finally:
+                            investigations.get_runtime=original_runtime; investigations.lookup_evidence=original_lookup
+                        result.update(status='success',result=item)
+                    except Exception as e:
+                        result.update(status='error',error={'type':type(e).__name__,'message':str(e)},failure_stage='inference_or_validation' if (folder/'request.json').exists() else 'pre_inference')
+                    end=time.monotonic(); result.update(latency_seconds=end-investigation_start if investigation_start is not None else None,setup_seconds=(investigation_start or end)-started,attempt_total_seconds=end-started,finished_at=utc())
+                    base.write_new(folder/'result.json',result); outputs[case['id']]=result
+            base.write_new(out/'raw.json',{'case_ids':[c['id'] for c in manifest['cases']],'assessment':None,'outputs':outputs})
+        except Exception as e:
+            base.write_new(out/'run-error.json',{'type':type(e).__name__,'message':str(e),'finished_at':utc()}); raise
+        finally: runtime.unload_model()
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__); p.add_argument('--fixture-dir',type=Path,default=FIXTURES); p.add_argument('--fixture-sha',required=True); p.add_argument('--purpose',required=True); p.add_argument('--plan-overrides',type=Path); p.add_argument('--case-id'); p.add_argument('--backend',choices=['python','native'],default='python'); p.add_argument('--preflight-only',action='store_true'); p.add_argument('--snapshot',type=Path); p.add_argument('--snapshot-manifest',type=Path); p.add_argument('--model',type=Path); p.add_argument('--sha256'); p.add_argument('--version',choices=['v12','v13']); p.add_argument('--output',type=Path); p.add_argument('--offline-check',action='store_true'); a=p.parse_args(); asyncio.run(run(a))
+if __name__=='__main__': main()

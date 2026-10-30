@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-3c6cb695-6903-4624-8a05-ba2012a1248d",
+  "object": "chat.completion",
+  "created": 1793380578,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"R1P1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours due to a Lumen service incident. The credit is ten percent of the workspace's monthly subscription charge. The rule is for\" ,\"status\": \"unknown\"}, \"R1P2\": {\"snippet_ids\": [\"S3\", \"S4\"], \"text\": \"A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the\" ,\"status\": \"unknown\"}, \"R1P3\": {\"snippet_ids\": [\"S5\", \"S6\"], \"text\": \"Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice\" ,\"status\": \"unknown\"}, \"R1P4\": {\"snippet_ids\": [\"S3\", \"S5\", \"S6\"], \"text\": \"A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the\" ,\"status\": \"unknown\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 745,
+    "completion_tokens": 293,
+    "total_tokens": 1038
+  }
+}

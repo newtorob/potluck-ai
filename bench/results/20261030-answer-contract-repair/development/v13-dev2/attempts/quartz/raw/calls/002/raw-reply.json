@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1ee5c7c4-5487-413e-9614-93b6c2513af7",
+  "object": "chat.completion",
+  "created": 1793381659,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The average onboarding time for the first period is 20 calendar days, and for the second period is 15 calendar days. The difference is 5 calendar days.\", \"minuend_id\": \"N1\", \"subtrahend_id\": \"N3\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R2\": {\"status\": \"ready\", \"reason\": \"The percentage change in Quartz average onboarding time from the first period to the second is calculated as (15 - 20) / 20 * 100 = -25%. The negative sign indicates a decrease.\", \"baseline_id\": \"N1\", \"current_id\": \"N3\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R3\": {\"R3P1\": {\"snippet_ids\": [\"S5\"], \"text\": \"The Quartz onboarding figures track elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\" , \"status\": \"supported\"}, \"R3P2\": {\"snippet_ids\": [\"S5\"], \"text\": \"The figures measure the time it takes for customers to move from signed agreement to completed setup, in calendar days.\", \"status\": \"supported\"}, \"R3P3\": {\"snippet_ids\": [\"S5\"], \"text\": \"The data points include the elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\", \"status\": \"supported\"}, \"R3P4\": {\"snippet_ids\": [\"S5\"], \"text\": \"The figures represent the average time it takes for customers to complete onboarding, measured in calendar days from signed agreement to completed setup.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1308,
+    "completion_tokens": 423,
+    "total_tokens": 1731
+  }
+}

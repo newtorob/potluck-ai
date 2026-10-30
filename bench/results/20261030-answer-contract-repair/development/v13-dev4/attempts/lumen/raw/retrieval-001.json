@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "5f2df0a1-3462-4c57-ba32-d34c20166970"
+  ],
+  "query": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "5f2df0a1-3462-4c57-ba32-d34c20166970"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "5f2df0a1-3462-4c57-ba32-d34c20166970",
+        "document_id": "3f7efdaf-0568-5663-9501-8b3223fadac9",
+        "revision_id": "2fccb49c-a81a-5750-8033-1ef385409e86",
+        "relative_path": "sources/lumen_policy.md",
+        "updated_at": "2026-10-30T17:49:48.604430+00:00",
+        "chunk_id": "4920d1cf-992c-5030-86a5-2622c76a8305",
+        "anchor": "service-credit-eligibility",
+        "heading": "Service credit eligibility",
+        "content": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:49:48.605104+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4920d1cf-992c-5030-86a5-2622c76a8305:2fccb49c-a81a-5750-8033-1ef385409e86"
+      },
+      {
+        "collection_id": "5f2df0a1-3462-4c57-ba32-d34c20166970",
+        "document_id": "e4b68038-4763-5ed2-8468-5aceb6d433b0",
+        "revision_id": "812d335d-6a60-5c2c-af4b-82bfaf765abe",
+        "relative_path": "sources/lumen_process.md",
+        "updated_at": "2026-10-30T17:49:48.605017+00:00",
+        "chunk_id": "a51e3519-fe35-5c71-8576-86f209c8f1b0",
+        "anchor": "credit-request-handling",
+        "heading": "Credit request handling",
+        "content": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:49:48.605104+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a51e3519-fe35-5c71-8576-86f209c8f1b0:812d335d-6a60-5c2c-af4b-82bfaf765abe"
+      },
+      {
+        "collection_id": "5f2df0a1-3462-4c57-ba32-d34c20166970",
+        "document_id": "128f0e51-7673-50a5-9420-a7374dcd60ba",
+        "revision_id": "1da1e807-714a-581d-b4f3-ddf1330d1949",
+        "relative_path": "sources/lumen_billing.md",
+        "updated_at": "2026-10-30T17:49:48.603691+00:00",
+        "chunk_id": "03abb088-933e-5032-884c-91c2a4698700",
+        "anchor": "applying-an-approved-credit",
+        "heading": "Applying an approved credit",
+        "content": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:49:48.605104+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:03abb088-933e-5032-884c-91c2a4698700:1da1e807-714a-581d-b4f3-ddf1330d1949"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

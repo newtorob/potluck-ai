@@ -1,0 +1,93 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "04ad5b46-61b5-4b84-9ded-017ded24c48f"
+  ],
+  "query": "For Copper Wren, how much did median resolution time change in business days and percent from the before period to the after period, and what exactly was measured?",
+  "limit": 10,
+  "kwargs": {
+    "retrieval_version": "v2"
+  },
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "04ad5b46-61b5-4b84-9ded-017ded24c48f"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "04ad5b46-61b5-4b84-9ded-017ded24c48f",
+        "document_id": "3bcea56c-d9ac-528b-8c05-5db818de34ba",
+        "revision_id": "493e67c1-5ce4-583c-abc6-89af15ed1917",
+        "relative_path": "sources/copper_wren/source-3.md",
+        "updated_at": "2026-10-30T18:09:10.620010+00:00",
+        "chunk_id": "c0ac64da-8dbc-5a1c-95c3-162cff0140aa",
+        "anchor": "follow-up-support-report-march-2026-cohort",
+        "heading": "Follow-up support report — March 2026 cohort",
+        "content": "The report includes cases submitted from March 1 through March 31 and resolved by the reporting cutoff. Operations used the same version 3 definition and event-log extraction as for the January baseline. A new routing queue was introduced between the periods, but the comparison alone does not establish that the queue caused the observed change. Changes in the mix of customer questions, staffing, or the number of cases still open at cutoff may also influence the published median. The team maintained a separate table of open cases and did not assign those cases an artificial resolution duration. For this report, standard priority is the priority recorded at submission, so an agent's later change to a ticket's label does not retrospectively put it in or out of the cohort. Customers' names were removed from the aggregate report before the results were shared with the product team. Each report describes submitted cases from its own month, rather than the exact same tickets followed across both months. March is the after period in the improvement review.\n\nThe March cohort's median business time to first resolution was 3.75 business days. The report compares this median with the January median of 5 business days, using January as the baseline.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.620223+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c0ac64da-8dbc-5a1c-95c3-162cff0140aa:493e67c1-5ce4-583c-abc6-89af15ed1917"
+      },
+      {
+        "collection_id": "04ad5b46-61b5-4b84-9ded-017ded24c48f",
+        "document_id": "6fa523b5-0d13-526f-8fb1-15ac4694a562",
+        "revision_id": "34b19f90-d03c-5d2e-b588-02d072dd3745",
+        "relative_path": "sources/copper_wren/source-2.md",
+        "updated_at": "2026-10-30T18:09:10.619277+00:00",
+        "chunk_id": "bb7b8299-0a8b-5d80-93fd-c2532b2ae1d0",
+        "anchor": "baseline-support-report-january-2026-cohort",
+        "heading": "Baseline support report — January 2026 cohort",
+        "content": "The report includes cases submitted from January 1 through January 31 and resolved by the reporting cutoff. The support team applied the version 3 metric definition consistently to this cohort before publishing it. Case submission times and resolution times came from the support system's event log, and the operations analyst checked the resulting duration distribution for duplicate records. Internal training exercises were tagged before extraction so they did not enter the cohort. The cohort was not restricted to a single day of the week or to a single support agent, and it covers standard-priority cases from paying repair shops. The published value is a median across the qualifying individual cases. It is not a target or a guaranteed maximum for an individual customer. The report includes a separate open-case count, because excluding unresolved cases means the median does not describe how long those outstanding cases will eventually take. The team cautions against comparing this figure to an elapsed-clock-time metric without conversion. January is the before period in the improvement review.\n\nThe January cohort's median business time to first resolution was 5 business days. This baseline uses the same case definition as the later March cohort.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.620223+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:bb7b8299-0a8b-5d80-93fd-c2532b2ae1d0:34b19f90-d03c-5d2e-b588-02d072dd3745"
+      },
+      {
+        "collection_id": "04ad5b46-61b5-4b84-9ded-017ded24c48f",
+        "document_id": "a6430445-2096-5693-b0d3-2aeb1e3e4387",
+        "revision_id": "2cef7850-c2a2-5bcf-a203-4b7002a64d9b",
+        "relative_path": "sources/copper_wren/source-1.md",
+        "updated_at": "2026-10-30T18:09:10.618588+00:00",
+        "chunk_id": "4fac2ea4-0e48-5b4a-8d7c-041acf4c5d94",
+        "anchor": "support-measurement-specification-version-3",
+        "heading": "Support measurement specification — version 3",
+        "content": "Copper Wren provides workflow software for independent repair shops. The support operations team publishes a monthly duration measure to understand how long ordinary cases take to resolve. Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent. If a resolved case is later reopened, the initial resolution timestamp remains the endpoint of this measure. The team uses business time rather than elapsed clock time, counting eight working hours per business day and excluding nights and weekends. The median is calculated across case-level durations, not by taking the mean of daily medians. Cases are grouped by the month in which they were submitted, and the calculation is rerun after the follow-up period has ended so that late resolutions can be counted. Cases that remain unresolved at the cutoff are handled under a separate open-case report and do not enter the resolved-case median. This metric is intended to describe speed for this narrowly defined case population; it is not a measure of customer satisfaction or engineering delivery time.\n\nThe measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T18:09:10.620223+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4fac2ea4-0e48-5b4a-8d7c-041acf4c5d94:2cef7850-c2a2-5bcf-a203-4b7002a64d9b"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined.",
+      "The first two ranked chunks per document are preferred; additional chunks backfill remaining slots."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false,
+    "retrieval_version": "v2",
+    "retrieval_trace": {
+      "candidate_limit_reached": false,
+      "preferred_chunks_per_document": 2,
+      "deprioritized_chunks": 0,
+      "result_omitted": 0,
+      "result_limit_reached": false
+    }
+  }
+}

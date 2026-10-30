@@ -1,0 +1,4 @@
+{
+  "type": "TimeoutError",
+  "message": "Recorded frozen generation had no final response; no inference attempted"
+}

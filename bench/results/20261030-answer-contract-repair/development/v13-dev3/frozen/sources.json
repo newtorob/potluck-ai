@@ -1,0 +1,77 @@
+{
+  "sources": [
+    {
+      "file": "sources/cedar_launch_note.md",
+      "sha256": "88044628fc66ee5efdfd8b57145307f5b6eb73cace809cbad45d18a7f71ea820"
+    },
+    {
+      "file": "sources/cedar_operations_update.md",
+      "sha256": "ef9301212482e44747f97128ada95dbe5ba3e948c0279264c3172bc48a98d418"
+    },
+    {
+      "file": "sources/cedar_product_update.md",
+      "sha256": "9ed9fb5bec751d6eeea34d4e117eee13f69bb2e7fb102514960b5b0f8b6e785c"
+    },
+    {
+      "file": "sources/harbor_guide.md",
+      "sha256": "33e9a4af8a73233cec5f57d6ba8e95cf951adbf1fdd4fa846ecd5ab0b98ab1ec"
+    },
+    {
+      "file": "sources/harbor_limits.md",
+      "sha256": "1d7732b2655cd4937e6b963c2a4122709f549b8ba06c16b381bfea3d306de754"
+    },
+    {
+      "file": "sources/harbor_roadmap.md",
+      "sha256": "1e445f6c1f48d0bf839af753958312580c2ad0e5e0ee1037f90db82d14dc3777"
+    },
+    {
+      "file": "sources/lumen_billing.md",
+      "sha256": "d8d04c301e447e089f39895769df8c04d50d376d8671ad315c0c712037924fab"
+    },
+    {
+      "file": "sources/lumen_policy.md",
+      "sha256": "ac9b31582929d44921592c3fad9a9b2108682ddfff2ecb00b089455ac5982e3d"
+    },
+    {
+      "file": "sources/lumen_process.md",
+      "sha256": "e184377a8fbe4fda5fb4303f52b84b82c6700c9a3f9bd07ee8106fadea6305a1"
+    },
+    {
+      "file": "sources/maple_pipeline.md",
+      "sha256": "039146d09f29af6b1d789398c550841de71fa2a1f628c0831e8b3a95507b3145"
+    },
+    {
+      "file": "sources/maple_process.md",
+      "sha256": "49474755310fb34f7427c9acb4690829483acdb2240e4ce6a1530cf52fc80639"
+    },
+    {
+      "file": "sources/maple_snapshot.md",
+      "sha256": "7f0d74554d197191f33dc5e99e0ba72f015e5d7b42fef00e119a86f28e7062ea"
+    },
+    {
+      "file": "sources/orchard_approval.md",
+      "sha256": "98755280155beb55e9bedde5c99466c35df6457a56771f809ab9ad7feccacc5d"
+    },
+    {
+      "file": "sources/orchard_payment.md",
+      "sha256": "2065243c041c3de3bbc0ada1cc37bf6e1176c95aff73b562f03c856a451cf9fd"
+    },
+    {
+      "file": "sources/orchard_receipt.md",
+      "sha256": "d77fdd7eaaee65877cdf950087c621200e116bf530370fab0294293f5f6efcc1"
+    },
+    {
+      "file": "sources/quartz_context.md",
+      "sha256": "2fcbcae4112e5958ec93ff06de7a4dc33f1aba39d440f5f78ec857ed85112f22"
+    },
+    {
+      "file": "sources/quartz_first.md",
+      "sha256": "1c66a582e14b853b5472580c0bb79855c5845fcd59d10dbb7d481049ed89f753"
+    },
+    {
+      "file": "sources/quartz_second.md",
+      "sha256": "7db3169f6663a0cdac711bd3babd2f35e30d7a904dddadc039b304a83f78e4c9"
+    }
+  ],
+  "excluded_canary": "sources/excluded_canary.md"
+}

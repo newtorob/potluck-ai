@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "5f2df0a1-3462-4c57-ba32-d34c20166970",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/lumen/raw/allowed",
+  "files": {
+    "sources/lumen_policy.md": "ac9b31582929d44921592c3fad9a9b2108682ddfff2ecb00b089455ac5982e3d",
+    "sources/lumen_process.md": "e184377a8fbe4fda5fb4303f52b84b82c6700c9a3f9bd07ee8106fadea6305a1",
+    "sources/lumen_billing.md": "d8d04c301e447e089f39895769df8c04d50d376d8671ad315c0c712037924fab"
+  },
+  "scan": {
+    "collection_id": "5f2df0a1-3462-4c57-ba32-d34c20166970",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "5f2df0a1-3462-4c57-ba32-d34c20166970"
+  ],
+  "excluded_canary": {
+    "collection_id": "901d3c5a-2896-4b4f-977e-749a8be1e74a",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/lumen/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "901d3c5a-2896-4b4f-977e-749a8be1e74a",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

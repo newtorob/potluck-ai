@@ -1,0 +1,39 @@
+{
+  "denominator": 6,
+  "completed_cases": 0,
+  "ready_count": 0,
+  "run_status": "crashed, native exit 139 during Harbor final grammar",
+  "cases": {
+    "harbor": {
+      "status": "incomplete_crash",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    },
+    "orchard": {
+      "status": "not_run",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    },
+    "lumen": {
+      "status": "not_run",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    },
+    "cedar": {
+      "status": "not_run",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    },
+    "maple": {
+      "status": "not_run",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    },
+    "quartz": {
+      "status": "not_run",
+      "ready": false,
+      "criteria": "not assessed; no completed answer"
+    }
+  },
+  "note": "0/6 completed; this is a run failure, not a semantic grade of the five unrun cases."
+}

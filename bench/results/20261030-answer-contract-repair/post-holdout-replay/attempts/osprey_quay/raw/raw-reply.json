@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-393c9c4b-3daf-4ddd-8fe9-872c410e424a",
+  "object": "chat.completion",
+  "created": 1793383192,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"What is known about the Osprey Quay migration schedule\", \"the scope of the disagreement\", \"who will decide between the dates\", \"Distinguish the other dated events\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 118,
+    "completion_tokens": 41,
+    "total_tokens": 159
+  }
+}

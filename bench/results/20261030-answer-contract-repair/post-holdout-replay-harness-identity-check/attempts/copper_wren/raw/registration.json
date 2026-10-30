@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "04ad5b46-61b5-4b84-9ded-017ded24c48f",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/post-holdout-replay/attempts/copper_wren/raw/allowed",
+  "files": {
+    "sources/copper_wren/source-1.md": "c4244cf2a094a70681629b656abac94ef5cad49731a9ddf8f45495869640ba12",
+    "sources/copper_wren/source-2.md": "9f680f2fb8246a3bf52c99098aa5a07b76c39fb62b745bfece053f98e08bf561",
+    "sources/copper_wren/source-3.md": "bfaf9603c3e46200714db9d4919d351b40c52851b2ca6e79b910c759236ee090"
+  },
+  "scan": {
+    "collection_id": "04ad5b46-61b5-4b84-9ded-017ded24c48f",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "04ad5b46-61b5-4b84-9ded-017ded24c48f"
+  ],
+  "excluded_canary": {
+    "collection_id": "af8ab07f-5693-4610-af6e-3be24bbb05cf",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/post-holdout-replay/attempts/copper_wren/raw/excluded",
+    "file": "excluded-canary.md",
+    "sha256": "899deadea82173a75c0cac4bf7cae07aaabc410bc0d3dca295cedc1da5ceb6da",
+    "scan": {
+      "collection_id": "af8ab07f-5693-4610-af6e-3be24bbb05cf",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "sources": [
+    {
+      "file": "sources/cedar_lantern/source-1.md",
+      "sha256": "391e59be800a7f54684f42e457423c504a7e7221fc1c23cde8e93062e9cda760"
+    },
+    {
+      "file": "sources/cedar_lantern/source-2.md",
+      "sha256": "6247a847b26fc48cae8a4b8e6382ae69187c5e209559078563cae1fab2b0a925"
+    },
+    {
+      "file": "sources/cedar_lantern/source-3.md",
+      "sha256": "cd012cdecfa3988f44b10034caf633f3b2b607931fd2de697bc2252d5c585a69"
+    },
+    {
+      "file": "sources/harbor_rivet/source-1.md",
+      "sha256": "98c77aa9ecc86ba3f1367159c85d285441a2130c3687d13b2c1537c3654a77ca"
+    },
+    {
+      "file": "sources/harbor_rivet/source-2.md",
+      "sha256": "bcabfcd9571fdc0b282a0324f0d19048bba272d7e1f63b06f9143c2744d29213"
+    },
+    {
+      "file": "sources/harbor_rivet/source-3.md",
+      "sha256": "0b15b937239386b4eb84c0a319291537254d92f305f332aa75ee37479bf8e7c4"
+    },
+    {
+      "file": "sources/osprey_quay/source-1.md",
+      "sha256": "9b36edb2b73f88f0ed444ce1644ebb396126a4732ae521772a3dc756fcb8c6ad"
+    },
+    {
+      "file": "sources/osprey_quay/source-2.md",
+      "sha256": "72100bae5b86ef4c98547b8a80b45a3588e72be4944f9ad4ab4a2f5f6c7d04c9"
+    },
+    {
+      "file": "sources/osprey_quay/source-3.md",
+      "sha256": "41ecc71da10dde62b1cfac8ae0fd7883c7371e26b783a8030804fe31f6b1685b"
+    },
+    {
+      "file": "sources/copper_wren/source-1.md",
+      "sha256": "c4244cf2a094a70681629b656abac94ef5cad49731a9ddf8f45495869640ba12"
+    },
+    {
+      "file": "sources/copper_wren/source-2.md",
+      "sha256": "9f680f2fb8246a3bf52c99098aa5a07b76c39fb62b745bfece053f98e08bf561"
+    },
+    {
+      "file": "sources/copper_wren/source-3.md",
+      "sha256": "bfaf9603c3e46200714db9d4919d351b40c52851b2ca6e79b910c759236ee090"
+    }
+  ],
+  "excluded_canary": "excluded-canary.md"
+}

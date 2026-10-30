@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b51b7f32-536f-4dae-8e6d-a7a1754e97d5",
+  "object": "chat.completion",
+  "created": 1793381041,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"List the current capabilities of export scheduling for Harbor customers.\", \"Identify the existing limitations of export scheduling in Harbor.\", \"Outline the planned improvements for export scheduling in Harbor.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 106,
+    "completion_tokens": 40,
+    "total_tokens": 146
+  }
+}

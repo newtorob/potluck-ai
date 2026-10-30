@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4232a830-7952-4f5b-ab2d-335fb4b12cb4",
+  "object": "chat.completion",
+  "created": 1793382804,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The average onboarding time in the first period was 20 calendar days and in the second period was 15 calendar days. The difference is 5 calendar days.\", \"minuend_id\": \"N3\", \"subtrahend_id\": \"N1\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R2\": {\"status\": \"ready\", \"reason\": \"The percentage change in Quartz average onboarding time from the first period to the second is calculated as (15 - 20) / 20 * 100 = -25%. The average decreased by 25%.\", \"baseline_id\": \"N1\", \"current_id\": \"N3\", \"known_input_snippet_ids\": [\"S1\", \"S3\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}, \"R3\": {\"R3P1\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups.\" , \"status\": \"supported\"}, \"R3P2\": {\"snippet_ids\": [\"S5\"], \"text\": \"It does not count the number of hours employees actively worked on a setup.\", \"status\": \"supported\"}, \"R3P3\": {\"snippet_ids\": [\"S5\"], \"text\": \"A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\", \"status\": \"supported\"}, \"R3P4\": {\"snippet_ids\": [\"S5\"], \"text\": \"The onboarding dashboard reports elapsed time for completed setups.\", \"status\": \"supported\"}}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1311,
+    "completion_tokens": 385,
+    "total_tokens": 1696
+  }
+}

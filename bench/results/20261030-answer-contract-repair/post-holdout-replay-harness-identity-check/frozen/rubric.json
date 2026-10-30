@@ -1,0 +1,195 @@
+{
+  "cases": {
+    "cedar_lantern": {
+      "required": [
+        {
+          "id": "current",
+          "claim": "Administrators manually download a CSV for a selected month containing completed appointments and charges.",
+          "support_files": [
+            "sources/cedar_lantern/source-1.md"
+          ],
+          "support_quotes": [
+            "Account administrators open Settings, select a month, and download a CSV showing completed appointments and the associated charge for each location."
+          ]
+        },
+        {
+          "id": "limits",
+          "claim": "The current export has no scheduled email or API and is limited to one account at a time.",
+          "support_files": [
+            "sources/cedar_lantern/source-2.md"
+          ],
+          "support_quotes": [
+            "The export does not run on a schedule or send files by email. It has no API and cannot export more than one account at a time."
+          ]
+        },
+        {
+          "id": "future",
+          "claim": "A small pilot of scheduled email is planned for Q3 2026; an API is merely under consideration and unscheduled.",
+          "support_files": [
+            "sources/cedar_lantern/source-3.md"
+          ],
+          "support_quotes": [
+            "The team plans to pilot scheduled email delivery with a small group in the third quarter of 2026. An export API is only under consideration; it is not approved or scheduled."
+          ]
+        }
+      ],
+      "forbidden": [
+        "Present scheduled email or the API as available today.",
+        "Claim an API has been approved or scheduled."
+      ],
+      "expected_status": "supported"
+    },
+    "harbor_rivet": {
+      "required": [
+        {
+          "id": "intake",
+          "claim": "The intake coordinator records and holds the affected shipment and hands evidence to quality.",
+          "support_files": [
+            "sources/harbor_rivet/source-1.md"
+          ],
+          "support_quotes": [
+            "The intake coordinator opens the incident record and places the affected shipment on hold. The coordinator then hands the record and available evidence to the quality lead for assessment."
+          ]
+        },
+        {
+          "id": "assess",
+          "claim": "The quality lead determines affected scope, records evidence and uncertainties, and gives the delivered-material list to field safety.",
+          "support_files": [
+            "sources/harbor_rivet/source-2.md"
+          ],
+          "support_quotes": [
+            "The quality lead decides the affected scope and documents the evidence and uncertainties. For any material already delivered, the quality lead hands the scoped list to the field safety manager to coordinate site action."
+          ]
+        },
+        {
+          "id": "close",
+          "claim": "The field safety manager records site acknowledgments and containment, hands back the action record, and the quality lead verifies actions and documents follow-up before closure.",
+          "support_files": [
+            "sources/harbor_rivet/source-3.md"
+          ],
+          "support_quotes": [
+            "The field safety manager records site acknowledgments and completed containment, then hands the action record back to the quality lead. The quality lead closes the incident only after verifying the actions and documenting any remaining follow-up owner."
+          ]
+        },
+        {
+          "id": "warehouse",
+          "claim": "For material still in the warehouse, the quality lead coordinates segregation and further testing with warehouse operations.",
+          "support_files": [
+            "sources/harbor_rivet/source-3.md"
+          ],
+          "support_quotes": [
+            "For products still in the warehouse, quality coordinates with warehouse operations on segregation and any further testing."
+          ]
+        }
+      ],
+      "forbidden": [
+        "Claim intake closes the incident or decides affected scope.",
+        "Treat contact alone as completed containment."
+      ],
+      "expected_status": "supported"
+    },
+    "osprey_quay": {
+      "required": [
+        {
+          "id": "conflict",
+          "claim": "The live cutover is listed as April 21 in delivery and April 23 in customer operations, with no chosen date.",
+          "support_files": [
+            "sources/osprey_quay/source-1.md",
+            "sources/osprey_quay/source-2.md",
+            "sources/osprey_quay/source-3.md"
+          ],
+          "support_quotes": [
+            "the live ledger cutover for 21 April 2026",
+            "live ledger cutover on 23 April 2026",
+            "The minutes do not contain a vote, a chosen date, or an approval to treat either document as authoritative."
+          ]
+        },
+        {
+          "id": "scope",
+          "claim": "Both dates refer to the same shared-service ledger migration for all terminals, not separate phases or a pilot.",
+          "support_files": [
+            "sources/osprey_quay/source-2.md",
+            "sources/osprey_quay/source-3.md"
+          ],
+          "support_quotes": [
+            "both entries concern the same shared-service migration",
+            "the shared reservation ledger used by every terminal, not a phased rollout by terminal"
+          ]
+        },
+        {
+          "id": "owner",
+          "claim": "The authority to choose between the dates is explicitly unidentified.",
+          "support_files": [
+            "sources/osprey_quay/source-3.md"
+          ],
+          "support_quotes": [
+            "The minutes explicitly say the person or role authorized to choose between the 21 April and 23 April cutover dates has not yet been identified."
+          ]
+        },
+        {
+          "id": "events",
+          "claim": "The April 14 internal rehearsal and April 20 customer read-only window are distinct from live cutover.",
+          "support_files": [
+            "sources/osprey_quay/source-1.md",
+            "sources/osprey_quay/source-2.md"
+          ],
+          "support_quotes": [
+            "The delivery note schedules the internal rehearsal for 14 April",
+            "The calendar lists a customer read-only window on 20 April"
+          ]
+        }
+      ],
+      "forbidden": [
+        "Choose April 21 or April 23 as the final cutover date.",
+        "Name a decision owner or treat the disagreement as a staged terminal rollout.",
+        "Conflate the rehearsal or read-only window with production cutover."
+      ],
+      "expected_status": "supported"
+    },
+    "copper_wren": {
+      "required": [
+        {
+          "id": "difference",
+          "claim": "The median decreased by 1.25 business days, from 5 to 3.75 business days (after minus before is \u22121.25 business days).",
+          "support_files": [
+            "sources/copper_wren/source-2.md",
+            "sources/copper_wren/source-3.md"
+          ],
+          "support_quotes": [
+            "The January cohort's median business time to first resolution was 5 business days.",
+            "The March cohort's median business time to first resolution was 3.75 business days."
+          ]
+        },
+        {
+          "id": "percent",
+          "claim": "The change relative to the 5-business-day baseline is \u221225%, a 25% decrease.",
+          "support_files": [
+            "sources/copper_wren/source-2.md",
+            "sources/copper_wren/source-3.md"
+          ],
+          "support_quotes": [
+            "The January cohort's median business time to first resolution was 5 business days.",
+            "The March cohort's median business time to first resolution was 3.75 business days."
+          ]
+        },
+        {
+          "id": "scope",
+          "claim": "The metric is median business time from submission to first resolution for standard-priority cases from paying repair shops; it excludes nights and weekends and excludes urgent, test, and unresolved-at-cutoff cases.",
+          "support_files": [
+            "sources/copper_wren/source-1.md"
+          ],
+          "support_quotes": [
+            "Each observation starts when a customer submits a new support case and ends at the first time that case is marked resolved by an agent.",
+            "The measurement covers standard-priority support cases submitted by paying repair shops. It excludes urgent cases, internal test tickets, and cases unresolved at the reporting cutoff. Business time excludes nights and weekends and counts eight working hours per business day."
+          ]
+        }
+      ],
+      "forbidden": [
+        "Claim a 1.25-business-day increase or a 25 percentage-point change.",
+        "Claim causation from the observed comparison.",
+        "Describe the metric as elapsed clock time or all support cases."
+      ],
+      "expected_status": "supported"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5497c72f-41e9-497c-b4c3-9d3c9d8e3758",
+  "object": "chat.completion",
+  "created": 1793382936,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"What can Cedar Lantern customers do with the billing export today\", \"what are its current limits\", \"what is planned next?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 108,
+    "completion_tokens": 31,
+    "total_tokens": 139
+  }
+}

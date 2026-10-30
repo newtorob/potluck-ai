@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c9711a65-6ba8-4b4c-86a9-26131aa7f235",
+  "object": "chat.completion",
+  "created": 1793381543,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Maple’s enterprise customer retention rate last quarter\", \"Details about enterprise renewals\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 105,
+    "completion_tokens": 22,
+    "total_tokens": 127
+  }
+}

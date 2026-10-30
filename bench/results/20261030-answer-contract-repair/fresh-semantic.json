@@ -1,0 +1,59 @@
+{
+  "denominator": 4,
+  "accepted_results": 1,
+  "ready_literal_rubric": 0,
+  "fresh_baseline": "none",
+  "cases": {
+    "cedar_lantern": {
+      "status": "error",
+      "reason": "Invalid model format: part citations union exceeds aggregate maximum 8. No accepted answer.",
+      "raw_observations": [
+        "Raw incorrectly says no plan for combined report; source says no commitment."
+      ]
+    },
+    "harbor_rivet": {
+      "status": "error",
+      "reason": "Invalid model format: part citations union exceeds aggregate maximum 8. No accepted answer.",
+      "raw_observations": [
+        "Raw part 1 truncates; omitted warehouse branch; contradictory owner of closure."
+      ]
+    },
+    "osprey_quay": {
+      "status": "error",
+      "reason": "Investigation generation timed out; no final reply or accepted answer.",
+      "status_ambiguity": "Rubric expects supported: a supported description of a known conflict and unknown authority can coexist with conflicting or unknown labels for an unresolved date. No status evaluation possible without output."
+    },
+    "copper_wren": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Signed difference +1.25 reverses decrease; −25% is correct; 5→3.75 not stated in answer text."
+        },
+        {
+          "pass": true,
+          "reason": "−25% states correct relative change, source values appear in attached S4."
+        },
+        {
+          "pass": false,
+          "reason": "Scope text omits median; the working-hours and nights/weekends part cites only S9, which truncates before this fact (S12 attached to another part)."
+        }
+      ],
+      "answer_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "part_statuses": [
+        "supported",
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "quality": [
+        "Exact spans What/exactly/was/measured are not meaningful headings."
+      ]
+    }
+  }
+}

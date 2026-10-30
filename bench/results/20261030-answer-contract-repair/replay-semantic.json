@@ -1,0 +1,106 @@
+{
+  "denominator": 4,
+  "meaning": "Post-holdout captured-response workflow replay under citation fix; no new inference and not a fresh model result.",
+  "ready_literal_rubric": 1,
+  "clean_grounded_ready": 0,
+  "cases": {
+    "cedar_lantern": {
+      "status": "success",
+      "criteria": [
+        {
+          "id": "current",
+          "pass": true,
+          "reason": "S1/S5/S6 support manual CSV of completed appointments and charges."
+        },
+        {
+          "id": "limits",
+          "pass": true,
+          "reason": "S11 supports no schedule/email/API and one account."
+        },
+        {
+          "id": "future",
+          "pass": true,
+          "reason": "S15 supports Q3 pilot and undecided unscheduled API."
+        }
+      ],
+      "additional_quality": [
+        "No plan for multi-account report is not supported: S11 says no commitment, not no plan."
+      ],
+      "status_labels": [
+        "supported",
+        "supported",
+        "supported"
+      ]
+    },
+    "harbor_rivet": {
+      "status": "success",
+      "criteria": [
+        {
+          "id": "intake",
+          "pass": true,
+          "reason": "S4 supports intake coordinator holding and handoff."
+        },
+        {
+          "id": "assess",
+          "pass": false,
+          "reason": "Quality scope and field safety handoff are stated and S8 cited, but documenting evidence and uncertainties omitted."
+        },
+        {
+          "id": "close",
+          "pass": false,
+          "reason": "Closure text is asserted but decisive source-3 final paragraph lies in S12, not cited; field-safety-owning-closure claim is contradictory."
+        },
+        {
+          "id": "warehouse",
+          "pass": false,
+          "reason": "Quality/warehouse operations segregation and further testing omitted even though S9 is attached."
+        }
+      ],
+      "additional_quality": [
+        "First part truncates mid-sentence; unsupported contradictory closure ownership."
+      ],
+      "status_labels": [
+        "supported",
+        "supported"
+      ]
+    },
+    "osprey_quay": {
+      "status": "error",
+      "criteria": "not assessed; preserved recorded timeout with no final reply",
+      "additional_quality": [
+        "Rubric expected_status supported is ambiguous at unresolved-date vs known-conflict granularity."
+      ]
+    },
+    "copper_wren": {
+      "status": "success",
+      "criteria": [
+        {
+          "id": "difference",
+          "pass": false,
+          "reason": "Signed +1.25 reverses required decrease; values only in attached excerpts."
+        },
+        {
+          "id": "percent",
+          "pass": true,
+          "reason": "−25% supported by S4."
+        },
+        {
+          "id": "scope",
+          "pass": false,
+          "reason": "Median omitted and business-hours/eight-hours/weekends claim cites S9 which truncates before it; S12 appears on a different part."
+        }
+      ],
+      "additional_quality": [
+        "Planner spans What/exactly/was/measured have no semantic value."
+      ],
+      "status_labels": [
+        "supported",
+        "supported",
+        "supported",
+        "supported",
+        "supported",
+        "supported"
+      ]
+    }
+  }
+}

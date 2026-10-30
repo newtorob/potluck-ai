@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-22986caa-3746-4f6b-bba1-824a6a858245",
+  "object": "chat.completion",
+  "created": 1793383054,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Harbor Rivet handle a supplier safety incident from intake through closure\", \"who owns each stage and handoff?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 108,
+    "completion_tokens": 29,
+    "total_tokens": 137
+  }
+}

@@ -452,3 +452,38 @@ The owner-selected calculation preview remains available only for v9; it refuses
 ### Internal investigation-v12 experiment
 
 Service-only v12 retains v10 calculation semantics and v11's deterministic retrieval, with `paragraph-v2` source snippets. A separate bounded, source-free model call proposes exact ordered request spans for all factual operations. The service validates spans and records unmatched text, assigns fixed part IDs, and requires a final answer for each ID. The automatically generated part plan is `planned_unreviewed`, including when the operation plan was supplied by a fixture or confirmed by an owner. Span and citation checks do not establish semantic coverage or entailment. Factual-only final prompts omit calculation quantity catalogs and extraction notices while preserving source snippets and evidence omission notices; both catalogs and notices remain in provenance. Mixed and calculation plans retain the calculation context. Original parts remain in the draft when aggregate answers are corrected; correction reconstructs the stored snippet version. Planning and generation share the 240-second deadline and bounded outputs. This internal candidate does not change the default or expose a public switch; calculation preview remains v9 only. It requires fresh evaluation before any quality claim.
+
+### Internal bounded answers and compound durations (v13)
+
+The service-only `investigation-v13` experiment retains the full original request
+while planning up to four exact ordered request spans. If a well-shaped proposal
+paraphrases, overlaps or invents text, the server falls back to the entire original
+request as one part. It records the proposal and fallback separately as unreviewed
+diagnostics; answer headings always quote request text. This does not establish
+semantic coverage. Malformed JSON, duplicate keys or invalid plan shape still fail.
+
+Server-assigned part IDs are required in the final answer. Generation schemas,
+prompt-visible per-part limits and validation share a 4,000-character aggregate
+budget per factual operation, including separators, with at most 1,000 characters
+per part. A single-part fallback therefore has a 1,000-character limit. Older versions retain their
+1,000-character aggregate limit. Output is never silently truncated or repaired.
+Each factual part may cite up to eight snippets; the aggregate and its correction
+may cite up to 32 distinct snippets. Calculations retain their eight-snippet limit.
+Factual-only requests use a short factual instruction; mixed requests retain the
+explicit calculation contract. Source excerpts remain server-rendered and bound
+to scoped retrieved sources. Corrections allow the same bounded aggregate while
+retaining original machine parts and calculation traces separately and unchanged.
+
+V13 uses the versioned `v4` quantity parser for explicit calendar, business and
+working day quantities. These units remain distinct and cannot be converted or
+mixed; supported differences and percentage changes are computed deterministically.
+Lexical exclusion of nearby negation, approximate values and ranges is conservative,
+not proof that a source asserts a measurement. Unsupported expressions retain
+extraction notices. V1–v3 quantity extraction and v11/v12 answer replay stay intact.
+A request for both a difference and a percentage change requires two reviewed
+operations, plus a factual operation when measurement scope is requested. Fixture
+plans are recorded as supplied plans, never owner confirmation or verified coverage.
+
+V13 is not exposed by the public template selector and does not change defaults.
+Qualification results are recorded under `bench/results/20261030-answer-contract-repair`;
+unit-test success alone does not establish answer quality or pilot readiness.

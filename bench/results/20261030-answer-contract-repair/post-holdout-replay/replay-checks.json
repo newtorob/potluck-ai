@@ -1,0 +1,90 @@
+{
+  "new_inference": false,
+  "meaning": "Post-holdout validation replay, not a fresh model success or human review",
+  "collection_id_policy": "Reuse frozen collection UUIDs in separate isolated DBs to preserve exact prompt-visible extraction-notice citation IDs; real scanning/retrieval otherwise unchanged",
+  "original_run": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/fresh-v13",
+  "original_metadata_sha256": "43731132f3c8a5daee6e84faf8b0376f342a16c12e4c9d66893887d6575790a1",
+  "calls": [
+    {
+      "case": "cedar_lantern",
+      "call": 1,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "cedar_lantern",
+      "call": 2,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "harbor_rivet",
+      "call": 3,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "harbor_rivet",
+      "call": 4,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "osprey_quay",
+      "call": 5,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "osprey_quay",
+      "call": 6,
+      "messages_equal": true,
+      "settings_and_schema_equal": true,
+      "recorded_failure_without_reply": true
+    },
+    {
+      "case": "copper_wren",
+      "call": 7,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    },
+    {
+      "case": "copper_wren",
+      "call": 8,
+      "messages_equal": true,
+      "settings_and_schema_equal": true
+    }
+  ],
+  "cases": {
+    "cedar_lantern": {
+      "status": "success",
+      "retrieved_source_order_and_content_equal": true,
+      "captured_replies_equal": true,
+      "original_failure_without_reply_retained": false,
+      "correction_saved": true,
+      "export_succeeded": true
+    },
+    "harbor_rivet": {
+      "status": "success",
+      "retrieved_source_order_and_content_equal": true,
+      "captured_replies_equal": true,
+      "original_failure_without_reply_retained": false,
+      "correction_saved": true,
+      "export_succeeded": true
+    },
+    "osprey_quay": {
+      "status": "error",
+      "retrieved_source_order_and_content_equal": true,
+      "captured_replies_equal": true,
+      "original_failure_without_reply_retained": true
+    },
+    "copper_wren": {
+      "status": "success",
+      "retrieved_source_order_and_content_equal": true,
+      "captured_replies_equal": true,
+      "original_failure_without_reply_retained": false,
+      "correction_saved": true,
+      "export_succeeded": true
+    }
+  }
+}

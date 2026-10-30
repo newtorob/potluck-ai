@@ -1,0 +1,205 @@
+{
+  "denominator": 6,
+  "ready_count_literal_rubric": 4,
+  "basis": "Original criteria, relevant attached support, and original forbidden conditions. Other grounding and quality problems separately noted.",
+  "cases": {
+    "harbor": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1 supports paid-admin completed-order CSV"
+        },
+        {
+          "pass": true,
+          "reason": "S3 supports five/daily maximum and exclusions"
+        },
+        {
+          "pass": true,
+          "reason": "S5 supports weekly/monthly and cancelled filter planned"
+        },
+        {
+          "pass": true,
+          "reason": "S5 supports API undecided and unscheduled"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "First part ends mid-sentence and copies source text."
+      ]
+    },
+    "orchard": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S2 support receipt, checks, ledger entry and routing"
+        },
+        {
+          "pass": true,
+          "reason": "S3 supports budget owner approval and mismatch investigation"
+        },
+        {
+          "pass": true,
+          "reason": "S5 supports treasury payment schedule, eligibility and reference"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Visible planner labels invent procurement/finance/accounts-payable-clerk ownership contrary to cited sources and answer text."
+      ]
+    },
+    "lumen": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S2 support eligibility, exclusions, amount and request window"
+        },
+        {
+          "pass": true,
+          "reason": "S3 supports portal request, verification and decision"
+        },
+        {
+          "pass": true,
+          "reason": "S5/S6 support invoice application, tracking, no cash and carryforward"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Long copied passages and repetition."
+      ]
+    },
+    "cedar": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S5 support conflicting targets and no decision"
+        },
+        {
+          "pass": true,
+          "reason": "S1/S5 support Mira as readiness coordinator"
+        },
+        {
+          "pass": true,
+          "reason": "S3 supports two first-release features"
+        },
+        {
+          "pass": false,
+          "reason": "Employee preview distinction omitted; relevant launch-note preview excerpt not attached"
+        }
+      ],
+      "answer_statuses": [
+        "unknown"
+      ],
+      "part_statuses": [
+        [
+          "unknown",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Date part labelled unknown despite a cited conflict."
+      ]
+    },
+    "maple": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1 snapshot and S4 process support undetermined customer retention"
+        },
+        {
+          "pass": true,
+          "reason": "S5 supports twelve, eight, two and two unresolved"
+        },
+        {
+          "pass": true,
+          "reason": "S6 supports contracts need not equal customers"
+        }
+      ],
+      "answer_statuses": [
+        "unknown"
+      ],
+      "part_statuses": [
+        [
+          "unknown",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": []
+    },
+    "quartz": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Signed +5 reverses 20→15 despite correct −25%; S1/S3 contain correct values"
+        },
+        {
+          "pass": false,
+          "reason": "Measurement answer asserts signed agreement but only cites S5, which does not specify signed"
+        },
+        {
+          "pass": true,
+          "reason": "No causal assertion; context S5 attached"
+        }
+      ],
+      "answer_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "part_statuses": [
+        [],
+        [],
+        [
+          "supported",
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Difference operand roles reversed; arithmetic replay alone does not validate roles."
+      ]
+    }
+  }
+}

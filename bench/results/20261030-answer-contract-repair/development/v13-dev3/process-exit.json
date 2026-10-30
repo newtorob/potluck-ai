@@ -1,0 +1,10 @@
+{
+  "exit_code": 139,
+  "signal": "SIGSEGV",
+  "completed_cases": 0,
+  "scheduled_cases": 6,
+  "started_case": "harbor",
+  "remaining_cases": "not run after process crash",
+  "cause": "Native grammar parser rejected text maxLength1332; subsequent native sampler crashed. Original artifacts retained.",
+  "repair": "v13 text schema, prompt and validator cap each part at1000 while retaining4000 aggregate."
+}

@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "ef512f36-b167-4de4-bfe7-691edca4d4ca",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/maple/raw/allowed",
+  "files": {
+    "sources/maple_pipeline.md": "039146d09f29af6b1d789398c550841de71fa2a1f628c0831e8b3a95507b3145",
+    "sources/maple_process.md": "49474755310fb34f7427c9acb4690829483acdb2240e4ce6a1530cf52fc80639",
+    "sources/maple_snapshot.md": "7f0d74554d197191f33dc5e99e0ba72f015e5d7b42fef00e119a86f28e7062ea"
+  },
+  "scan": {
+    "collection_id": "ef512f36-b167-4de4-bfe7-691edca4d4ca",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "ef512f36-b167-4de4-bfe7-691edca4d4ca"
+  ],
+  "excluded_canary": {
+    "collection_id": "5f6567e6-2939-4a2c-aef8-c1b2b89ba370",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev4/attempts/maple/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "5f6567e6-2939-4a2c-aef8-c1b2b89ba370",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

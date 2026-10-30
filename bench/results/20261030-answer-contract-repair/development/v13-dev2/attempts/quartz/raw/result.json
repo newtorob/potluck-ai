@@ -1,0 +1,718 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "29156262-18a2-4434-88ef-2b5f759196c8",
+    "workspace": "pilot-eval",
+    "issue": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How did Quartz average onboarding time change in calendar days from the first period to the second?"
+        },
+        {
+          "id": "R2",
+          "text": "What was the percentage change in Quartz average onboarding time from the first period to the second?"
+        },
+        {
+          "id": "R3",
+          "text": "What do the Quartz onboarding figures measure?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 5 calendar day.",
+          "snippet_ids": [
+            "S1",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 5 calendar day.",
+            "formula": "after - before",
+            "result": "5",
+            "unit": "calendar day",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N3",
+                "snippet_id": "S3",
+                "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                "source_text": "15 calendar days",
+                "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                "start": 91,
+                "end": 107,
+                "value": "15",
+                "unit": "calendar day",
+                "dimension": "compound_day"
+              },
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                "source_text": "20 calendar days",
+                "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                "start": 108,
+                "end": 124,
+                "value": "20",
+                "unit": "calendar day",
+                "dimension": "compound_day"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v4",
+            "normalized_inputs": [
+              {
+                "id": "N3",
+                "role": "before",
+                "value": "15",
+                "unit": "calendar day",
+                "original_value": "15",
+                "original_unit": "calendar day",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N1",
+                "role": "after",
+                "value": "20",
+                "unit": "calendar day",
+                "original_value": "20",
+                "original_unit": "calendar day",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "20 calendar day - 15 calendar day = 5 calendar day (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "minuend_id": "N1",
+              "subtrahend_id": "N3"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S3"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        },
+        {
+          "question_id": "R2",
+          "status": "supported",
+          "text": "Signed percent change: -25 %.",
+          "snippet_ids": [
+            "S1",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: -25 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "-25",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                "source_text": "20 calendar days",
+                "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                "start": 108,
+                "end": 124,
+                "value": "20",
+                "unit": "calendar day",
+                "dimension": "compound_day"
+              },
+              {
+                "id": "N3",
+                "snippet_id": "S3",
+                "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                "source_text": "15 calendar days",
+                "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                "start": 91,
+                "end": 107,
+                "value": "15",
+                "unit": "calendar day",
+                "dimension": "compound_day"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v4",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "20",
+                "unit": "calendar day",
+                "original_value": "20",
+                "original_unit": "calendar day",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N3",
+                "role": "after",
+                "value": "15",
+                "unit": "calendar day",
+                "original_value": "15",
+                "original_unit": "calendar day",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(15 calendar day - 20 calendar day) / 20 calendar day × 100 = -25 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "baseline_id": "N1",
+              "current_id": "N3"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S3"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        },
+        {
+          "question_id": "R3",
+          "status": "supported",
+          "text": "The Quartz onboarding figures track elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\nThe figures measure the time it takes for customers to move from signed agreement to completed setup, in calendar days.\nThe data points include the elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\nThe figures represent the average time it takes for customers to complete onboarding, measured in calendar days from signed agreement to completed setup.",
+          "snippet_ids": [
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+              "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+            }
+          ],
+          "parts": [
+            {
+              "id": "R3P1",
+              "label": "What specific metrics do the Quartz onboarding figures track?",
+              "status": "supported",
+              "text": "The Quartz onboarding figures track elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                  "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                }
+              ]
+            },
+            {
+              "id": "R3P2",
+              "label": "What aspects of user onboarding are measured by Quartz figures?",
+              "status": "supported",
+              "text": "The figures measure the time it takes for customers to move from signed agreement to completed setup, in calendar days.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                  "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                }
+              ]
+            },
+            {
+              "id": "R3P3",
+              "label": "What data points are included in the Quartz onboarding figures?",
+              "status": "supported",
+              "text": "The data points include the elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                  "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                }
+              ]
+            },
+            {
+              "id": "R3P4",
+              "label": "What do the figures in Quartz's onboarding process represent?",
+              "status": "supported",
+              "text": "The figures represent the average time it takes for customers to complete onboarding, measured in calendar days from signed agreement to completed setup.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                  "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+        "document_id": "0cac2e09-2f17-58f7-a49d-fceaac08b5ab",
+        "revision_id": "c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+        "relative_path": "sources/quartz_first.md",
+        "updated_at": "2026-10-30T17:34:06.802795+00:00",
+        "chunk_id": "0561e7db-1997-5ee2-9087-dd457f288b56",
+        "anchor": "first-measurement-period",
+        "heading": "First measurement period",
+        "content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+        "presented_content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+      },
+      {
+        "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+        "document_id": "9193d7f4-52b3-5827-9459-8366d9671d01",
+        "revision_id": "7f744a27-10de-5774-9c00-848faca56881",
+        "relative_path": "sources/quartz_second.md",
+        "updated_at": "2026-10-30T17:34:06.803711+00:00",
+        "chunk_id": "5157e86b-0051-5293-a222-76bcc218a692",
+        "anchor": "second-measurement-period",
+        "heading": "Second measurement period",
+        "content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+        "presented_content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+      },
+      {
+        "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+        "document_id": "303a1c52-4609-5965-9acb-afe326cef336",
+        "revision_id": "76614e33-d208-559b-9c88-60ff3d2d0c6f",
+        "relative_path": "sources/quartz_context.md",
+        "updated_at": "2026-10-30T17:34:06.801592+00:00",
+        "chunk_id": "8403b16d-848e-56a4-b272-2b987cec79ef",
+        "anchor": "measurement-context",
+        "heading": "Measurement context",
+        "content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+        "presented_content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T17:35:52.552502+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v13",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+      "retrieval_version": "v2",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 105736,
+      "created_at": "2026-10-30T17:35:52.552502+00:00",
+      "retrieval_trace": {
+        "candidate_limit_reached": false,
+        "preferred_chunks_per_document": 2,
+        "deprioritized_chunks": 0,
+        "result_omitted": 0,
+        "result_limit_reached": false
+      },
+      "snippet_trace": {
+        "version": "paragraph-v2",
+        "max_snippets": 100,
+        "max_quote_length": 500,
+        "omitted_snippets": 0,
+        "omitted_characters": 0,
+        "whitespace_only_characters": 0,
+        "split_blocks": 0,
+        "truncated": false
+      },
+      "answer_coverage": {
+        "coverage_assessment": "Semantic request coverage is not verified."
+      },
+      "answer_part_plan": {
+        "R3": [
+          {
+            "id": "R3P1",
+            "label": "What specific metrics do the Quartz onboarding figures track?"
+          },
+          {
+            "id": "R3P2",
+            "label": "What aspects of user onboarding are measured by Quartz figures?"
+          },
+          {
+            "id": "R3P3",
+            "label": "What data points are included in the Quartz onboarding figures?"
+          },
+          {
+            "id": "R3P4",
+            "label": "What do the figures in Quartz's onboarding process represent?"
+          }
+        ]
+      },
+      "answer_part_plan_origin": "planned_unreviewed",
+      "answer_part_planner_version": "deliverable-labels-v1",
+      "answer_part_unmatched_text": {},
+      "answer_part_planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How did Quartz average onboarding time change in calendar days from the first period to the second?",
+          "operation": "difference"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "What was the percentage change in Quartz average onboarding time from the first period to the second?",
+          "operation": "percent_change"
+        },
+        {
+          "id": "R3",
+          "question_id": "Q1",
+          "request": "What do the Quartz onboarding figures measure?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+          "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+          "quote": "\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+          "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+          "quote": "\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+          "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+          "quote": "\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+          "source_text": "20 calendar days",
+          "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+          "start": 108,
+          "end": 124,
+          "value": "20",
+          "unit": "calendar day",
+          "dimension": "compound_day"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+          "source_text": "40 completed onboardings",
+          "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+          "start": 188,
+          "end": 212,
+          "value": "40",
+          "unit": "completed onboardings",
+          "dimension": "count"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S3",
+          "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+          "source_text": "15 calendar days",
+          "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+          "start": 91,
+          "end": 107,
+          "value": "15",
+          "unit": "calendar day",
+          "dimension": "compound_day"
+        },
+        {
+          "id": "N4",
+          "snippet_id": "S3",
+          "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+          "source_text": "50 completed onboardings",
+          "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+          "start": 172,
+          "end": 196,
+          "value": "50",
+          "unit": "completed onboardings",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v4",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 5 calendar day.",
+          "formula": "after - before",
+          "result": "5",
+          "unit": "calendar day",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N3",
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "source_text": "15 calendar days",
+              "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+              "start": 91,
+              "end": 107,
+              "value": "15",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "source_text": "20 calendar days",
+              "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+              "start": 108,
+              "end": 124,
+              "value": "20",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v4",
+          "normalized_inputs": [
+            {
+              "id": "N3",
+              "role": "before",
+              "value": "15",
+              "unit": "calendar day",
+              "original_value": "15",
+              "original_unit": "calendar day",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N1",
+              "role": "after",
+              "value": "20",
+              "unit": "calendar day",
+              "original_value": "20",
+              "original_unit": "calendar day",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "20 calendar day - 15 calendar day = 5 calendar day (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "minuend_id": "N1",
+            "subtrahend_id": "N3"
+          },
+          "known_input_snippet_ids": [
+            "S1",
+            "S3"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        },
+        {
+          "request_id": "R2",
+          "operation": "percent_change",
+          "status": "computed",
+          "text": "Signed percent change: -25 %.",
+          "formula": "(after - before) / before × 100",
+          "result": "-25",
+          "unit": "%",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "source_text": "20 calendar days",
+              "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+              "start": 108,
+              "end": 124,
+              "value": "20",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "source_text": "15 calendar days",
+              "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+              "start": 91,
+              "end": 107,
+              "value": "15",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v4",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "20",
+              "unit": "calendar day",
+              "original_value": "20",
+              "original_unit": "calendar day",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N3",
+              "role": "after",
+              "value": "15",
+              "unit": "calendar day",
+              "original_value": "15",
+              "original_unit": "calendar day",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "(15 calendar day - 20 calendar day) / 20 calendar day × 100 = -25 % (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "baseline_id": "N1",
+            "current_id": "N3"
+          },
+          "known_input_snippet_ids": [
+            "S1",
+            "S3"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "3c77c1c1-afb2-43b5-9580-b38269cf1e1d"
+    ]
+  },
+  "latency_seconds": 105.75178462453187,
+  "setup_seconds": 0.02568195853382349,
+  "attempt_total_seconds": 105.77746658306569,
+  "finished_at": "2026-10-30T17:35:52.563657+00:00"
+}

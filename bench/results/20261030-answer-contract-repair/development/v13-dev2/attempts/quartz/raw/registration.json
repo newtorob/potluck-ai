@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/quartz/raw/allowed",
+  "files": {
+    "sources/quartz_first.md": "1c66a582e14b853b5472580c0bb79855c5845fcd59d10dbb7d481049ed89f753",
+    "sources/quartz_second.md": "7db3169f6663a0cdac711bd3babd2f35e30d7a904dddadc039b304a83f78e4c9",
+    "sources/quartz_context.md": "2fcbcae4112e5958ec93ff06de7a4dc33f1aba39d440f5f78ec857ed85112f22"
+  },
+  "scan": {
+    "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "3c77c1c1-afb2-43b5-9580-b38269cf1e1d"
+  ],
+  "excluded_canary": {
+    "collection_id": "86fbc1c6-bfee-4eaa-87b8-b2c81a759b39",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/development/v13-dev2/attempts/quartz/raw/excluded",
+    "file": "sources/excluded_canary.md",
+    "sha256": "e86108d4f2e42b9f54aa6c9dc346a17c29cd6009141184e857012fc842477505",
+    "scan": {
+      "collection_id": "86fbc1c6-bfee-4eaa-87b8-b2c81a759b39",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

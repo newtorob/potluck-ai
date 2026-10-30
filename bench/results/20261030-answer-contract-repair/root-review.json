@@ -1,0 +1,92 @@
+{
+  "basis": "Primary agent read the implementation diffs and each retained answer against source excerpts and the frozen rubric. Independent Terra assessment is separate.",
+  "code_review": [
+    "Versioned v13 leaves default/public route and v11/v12 contracts unchanged.",
+    "Bounded planner rejects malformed JSON and keys; well-shaped invalid exact spans fall back to original request with diagnostic provenance.",
+    "Final schema, prompt and validator share per-part cap<=1000 and aggregate4000 including separators; no silent truncation.",
+    "Source IDs, authentic excerpts, replay and correction validation remain strict; semantic coverage and entailment remain unverified.",
+    "V4 compound calendar/business/working-day units remain distinct, with lexical ambiguity guards and source-prefix validation. No calendar conversion or general entailment claim.",
+    "Original v12 Quartz supplied only one operation despite the question asking day change, percent and scope. This run explicitly supplies all three and attribution is limited accordingly.",
+    "Dev3 native grammar failure was reproduced using the installed model vocabulary; capped1..4/mixed native initialization passes. Fresh inference is still necessary.",
+    "Rejected sequential-regex alternative to native string maxLength: converter does not preserve decoded JSON string semantics and overlapping repetition causes excessive boundary-check backtracking. No production change.",
+    "Final native subprocess tests pin LLAMA_CPP_LIB_PATH to the library already loaded by the parent process, preserving real sampler initialization/free and process return-code assertions. This addresses full-suite environment isolation without production changes."
+  ],
+  "dev4": {
+    "harbor": {
+      "literal_rubric_pass": true,
+      "status_truth": true,
+      "unsupported_visible_claims": false,
+      "complete_prose": true,
+      "notes": "All current capability, limits, planned cadence/filter and unscheduled API are directly supported. Long/repeated source copying remains but sentences finish."
+    },
+    "orchard": {
+      "literal_rubric_pass": true,
+      "status_truth": true,
+      "unsupported_visible_claims": false,
+      "complete_prose": false,
+      "notes": "S1/S2 intake routing; S3 approval/mismatch; S5 payment eligibility/treasury directly supported. Exact headings fixed inventedowners. Redundant fourth ownerpart ends mid-sentence and excludes treasury; other part covers it. Not a wholly usable draft."
+    },
+    "lumen": {
+      "literal_rubric_pass": false,
+      "status_truth": "Supported claims but incomplete requested answer",
+      "unsupported_visible_claims": false,
+      "complete_prose": false,
+      "notes": "Eligibility and request handling complete/cited. Fallback whole request hits1000 cap at Billing applys; application/tracking/no cash/carryforward omitted despite evidence."
+    },
+    "cedar": {
+      "literal_rubric_pass": false,
+      "status_truth": "Date uncertainty correctly described but part marked supported; conflicting would better express answer state",
+      "unsupported_visible_claims": false,
+      "complete_prose": true,
+      "notes": "Conflicting dates, coordinator, confirmed scope cited; employee-preview distinction omitted. No date chosen."
+    },
+    "maple": {
+      "literal_rubric_pass": true,
+      "status_truth": true,
+      "unsupported_visible_claims": false,
+      "complete_prose": false,
+      "notes": "Unknown customerretention with known12/8/2/2 contractoutcomes, distinct-contract/customer explanation supported across answerparts. Secondpart ends mid-sentence after allrequiredfacts; repetitive and notwhole-draftusable."
+    },
+    "quartz": {
+      "literal_rubric_pass": false,
+      "status_truth": true,
+      "unsupported_visible_claims": false,
+      "complete_prose": true,
+      "notes": "Correct deterministic -5calendar-day and -25percent computations/citations. Factualmeasurement usesS5only and omits signedagreement/completedcohort detail supported inS1/S3 elsewhere; repeated semanticweak parts What/do/the/Quartz pass lexicalspanchecks but do notestablishrequestcoverage. Strictcriterion1 also requires explicitly stating20to15; numbersappearonlyinputtrace/excerpts, notanswerprose. Correctarithmeticdoesnotmakethiscomplete."
+    }
+  },
+  "fresh": {
+    "original_saved_drafts": 1,
+    "literal_rubric_passes": 0,
+    "denominator": 4,
+    "notes": "Twoaggregatecitationformaterrors, one240s timeout, oneacceptedCopperwithwrong+1.25difference andincomplete/misattributedmeasurement details. Rootreadallthreeavailablefinalresponses andsourcecatalogs."
+  },
+  "dev4_summary": {
+    "literal_rubric_passes": 3,
+    "denominator": 6,
+    "saved_drafts": 6,
+    "whole_draft_usable": 1,
+    "whole_draft_basis": "Primary additional screen: alloriginalfactsandcitations, completeprose, no unsupportedvisibleclaims, correctuncertaintylabels. Harboronly; this is separate fromfrozenoriginalrubric."
+  },
+  "post_holdout_replay": {
+    "saved_drafts": 3,
+    "literal_rubric_passes": 1,
+    "clean_grounded_usable": 0,
+    "denominator": 4,
+    "new_inference": false,
+    "all8_requests_settings_schema_exact": true,
+    "cases": {
+      "cedar_lantern": "All3listedrequiredfactsandcitations, butunsupportedassertion no plan for multi-accountreport overstates no commitment/no decision.",
+      "harbor_rivet": "Intakepass; evidence/uncertainties, warehousebranch missing; closureclaim lacksS12 and contradictoryfield-safetyclosureownership; firstpartcutoff.",
+      "osprey_quay": "Recorded missingfinalreply/timeoutretained; nopretendperformance measurement.",
+      "copper_wren": "Wrong+1.25difference, correct\u221225percent; noexplicit5\u21923.75statement; medianomitted, hours/weekendclaimnotboundtorightsnippetinitsownpart."
+    }
+  },
+  "whitespace_check": [
+    {
+      "file": "apps/desktop/python/potluck_local/services/investigation_bounded_answers.py",
+      "message": "/Users/rob/Documents/potluck/apps/desktop/python/potluck_local/services/investigation_bounded_answers.py:199: new blank line at EOF.\n"
+    }
+  ],
+  "whitespace_disposition": "Retain the evaluated frozen source bytes; final blank-line warnings are formatting only."
+}

@@ -1,0 +1,35 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "c1ce3093-5bc2-49eb-a787-25952a12e86f",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/post-holdout-replay/attempts/harbor_rivet/raw/allowed",
+  "files": {
+    "sources/harbor_rivet/source-1.md": "98c77aa9ecc86ba3f1367159c85d285441a2130c3687d13b2c1537c3654a77ca",
+    "sources/harbor_rivet/source-2.md": "bcabfcd9571fdc0b282a0324f0d19048bba272d7e1f63b06f9143c2744d29213",
+    "sources/harbor_rivet/source-3.md": "0b15b937239386b4eb84c0a319291537254d92f305f332aa75ee37479bf8e7c4"
+  },
+  "scan": {
+    "collection_id": "c1ce3093-5bc2-49eb-a787-25952a12e86f",
+    "files_scanned": 3,
+    "files_added": 3,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 3
+  },
+  "evidence_scope_collection_ids": [
+    "c1ce3093-5bc2-49eb-a787-25952a12e86f"
+  ],
+  "excluded_canary": {
+    "collection_id": "13b5653a-77e3-49dc-9e0c-ea6f0825d9e1",
+    "root": "/Users/rob/Documents/potluck/bench/results/20261030-answer-contract-repair/post-holdout-replay/attempts/harbor_rivet/raw/excluded",
+    "file": "excluded-canary.md",
+    "sha256": "899deadea82173a75c0cac4bf7cae07aaabc410bc0d3dca295cedc1da5ceb6da",
+    "scan": {
+      "collection_id": "13b5653a-77e3-49dc-9e0c-ea6f0825d9e1",
+      "files_scanned": 1,
+      "files_added": 1,
+      "files_updated": 0,
+      "files_removed": 0,
+      "chunks_inserted": 1
+    }
+  }
+}

@@ -1,0 +1,2567 @@
+{
+  "case_ids": [
+    "harbor",
+    "orchard",
+    "lumen",
+    "cedar",
+    "maple",
+    "quartz"
+  ],
+  "assessment": null,
+  "outputs": {
+    "harbor": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "8fa61034-217f-4232-984f-6b648e14c280",
+        "workspace": "pilot-eval",
+        "issue": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file. The team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page. A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace\nA workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.\nThe reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request. The roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                  "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                  "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                  "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                  "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                  "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R1P1",
+                  "label": "List the current capabilities of export scheduling for Harbor customers.",
+                  "status": "supported",
+                  "text": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file. The team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page. A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace",
+                  "snippet_ids": [
+                    "S1",
+                    "S2",
+                    "S3",
+                    "S4"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                      "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+                    },
+                    {
+                      "snippet_id": "S2",
+                      "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+                      "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+                    },
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                      "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                    },
+                    {
+                      "snippet_id": "S4",
+                      "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                      "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P2",
+                  "label": "Identify the existing limitations of export scheduling in Harbor.",
+                  "status": "supported",
+                  "text": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded. The delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+                  "snippet_ids": [
+                    "S3",
+                    "S4"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                      "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+                    },
+                    {
+                      "snippet_id": "S4",
+                      "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+                      "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P3",
+                  "label": "Outline the planned improvements for export scheduling in Harbor.",
+                  "status": "supported",
+                  "text": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request. The roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+                  "snippet_ids": [
+                    "S5",
+                    "S6"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                      "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+                    },
+                    {
+                      "snippet_id": "S6",
+                      "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+                      "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+            "document_id": "25e91832-e48d-52ff-ad13-a870f3bde97b",
+            "revision_id": "94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+            "relative_path": "sources/harbor_guide.md",
+            "updated_at": "2026-10-30T17:24:01.107140+00:00",
+            "chunk_id": "23374977-40ac-5f35-8552-290546ebe9ff",
+            "anchor": "harbor-export-scheduling",
+            "heading": "Harbor export scheduling",
+            "content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+            "presented_content": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+          },
+          {
+            "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+            "document_id": "522b8e05-2e13-503f-b376-fbf5842774af",
+            "revision_id": "8feb4813-78e9-5e3d-bac5-13821a3260d6",
+            "relative_path": "sources/harbor_limits.md",
+            "updated_at": "2026-10-30T17:24:01.108137+00:00",
+            "chunk_id": "43bb4da1-67df-5c75-b8b5-ff4809d7293b",
+            "anchor": "operational-limits",
+            "heading": "Operational limits",
+            "content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+            "presented_content": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+          },
+          {
+            "collection_id": "291f9ca6-95fd-44c1-89aa-1e03b3775e47",
+            "document_id": "cb93f12e-ce71-50ea-9391-dbfdab90a270",
+            "revision_id": "9233dcda-6fa1-5e42-8c03-cdc59f831760",
+            "relative_path": "sources/harbor_roadmap.md",
+            "updated_at": "2026-10-30T17:24:01.108971+00:00",
+            "chunk_id": "dedc5389-7ba2-5403-a533-93ab64d9fe97",
+            "anchor": "reporting-work-planned",
+            "heading": "Reporting work planned",
+            "content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:24:01.109083+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+            "presented_content": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:26:35.035772+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 153914,
+          "created_at": "2026-10-30T17:26:35.035772+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R1": [
+              {
+                "id": "R1P1",
+                "label": "List the current capabilities of export scheduling for Harbor customers."
+              },
+              {
+                "id": "R1P2",
+                "label": "Identify the existing limitations of export scheduling in Harbor."
+              },
+              {
+                "id": "R1P3",
+                "label": "Outline the planned improvements for export scheduling in Harbor."
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What can Harbor customers do today with export scheduling, what are its current limits, and what improvements are planned?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+              "quote": "Harbor workspace administrators can schedule a recurring CSV export of completed orders from the reporting page. The scheduler is available to all paid workspaces as of the September release. Each schedule sends a download link to the administrator who created it; the link expires after seven days. Scheduling does not grant access to other reports, and the recipient still needs an active workspace account to download the file.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+              "quote": "\nThe team considers a schedule active once its first delivery has been queued. Workspace owners can pause or delete a schedule from the same page. Pausing keeps the configuration, while deleting it removes the configuration and its delivery history from the page."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+              "quote": "A workspace may maintain up to five active export schedules. A schedule runs at most once per day, using the workspace time zone. The current CSV contains completed orders only; pending and cancelled orders are excluded.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+              "quote": "\nThe delivery service retries a failed send twice over the following hour. A workspace administrator can check the most recent delivery result in the reporting page, but individual download events are not currently shown there."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+              "quote": "The reporting group has approved work to add weekly and monthly cadence choices and to include cancelled orders as an optional export filter. Both items are planned for the next reporting cycle; neither has shipped. The group has also recorded a request for an API to create schedules, but no decision or target date exists for that request.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:dedc5389-7ba2-5403-a533-93ab64d9fe97:9233dcda-6fa1-5e42-8c03-cdc59f831760",
+              "quote": "\nThe roadmap is a planning record and does not change the functionality described in the current administrator guide."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:23374977-40ac-5f35-8552-290546ebe9ff:94b9eaed-f0b2-5531-85b5-dd7791bc6e0d",
+              "source_text": "seven days. Scheduling does not grant access ",
+              "start": 288,
+              "end": 333,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:43bb4da1-67df-5c75-b8b5-ff4809d7293b:8feb4813-78e9-5e3d-bac5-13821a3260d6",
+              "source_text": "five active export schedules. A schedule run",
+              "start": 31,
+              "end": 75,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "291f9ca6-95fd-44c1-89aa-1e03b3775e47"
+        ]
+      },
+      "latency_seconds": 153.92664816696197,
+      "setup_seconds": 0.03352983295917511,
+      "attempt_total_seconds": 153.96017799992114,
+      "finished_at": "2026-10-30T17:26:35.043894+00:00"
+    },
+    "orchard": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "d775076f-1b82-4c6d-bf35-722730b5bbd0",
+        "workspace": "pilot-eval",
+        "issue": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order. The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\nThe treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+                  "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+                  "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+                  "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+                  "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+                  "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R1P1",
+                  "label": "Orchard's invoice receipt process starts with the procurement team receiving the invoice, followed by the accounts recei",
+                  "status": "supported",
+                  "text": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.",
+                  "snippet_ids": [
+                    "S1"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+                      "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P2",
+                  "label": "The invoice is then forwarded to the finance team for approval, with the finance manager owning the approval stage",
+                  "status": "supported",
+                  "text": "For invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order. The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.",
+                  "snippet_ids": [
+                    "S2",
+                    "S3"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S2",
+                      "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+                      "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+                    },
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+                      "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P3",
+                  "label": "Once approved, the payment is processed by the accounts payable department, with the accounts payable clerk owning the支付",
+                  "status": "supported",
+                  "text": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+                      "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P4",
+                  "label": "The entire process is documented in Orchard's system, with audit trails maintained for each stage",
+                  "status": "supported",
+                  "text": "A weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable.",
+                  "snippet_ids": [
+                    "S6"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S6",
+                      "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+                      "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+            "document_id": "a005a1ee-7f4a-51ad-b26d-fe8b83b89207",
+            "revision_id": "b4293a57-2d2f-552c-934f-8db7123902b0",
+            "relative_path": "sources/orchard_receipt.md",
+            "updated_at": "2026-10-30T17:26:35.063926+00:00",
+            "chunk_id": "44b2d71b-9e1c-549a-b6e5-7dce156cd7d4",
+            "anchor": "supplier-invoice-intake",
+            "heading": "Supplier invoice intake",
+            "content": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+            "presented_content": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+          },
+          {
+            "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+            "document_id": "203ddfc7-2ecb-5600-85e0-acb5ca720ee1",
+            "revision_id": "38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+            "relative_path": "sources/orchard_approval.md",
+            "updated_at": "2026-10-30T17:26:35.062517+00:00",
+            "chunk_id": "6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5",
+            "anchor": "budget-approval",
+            "heading": "Budget approval",
+            "content": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+            "presented_content": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+          },
+          {
+            "collection_id": "95cdba41-aff2-4a9d-ac22-68bb78d2af1b",
+            "document_id": "65351b84-b996-5c69-9bfb-c5fb56a79ed7",
+            "revision_id": "77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+            "relative_path": "sources/orchard_payment.md",
+            "updated_at": "2026-10-30T17:26:35.063277+00:00",
+            "chunk_id": "298953df-eb85-588e-85b9-736d3e284541",
+            "anchor": "payment-run",
+            "heading": "Payment run",
+            "content": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:26:35.064026+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+            "presented_content": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:28:54.938825+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 139864,
+          "created_at": "2026-10-30T17:28:54.938825+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R1": [
+              {
+                "id": "R1P1",
+                "label": "Orchard's invoice receipt process starts with the procurement team receiving the invoice, followed by the accounts recei"
+              },
+              {
+                "id": "R1P2",
+                "label": "The invoice is then forwarded to the finance team for approval, with the finance manager owning the approval stage"
+              },
+              {
+                "id": "R1P3",
+                "label": "Once approved, the payment is processed by the accounts payable department, with the accounts payable clerk owning the支付"
+              },
+              {
+                "id": "R1P4",
+                "label": "The entire process is documented in Orchard's system, with audit trails maintained for each stage"
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "How does Orchard handle a supplier invoice from receipt through approval and payment, and who owns each stage?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+              "quote": "At Orchard, the accounts payable coordinator receives supplier invoices in the shared invoice mailbox. The coordinator checks that each invoice names a supplier and purchase order, then enters it in the ledger with status Received. Missing purchase order details are returned to the supplier for correction; the invoice does not enter the approval queue until corrected.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:44b2d71b-9e1c-549a-b6e5-7dce156cd7d4:b4293a57-2d2f-552c-934f-8db7123902b0",
+              "quote": "\nFor invoices with complete intake details, the coordinator attaches the original invoice to the ledger record and routes the record to the budget owner named on the purchase order."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+              "quote": "The budget owner compares the invoice amount with the purchase order and confirms that the goods or services were received. If both checks pass, the owner marks the invoice Approved in the ledger. A mismatch is sent back to accounts payable for investigation, rather than being approved automatically.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:6e0d48fa-2fa2-5fdf-883c-e9b00978a4b5:38c6ca5a-7434-55c4-b43f-f1143f19ef20",
+              "quote": "\nApproval is the budget owner's decision. Accounts payable maintains the record and communicates with the supplier during an investigation, but does not substitute its own approval for the owner's decision."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+              "quote": "The treasury specialist includes approved invoices in the next Thursday payment run, provided the due date falls within the next fourteen days. Treasury sends the payment and records the payment reference in the ledger. An approved invoice outside that window stays approved until a later eligible run.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+              "quote": "\nA weekly reconciliation checks payment references against the bank statement. The treasury specialist resolves discrepancies with accounts payable."
+            }
+          ],
+          "quantity_catalog": [],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:298953df-eb85-588e-85b9-736d3e284541:77d628f5-7bf1-5029-96a6-6abc1b4cd3d4",
+              "source_text": "fourteen days. Treasury sends the payment and re",
+              "start": 129,
+              "end": 177,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "95cdba41-aff2-4a9d-ac22-68bb78d2af1b"
+        ]
+      },
+      "latency_seconds": 139.8747638752684,
+      "setup_seconds": 0.024427625350654125,
+      "attempt_total_seconds": 139.89919150061905,
+      "finished_at": "2026-10-30T17:28:54.945392+00:00"
+    },
+    "lumen": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "51c6a755-a9e8-45d7-9ab1-fd11605eb253",
+        "workspace": "pilot-eval",
+        "issue": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.\nA customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later.\nBilling applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.\nA customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                  "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                  "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                  "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                  "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                  "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R1P1",
+                  "label": "Eligibility rules for Lumen’s customer credit",
+                  "status": "supported",
+                  "text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge. The rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.",
+                  "snippet_ids": [
+                    "S1",
+                    "S2"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                      "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+                    },
+                    {
+                      "snippet_id": "S2",
+                      "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+                      "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P2",
+                  "label": "Process for applying for Lumen’s customer credit",
+                  "status": "supported",
+                  "text": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. The portal records the outcome and a link to the incident record so the support team can follow the decision later.",
+                  "snippet_ids": [
+                    "S3",
+                    "S4"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                      "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+                    },
+                    {
+                      "snippet_id": "S4",
+                      "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                      "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P3",
+                  "label": "How Lumen applies customer credit",
+                  "status": "supported",
+                  "text": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+                  "snippet_ids": [
+                    "S5",
+                    "S6"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                      "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+                    },
+                    {
+                      "snippet_id": "S6",
+                      "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                      "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P4",
+                  "label": "How Lumen tracks customer credit",
+                  "status": "supported",
+                  "text": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal. Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment. If the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+                  "snippet_ids": [
+                    "S3",
+                    "S5",
+                    "S6"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+                      "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+                    },
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                      "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+                    },
+                    {
+                      "snippet_id": "S6",
+                      "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+                      "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+            "document_id": "1d73b7d7-451c-5b25-b8d1-eb4246497a29",
+            "revision_id": "03783f97-ce92-56e6-89a7-2b74498ecda9",
+            "relative_path": "sources/lumen_policy.md",
+            "updated_at": "2026-10-30T17:28:54.967110+00:00",
+            "chunk_id": "56cab1d3-b843-56fb-93e8-9bb07b5dbe81",
+            "anchor": "service-credit-eligibility",
+            "heading": "Service credit eligibility",
+            "content": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+            "presented_content": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+          },
+          {
+            "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+            "document_id": "b71cf48e-4fe7-5aff-8838-8518e4446dfb",
+            "revision_id": "ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+            "relative_path": "sources/lumen_process.md",
+            "updated_at": "2026-10-30T17:28:54.967683+00:00",
+            "chunk_id": "2a92562a-4f60-5115-8578-b351001f1195",
+            "anchor": "credit-request-handling",
+            "heading": "Credit request handling",
+            "content": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+            "presented_content": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+          },
+          {
+            "collection_id": "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b",
+            "document_id": "58be3f63-37b8-5c19-9e13-eb2ecca151a3",
+            "revision_id": "7aaddedd-9ab2-5fb4-839c-d846135cff44",
+            "relative_path": "sources/lumen_billing.md",
+            "updated_at": "2026-10-30T17:28:54.966358+00:00",
+            "chunk_id": "2a1cbaf6-9374-5c2e-b53c-434fff49ff76",
+            "anchor": "applying-an-approved-credit",
+            "heading": "Applying an approved credit",
+            "content": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:28:54.967755+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+            "presented_content": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:31:26.125601+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 151144,
+          "created_at": "2026-10-30T17:31:26.125601+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R1": [
+              {
+                "id": "R1P1",
+                "label": "Eligibility rules for Lumen’s customer credit"
+              },
+              {
+                "id": "R1P2",
+                "label": "Process for applying for Lumen’s customer credit"
+              },
+              {
+                "id": "R1P3",
+                "label": "How Lumen applies customer credit"
+              },
+              {
+                "id": "R1P4",
+                "label": "How Lumen tracks customer credit"
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What are the eligibility rules and process for Lumen’s customer credit, and how is the credit applied and tracked?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "quote": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "quote": "\nThe rule applies to the affected workspace, not every workspace owned by the customer. A customer must request a credit within thirty days of the incident ending."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+              "quote": "A customer submits a credit request through the support portal, including the affected workspace and incident date. Support verifies the incident window against the incident record and checks the request date. If eligible, support approves the request and forwards it to billing; if ineligible, support explains the reason in the portal.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:2a92562a-4f60-5115-8578-b351001f1195:ea911f0e-dd6c-5ad8-ba2c-720d178e4b67",
+              "quote": "\nThe portal records the outcome and a link to the incident record so the support team can follow the decision later."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+              "quote": "Billing applies an approved service credit to the affected workspace's next subscription invoice. The credit reduces that invoice's amount due and is not paid out as cash. Billing records the amount and support request identifier on the invoice adjustment.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:2a1cbaf6-9374-5c2e-b53c-434fff49ff76:7aaddedd-9ab2-5fb4-839c-d846135cff44",
+              "quote": "\nIf the next invoice is smaller than the credit, the unused balance carries forward to the following subscription invoice for the same workspace."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "source_text": "48 hours",
+              "snippet_text": "Lumen offers a service credit when a paid customer's production workspace is unavailable for more than four consecutive hours because of a Lumen service incident. Planned maintenance announced at least 48 hours ahead and outages caused solely by the customer's configuration are excluded. The credit equals ten percent of that workspace's monthly subscription charge.\n",
+              "start": 202,
+              "end": 210,
+              "value": "48",
+              "unit": "h",
+              "dimension": "time"
+            }
+          ],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "source_text": "four consecutive hours because of a Lumen se",
+              "start": 103,
+              "end": 147,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "source_text": "ten percent of that workspace's monthly sub",
+              "start": 307,
+              "end": 350,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:56cab1d3-b843-56fb-93e8-9bb07b5dbe81:03783f97-ce92-56e6-89a7-2b74498ecda9",
+              "source_text": "thirty days of the incident ending.",
+              "start": 128,
+              "end": 163,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "9384ab91-e4e1-4ccc-8fef-16e4f997ff8b"
+        ]
+      },
+      "latency_seconds": 151.15481774974614,
+      "setup_seconds": 0.028613165952265263,
+      "attempt_total_seconds": 151.1834309156984,
+      "finished_at": "2026-10-30T17:31:26.131722+00:00"
+    },
+    "cedar": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "0985073b-fbf8-40fb-b3c3-b166235728cc",
+        "workspace": "pilot-eval",
+        "issue": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "The operations update lists October 25 as the customer portal launch target. The product update says the customer portal launch is targeted for October 18. There is a discrepancy between the two dates, and neither source confirms a final launch decision. The operations update mentions October 25 as the target, while the product update lists October 18 as the target. The update does not record a final launch decision.\nThe operations update names Mira Chen as launch readiness coordinator. The product update names Mira Chen, the product lead, as the person coordinating launch readiness. Both sources agree that Mira Chen is the owner of the launch.\nThe Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.",
+              "snippet_ids": [
+                "S1",
+                "S5",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+                  "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+                  "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+                  "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R1P1",
+                  "label": "Launch date of Cedar’s new customer portal",
+                  "status": "unknown",
+                  "text": "The operations update lists October 25 as the customer portal launch target. The product update says the customer portal launch is targeted for October 18. There is a discrepancy between the two dates, and neither source confirms a final launch decision. The operations update mentions October 25 as the target, while the product update lists October 18 as the target. The update does not record a final launch decision.",
+                  "snippet_ids": [
+                    "S1",
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+                      "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                    },
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+                      "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P2",
+                  "label": "Owner of the launch",
+                  "status": "supported",
+                  "text": "The operations update names Mira Chen as launch readiness coordinator. The product update names Mira Chen, the product lead, as the person coordinating launch readiness. Both sources agree that Mira Chen is the owner of the launch.",
+                  "snippet_ids": [
+                    "S1",
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+                      "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+                    },
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+                      "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P3",
+                  "label": "Confirmed scope of the customer portal",
+                  "status": "supported",
+                  "text": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.",
+                  "snippet_ids": [
+                    "S3"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+                      "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "ffae7991-4a99-4647-99ba-14583be363d4",
+            "document_id": "257f02dc-7d51-50ad-8e45-5a64301d1c81",
+            "revision_id": "48d9a40f-2806-5d31-a233-b5b5c6b30062",
+            "relative_path": "sources/cedar_operations_update.md",
+            "updated_at": "2026-10-30T17:31:26.161254+00:00",
+            "chunk_id": "aa86151e-52ec-5275-a007-03daa8b9c08d",
+            "anchor": "operations-update",
+            "heading": "Operations update",
+            "content": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:31:26.162063+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+            "presented_content": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched."
+          },
+          {
+            "collection_id": "ffae7991-4a99-4647-99ba-14583be363d4",
+            "document_id": "ddeea3bf-e04d-5bcf-bd97-b732969adf83",
+            "revision_id": "1935113c-c1ad-5e24-a439-a7aef56e3311",
+            "relative_path": "sources/cedar_launch_note.md",
+            "updated_at": "2026-10-30T17:31:26.160328+00:00",
+            "chunk_id": "43def959-1720-55cc-a59f-94ac3ac5f38b",
+            "anchor": "portal-launch-note",
+            "heading": "Portal launch note",
+            "content": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:31:26.162063+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+            "presented_content": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision."
+          },
+          {
+            "collection_id": "ffae7991-4a99-4647-99ba-14583be363d4",
+            "document_id": "c42e0aea-145d-505d-83c4-79f0515df558",
+            "revision_id": "1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+            "relative_path": "sources/cedar_product_update.md",
+            "updated_at": "2026-10-30T17:31:26.161984+00:00",
+            "chunk_id": "9f2b2e1c-11dd-5262-a5ed-c6acbdc79287",
+            "anchor": "product-update",
+            "heading": "Product update",
+            "content": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:31:26.162063+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+            "presented_content": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:32:23.574872+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 57402,
+          "created_at": "2026-10-30T17:32:23.574872+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R1": [
+              {
+                "id": "R1P1",
+                "label": "Launch date of Cedar’s new customer portal"
+              },
+              {
+                "id": "R1P2",
+                "label": "Owner of the launch"
+              },
+              {
+                "id": "R1P3",
+                "label": "Confirmed scope of the customer portal"
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+              "quote": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+              "quote": "\nOperations is preparing a support handover for the portal, but this preparation is not evidence that the portal has launched."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+              "quote": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+              "quote": "\nAn internal preview has been running with employees. Preview availability should not be confused with a customer launch, which requires a separate readiness decision."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+              "quote": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+              "quote": "\nThe update also says the employee preview is useful for finding usability issues before customer access is enabled."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+              "source_text": "25",
+              "snippet_text": "The operations update lists October 25 as the customer portal launch target. It also names Mira Chen as launch readiness coordinator. It does not explain the difference between its date and the October 18 target in the product update.\n",
+              "start": 36,
+              "end": 38,
+              "value": "25",
+              "unit": "",
+              "dimension": "dimensionless"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S3",
+              "citation_id": "source:43def959-1720-55cc-a59f-94ac3ac5f38b:1935113c-c1ad-5e24-a439-a7aef56e3311",
+              "source_text": "two capabilities",
+              "snippet_text": "The Cedar customer portal is intended to let customers view their open support cases and update contact details. The product group has signed off those two capabilities for the first release. The note does not approve payment history or invoice downloads for the first release.\n",
+              "start": 152,
+              "end": 168,
+              "value": "2",
+              "unit": "capabilities",
+              "dimension": "count"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S5",
+              "citation_id": "source:9f2b2e1c-11dd-5262-a5ed-c6acbdc79287:1b5cb874-a11b-5ae2-bc91-8f1e2ff9f368",
+              "source_text": "18",
+              "snippet_text": "The product update says the customer portal launch is targeted for October 18. It names Mira Chen, the product lead, as the person coordinating launch readiness. The date was a target in this update, and the update does not record a final launch decision.\n",
+              "start": 75,
+              "end": 77,
+              "value": "18",
+              "unit": "",
+              "dimension": "dimensionless"
+            }
+          ],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:aa86151e-52ec-5275-a007-03daa8b9c08d:48d9a40f-2806-5d31-a233-b5b5c6b30062",
+              "source_text": "18 target in the product update.\n",
+              "start": 202,
+              "end": 235,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "ffae7991-4a99-4647-99ba-14583be363d4"
+        ]
+      },
+      "latency_seconds": 57.4125468749553,
+      "setup_seconds": 0.03554254211485386,
+      "attempt_total_seconds": 57.44808941707015,
+      "finished_at": "2026-10-30T17:32:23.581700+00:00"
+    },
+    "maple": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "d2605269-15cb-4740-b0c3-1393b876cccb",
+        "workspace": "pilot-eval",
+        "issue": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "The commercial operations snapshot does not provide a customer-level retention rate, and it does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. The snapshot indicates that at the start of the quarter, Maple had twelve enterprise contracts scheduled to expire. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome. However, the count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract. Therefore, the evidence is insufficient to determine Maple’s enterprise customer retention rate last quarter.\nThe renewal process involves an account manager contacting each enterprise customer before contract expiry and documenting the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree. A renewal record includes the contract identifier and its outcome. However, the process note does not define a customer retention metric or how customers with multiple contracts should be counted. The count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract. Therefore, the details about enterprise renewals are partially known but lack a clear definition of customer retention metrics.",
+              "snippet_ids": [
+                "S1",
+                "S5",
+                "S3",
+                "S4",
+                "S6"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+                  "quote": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n"
+                },
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+                  "quote": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+                  "quote": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n"
+                },
+                {
+                  "snippet_id": "S4",
+                  "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+                  "quote": "\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted."
+                },
+                {
+                  "snippet_id": "S6",
+                  "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+                  "quote": "\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract."
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R1P1",
+                  "label": "Maple’s enterprise customer retention rate last quarter",
+                  "status": "unknown",
+                  "text": "The commercial operations snapshot does not provide a customer-level retention rate, and it does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. The snapshot indicates that at the start of the quarter, Maple had twelve enterprise contracts scheduled to expire. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome. However, the count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract. Therefore, the evidence is insufficient to determine Maple’s enterprise customer retention rate last quarter.",
+                  "snippet_ids": [
+                    "S1",
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S1",
+                      "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+                      "quote": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n"
+                    },
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+                      "quote": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R1P2",
+                  "label": "Details about enterprise renewals",
+                  "status": "supported",
+                  "text": "The renewal process involves an account manager contacting each enterprise customer before contract expiry and documenting the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree. A renewal record includes the contract identifier and its outcome. However, the process note does not define a customer retention metric or how customers with multiple contracts should be counted. The count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract. Therefore, the details about enterprise renewals are partially known but lack a clear definition of customer retention metrics.",
+                  "snippet_ids": [
+                    "S3",
+                    "S4",
+                    "S5",
+                    "S6"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S3",
+                      "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+                      "quote": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n"
+                    },
+                    {
+                      "snippet_id": "S4",
+                      "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+                      "quote": "\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted."
+                    },
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+                      "quote": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n"
+                    },
+                    {
+                      "snippet_id": "S6",
+                      "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+                      "quote": "\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "18a2066b-49f0-41f0-9b16-6e444f9791e2",
+            "document_id": "4169ae10-a7e2-59cb-bd3e-53b0f1befa02",
+            "revision_id": "ebd1e236-7f45-5c06-874d-00873a5f6d52",
+            "relative_path": "sources/maple_snapshot.md",
+            "updated_at": "2026-10-30T17:32:23.599558+00:00",
+            "chunk_id": "b5e46695-cb00-514e-aea5-73943c7fce6d",
+            "anchor": "quarter-end-snapshot",
+            "heading": "Quarter-end snapshot",
+            "content": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n\nThe snapshot was prepared after the quarter closed and includes open negotiations as unresolved rather than automatically treating them as lost.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:32:23.599636+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+            "presented_content": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n\nThe snapshot was prepared after the quarter closed and includes open negotiations as unresolved rather than automatically treating them as lost."
+          },
+          {
+            "collection_id": "18a2066b-49f0-41f0-9b16-6e444f9791e2",
+            "document_id": "b26bc687-d863-59e5-8920-4cc36a84e6b5",
+            "revision_id": "047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+            "relative_path": "sources/maple_process.md",
+            "updated_at": "2026-10-30T17:32:23.598967+00:00",
+            "chunk_id": "793e7ab4-e26f-5038-9fec-a0ff592fef7f",
+            "anchor": "renewal-process",
+            "heading": "Renewal process",
+            "content": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:32:23.599636+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+            "presented_content": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted."
+          },
+          {
+            "collection_id": "18a2066b-49f0-41f0-9b16-6e444f9791e2",
+            "document_id": "28e364e9-8028-5ef4-bf39-8d22cf57e678",
+            "revision_id": "3d4a40bf-3dee-5623-b0db-34e3870d129a",
+            "relative_path": "sources/maple_pipeline.md",
+            "updated_at": "2026-10-30T17:32:23.598170+00:00",
+            "chunk_id": "25d9774e-1e39-5bce-9c3b-246a13fe6f16",
+            "anchor": "enterprise-renewal-pipeline",
+            "heading": "Enterprise renewal pipeline",
+            "content": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:32:23.599636+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+            "presented_content": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:34:06.777596+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 103169,
+          "created_at": "2026-10-30T17:34:06.777596+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R1": [
+              {
+                "id": "R1P1",
+                "label": "Maple’s enterprise customer retention rate last quarter"
+              },
+              {
+                "id": "R1P2",
+                "label": "Details about enterprise renewals"
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What is Maple’s enterprise customer retention rate last quarter, and what else is known about enterprise renewals?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+              "quote": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+              "quote": "\nThe snapshot was prepared after the quarter closed and includes open negotiations as unresolved rather than automatically treating them as lost."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+              "quote": "An account manager contacts each enterprise customer before contract expiry and documents the customer's decision in the renewal tracker. The finance team validates the commercial terms before a renewal is marked complete. Negotiations can continue beyond the nominal expiry date if both parties agree.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:793e7ab4-e26f-5038-9fec-a0ff592fef7f:047cb6cf-2584-5de7-b3e9-3194b0b37ae3",
+              "quote": "\nA renewal record includes the contract identifier and its outcome. The process note does not define a customer retention metric or how customers with multiple contracts should be counted."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "quote": "At the start of the quarter Maple had twelve enterprise contracts scheduled to expire during the quarter. By the close of the quarter, the account team had recorded eight of those contracts as renewed and two as not renewed. The remaining two were still being negotiated and had not been assigned a final outcome.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "quote": "\nThe count refers to contracts rather than individual customer organizations. A customer can have more than one enterprise contract."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:b5e46695-cb00-514e-aea5-73943c7fce6d:ebd1e236-7f45-5c06-874d-00873a5f6d52",
+              "source_text": "twelve expiring contracts",
+              "snippet_text": "The commercial operations snapshot reports contract outcomes, not a customer-level retention rate. It does not state the number of distinct enterprise customers represented by the twelve expiring contracts or the number of those customers retained. It also does not provide an approved definition for customer retention.\n",
+              "start": 180,
+              "end": 205,
+              "value": "12",
+              "unit": "expiring contracts",
+              "dimension": "count"
+            }
+          ],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "source_text": "twelve enterprise contracts scheduled to expir",
+              "start": 38,
+              "end": 84,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "source_text": "eight of those contracts as renewed and two a",
+              "start": 165,
+              "end": 210,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "source_text": "two as not renewed. The remaining two were ",
+              "start": 205,
+              "end": 248,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "source_text": "two were still being negotiated and had not",
+              "start": 239,
+              "end": 282,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:25d9774e-1e39-5bce-9c3b-246a13fe6f16:3d4a40bf-3dee-5623-b0db-34e3870d129a",
+              "source_text": "one enterprise contract.",
+              "start": 108,
+              "end": 132,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "18a2066b-49f0-41f0-9b16-6e444f9791e2"
+        ]
+      },
+      "latency_seconds": 103.1804187912494,
+      "setup_seconds": 0.022921583615243435,
+      "attempt_total_seconds": 103.20334037486464,
+      "finished_at": "2026-10-30T17:34:06.784895+00:00"
+    },
+    "quartz": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "29156262-18a2-4434-88ef-2b5f759196c8",
+        "workspace": "pilot-eval",
+        "issue": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "How did Quartz average onboarding time change in calendar days from the first period to the second?"
+            },
+            {
+              "id": "R2",
+              "text": "What was the percentage change in Quartz average onboarding time from the first period to the second?"
+            },
+            {
+              "id": "R3",
+              "text": "What do the Quartz onboarding figures measure?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Signed difference: 5 calendar day.",
+              "snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                  "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                  "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: 5 calendar day.",
+                "formula": "after - before",
+                "result": "5",
+                "unit": "calendar day",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N3",
+                    "snippet_id": "S3",
+                    "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                    "source_text": "15 calendar days",
+                    "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                    "start": 91,
+                    "end": 107,
+                    "value": "15",
+                    "unit": "calendar day",
+                    "dimension": "compound_day"
+                  },
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                    "source_text": "20 calendar days",
+                    "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                    "start": 108,
+                    "end": 124,
+                    "value": "20",
+                    "unit": "calendar day",
+                    "dimension": "compound_day"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v4",
+                "normalized_inputs": [
+                  {
+                    "id": "N3",
+                    "role": "before",
+                    "value": "15",
+                    "unit": "calendar day",
+                    "original_value": "15",
+                    "original_unit": "calendar day",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N1",
+                    "role": "after",
+                    "value": "20",
+                    "unit": "calendar day",
+                    "original_value": "20",
+                    "original_unit": "calendar day",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "20 calendar day - 15 calendar day = 5 calendar day (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+                "operand_roles": {
+                  "minuend_id": "N1",
+                  "subtrahend_id": "N3"
+                },
+                "known_input_snippet_ids": [
+                  "S1",
+                  "S3"
+                ],
+                "competing_snippet_ids": [],
+                "limitation_snippet_ids": [],
+                "limitation_basis": null,
+                "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+              }
+            },
+            {
+              "question_id": "R2",
+              "status": "supported",
+              "text": "Signed percent change: -25 %.",
+              "snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                  "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                  "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+                }
+              ],
+              "calculation": {
+                "request_id": "R2",
+                "operation": "percent_change",
+                "status": "computed",
+                "text": "Signed percent change: -25 %.",
+                "formula": "(after - before) / before × 100",
+                "result": "-25",
+                "unit": "%",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                    "source_text": "20 calendar days",
+                    "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                    "start": 108,
+                    "end": 124,
+                    "value": "20",
+                    "unit": "calendar day",
+                    "dimension": "compound_day"
+                  },
+                  {
+                    "id": "N3",
+                    "snippet_id": "S3",
+                    "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                    "source_text": "15 calendar days",
+                    "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                    "start": 91,
+                    "end": 107,
+                    "value": "15",
+                    "unit": "calendar day",
+                    "dimension": "compound_day"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v4",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "20",
+                    "unit": "calendar day",
+                    "original_value": "20",
+                    "original_unit": "calendar day",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N3",
+                    "role": "after",
+                    "value": "15",
+                    "unit": "calendar day",
+                    "original_value": "15",
+                    "original_unit": "calendar day",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "(15 calendar day - 20 calendar day) / 20 calendar day × 100 = -25 % (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+                "operand_roles": {
+                  "baseline_id": "N1",
+                  "current_id": "N3"
+                },
+                "known_input_snippet_ids": [
+                  "S1",
+                  "S3"
+                ],
+                "competing_snippet_ids": [],
+                "limitation_snippet_ids": [],
+                "limitation_basis": null,
+                "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+              }
+            },
+            {
+              "question_id": "R3",
+              "status": "supported",
+              "text": "The Quartz onboarding figures track elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\nThe figures measure the time it takes for customers to move from signed agreement to completed setup, in calendar days.\nThe data points include the elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.\nThe figures represent the average time it takes for customers to complete onboarding, measured in calendar days from signed agreement to completed setup.",
+              "snippet_ids": [
+                "S5"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S5",
+                  "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                  "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                }
+              ],
+              "parts": [
+                {
+                  "id": "R3P1",
+                  "label": "What specific metrics do the Quartz onboarding figures track?",
+                  "status": "supported",
+                  "text": "The Quartz onboarding figures track elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                      "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R3P2",
+                  "label": "What aspects of user onboarding are measured by Quartz figures?",
+                  "status": "supported",
+                  "text": "The figures measure the time it takes for customers to move from signed agreement to completed setup, in calendar days.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                      "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R3P3",
+                  "label": "What data points are included in the Quartz onboarding figures?",
+                  "status": "supported",
+                  "text": "The data points include the elapsed time for completed setups, measured in calendar days from signed agreement to completed setup.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                      "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                    }
+                  ]
+                },
+                {
+                  "id": "R3P4",
+                  "label": "What do the figures in Quartz's onboarding process represent?",
+                  "status": "supported",
+                  "text": "The figures represent the average time it takes for customers to complete onboarding, measured in calendar days from signed agreement to completed setup.",
+                  "snippet_ids": [
+                    "S5"
+                  ],
+                  "source_excerpts": [
+                    {
+                      "snippet_id": "S5",
+                      "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+                      "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+            "document_id": "0cac2e09-2f17-58f7-a49d-fceaac08b5ab",
+            "revision_id": "c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+            "relative_path": "sources/quartz_first.md",
+            "updated_at": "2026-10-30T17:34:06.802795+00:00",
+            "chunk_id": "0561e7db-1997-5ee2-9087-dd457f288b56",
+            "anchor": "first-measurement-period",
+            "heading": "First measurement period",
+            "content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+            "presented_content": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+          },
+          {
+            "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+            "document_id": "9193d7f4-52b3-5827-9459-8366d9671d01",
+            "revision_id": "7f744a27-10de-5774-9c00-848faca56881",
+            "relative_path": "sources/quartz_second.md",
+            "updated_at": "2026-10-30T17:34:06.803711+00:00",
+            "chunk_id": "5157e86b-0051-5293-a222-76bcc218a692",
+            "anchor": "second-measurement-period",
+            "heading": "Second measurement period",
+            "content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+            "presented_content": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+          },
+          {
+            "collection_id": "3c77c1c1-afb2-43b5-9580-b38269cf1e1d",
+            "document_id": "303a1c52-4609-5965-9acb-afe326cef336",
+            "revision_id": "76614e33-d208-559b-9c88-60ff3d2d0c6f",
+            "relative_path": "sources/quartz_context.md",
+            "updated_at": "2026-10-30T17:34:06.801592+00:00",
+            "chunk_id": "8403b16d-848e-56a4-b272-2b987cec79ef",
+            "anchor": "measurement-context",
+            "heading": "Measurement context",
+            "content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-30T17:34:06.803826+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+            "presented_content": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-30T17:35:52.552502+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v13",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?",
+          "retrieval_version": "v2",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 105736,
+          "created_at": "2026-10-30T17:35:52.552502+00:00",
+          "retrieval_trace": {
+            "candidate_limit_reached": false,
+            "preferred_chunks_per_document": 2,
+            "deprioritized_chunks": 0,
+            "result_omitted": 0,
+            "result_limit_reached": false
+          },
+          "snippet_trace": {
+            "version": "paragraph-v2",
+            "max_snippets": 100,
+            "max_quote_length": 500,
+            "omitted_snippets": 0,
+            "omitted_characters": 0,
+            "whitespace_only_characters": 0,
+            "split_blocks": 0,
+            "truncated": false
+          },
+          "answer_coverage": {
+            "coverage_assessment": "Semantic request coverage is not verified."
+          },
+          "answer_part_plan": {
+            "R3": [
+              {
+                "id": "R3P1",
+                "label": "What specific metrics do the Quartz onboarding figures track?"
+              },
+              {
+                "id": "R3P2",
+                "label": "What aspects of user onboarding are measured by Quartz figures?"
+              },
+              {
+                "id": "R3P3",
+                "label": "What data points are included in the Quartz onboarding figures?"
+              },
+              {
+                "id": "R3P4",
+                "label": "What do the figures in Quartz's onboarding process represent?"
+              }
+            ]
+          },
+          "answer_part_plan_origin": "planned_unreviewed",
+          "answer_part_planner_version": "deliverable-labels-v1",
+          "answer_part_unmatched_text": {},
+          "answer_part_planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How did Quartz’s average onboarding time change from the first period to the second, in days and percentage, and what do the figures measure?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "How did Quartz average onboarding time change in calendar days from the first period to the second?",
+              "operation": "difference"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "What was the percentage change in Quartz average onboarding time from the first period to the second?",
+              "operation": "percent_change"
+            },
+            {
+              "id": "R3",
+              "question_id": "Q1",
+              "request": "What do the Quartz onboarding figures measure?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "fixture_supplied",
+          "planner_version": null,
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "quote": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "quote": "\nThe measurement records elapsed calendar time, including weekends, rather than staff hours. Customers who had not completed onboarding by the end of the period were not included in this completed cohort."
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "quote": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n"
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "quote": "\nThe operations team used the same start and end events as in the first period and included weekends. This is a descriptive comparison of completed cohorts, not a controlled experiment."
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+              "quote": "The onboarding dashboard reports elapsed time for completed setups. It does not count the number of hours employees actively worked on a setup. A lower average means completed customers moved from agreement to setup in fewer calendar days on average.\n"
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:8403b16d-848e-56a4-b272-2b987cec79ef:76614e33-d208-559b-9c88-60ff3d2d0c6f",
+              "quote": "\nThe dashboard does not establish why the average changed between periods; the customer mix and operating conditions may differ."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "source_text": "20 calendar days",
+              "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+              "start": 108,
+              "end": 124,
+              "value": "20",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+              "source_text": "40 completed onboardings",
+              "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+              "start": 188,
+              "end": 212,
+              "value": "40",
+              "unit": "completed onboardings",
+              "dimension": "count"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "source_text": "15 calendar days",
+              "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+              "start": 91,
+              "end": 107,
+              "value": "15",
+              "unit": "calendar day",
+              "dimension": "compound_day"
+            },
+            {
+              "id": "N4",
+              "snippet_id": "S3",
+              "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+              "source_text": "50 completed onboardings",
+              "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+              "start": 172,
+              "end": 196,
+              "value": "50",
+              "unit": "completed onboardings",
+              "dimension": "count"
+            }
+          ],
+          "quantity_parser_version": "v4",
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: 5 calendar day.",
+              "formula": "after - before",
+              "result": "5",
+              "unit": "calendar day",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N3",
+                  "snippet_id": "S3",
+                  "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                  "source_text": "15 calendar days",
+                  "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                  "start": 91,
+                  "end": 107,
+                  "value": "15",
+                  "unit": "calendar day",
+                  "dimension": "compound_day"
+                },
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                  "source_text": "20 calendar days",
+                  "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                  "start": 108,
+                  "end": 124,
+                  "value": "20",
+                  "unit": "calendar day",
+                  "dimension": "compound_day"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v4",
+              "normalized_inputs": [
+                {
+                  "id": "N3",
+                  "role": "before",
+                  "value": "15",
+                  "unit": "calendar day",
+                  "original_value": "15",
+                  "original_unit": "calendar day",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N1",
+                  "role": "after",
+                  "value": "20",
+                  "unit": "calendar day",
+                  "original_value": "20",
+                  "original_unit": "calendar day",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "20 calendar day - 15 calendar day = 5 calendar day (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+              "operand_roles": {
+                "minuend_id": "N1",
+                "subtrahend_id": "N3"
+              },
+              "known_input_snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "competing_snippet_ids": [],
+              "limitation_snippet_ids": [],
+              "limitation_basis": null,
+              "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+            },
+            {
+              "request_id": "R2",
+              "operation": "percent_change",
+              "status": "computed",
+              "text": "Signed percent change: -25 %.",
+              "formula": "(after - before) / before × 100",
+              "result": "-25",
+              "unit": "%",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:0561e7db-1997-5ee2-9087-dd457f288b56:c4a0c373-a834-5ed8-83a4-50f15d7d383f",
+                  "source_text": "20 calendar days",
+                  "snippet_text": "Quartz measured onboarding time for customers who completed onboarding in the first period. The average was 20 calendar days from signed agreement to completed setup. The cohort contained 40 completed onboardings.\n",
+                  "start": 108,
+                  "end": 124,
+                  "value": "20",
+                  "unit": "calendar day",
+                  "dimension": "compound_day"
+                },
+                {
+                  "id": "N3",
+                  "snippet_id": "S3",
+                  "citation_id": "source:5157e86b-0051-5293-a222-76bcc218a692:7f744a27-10de-5774-9c00-848faca56881",
+                  "source_text": "15 calendar days",
+                  "snippet_text": "For customers who completed onboarding in the second period, Quartz recorded an average of 15 calendar days from signed agreement to completed setup. This cohort contained 50 completed onboardings.\n",
+                  "start": 91,
+                  "end": 107,
+                  "value": "15",
+                  "unit": "calendar day",
+                  "dimension": "compound_day"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v4",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "20",
+                  "unit": "calendar day",
+                  "original_value": "20",
+                  "original_unit": "calendar day",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N3",
+                  "role": "after",
+                  "value": "15",
+                  "unit": "calendar day",
+                  "original_value": "15",
+                  "original_unit": "calendar day",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "(15 calendar day - 20 calendar day) / 20 calendar day × 100 = -25 % (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+              "operand_roles": {
+                "baseline_id": "N1",
+                "current_id": "N3"
+              },
+              "known_input_snippet_ids": [
+                "S1",
+                "S3"
+              ],
+              "competing_snippet_ids": [],
+              "limitation_snippet_ids": [],
+              "limitation_basis": null,
+              "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "3c77c1c1-afb2-43b5-9580-b38269cf1e1d"
+        ]
+      },
+      "latency_seconds": 105.75178462453187,
+      "setup_seconds": 0.02568195853382349,
+      "attempt_total_seconds": 105.77746658306569,
+      "finished_at": "2026-10-30T17:35:52.563657+00:00"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-42c1416f-ac67-47d6-acb1-059f2d34f145",
+  "object": "chat.completion",
+  "created": 1793380568,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": [\"Eligibility Rules for Lumen Customer Credit\", \"Credit Application Process\", \"Credit Tracking Mechanism\", \"Credit Application and Tracking Integration\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 101,
+    "completion_tokens": 33,
+    "total_tokens": 134
+  }
+}

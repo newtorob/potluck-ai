@@ -1,0 +1,204 @@
+{
+  "denominator": 6,
+  "ready_count_literal_rubric": 3,
+  "basis": "Original rubric criteria, attached relevant support, and forbidden conditions; statuses and prose assessed separately.",
+  "cases": {
+    "harbor": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1 paid-admin completed-order CSV"
+        },
+        {
+          "pass": true,
+          "reason": "S3 five, daily maximum and exclusions"
+        },
+        {
+          "pass": true,
+          "reason": "S5 planned weekly/monthly and cancelled filter"
+        },
+        {
+          "pass": true,
+          "reason": "S5 API undecided and unscheduled"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Repeated copied passages."
+      ]
+    },
+    "orchard": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S2 receipt checks ledger routing"
+        },
+        {
+          "pass": true,
+          "reason": "S3 budget approval and mismatch investigation"
+        },
+        {
+          "pass": true,
+          "reason": "S5 treasury Thursday, fourteen-day eligibility and reference"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Final ownership part truncates; payment part separately states treasury owner."
+      ]
+    },
+    "lumen": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S2 eligibility exclusions and request window"
+        },
+        {
+          "pass": true,
+          "reason": "S3 portal verification decision"
+        },
+        {
+          "pass": false,
+          "reason": "Billing answer ends at Billing applys, omitting application, tracking, no-cash and carryforward"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Whole-request fallback part truncates and is labelled supported."
+      ]
+    },
+    "cedar": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1/S5 conflicting targets, no final decision"
+        },
+        {
+          "pass": true,
+          "reason": "S1/S5 Mira coordinates readiness"
+        },
+        {
+          "pass": true,
+          "reason": "S3 first release scope"
+        },
+        {
+          "pass": false,
+          "reason": "Employee preview distinction omitted and preview excerpt not cited"
+        }
+      ],
+      "answer_statuses": [
+        "supported"
+      ],
+      "part_statuses": [
+        [
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Date part says supported though targets conflict and actual date unknown."
+      ]
+    },
+    "maple": {
+      "status": "success",
+      "ready_literal_rubric": true,
+      "criteria": [
+        {
+          "pass": true,
+          "reason": "S1 and S4 cannot determine retention"
+        },
+        {
+          "pass": true,
+          "reason": "S5 twelve/eight/two/two outcomes"
+        },
+        {
+          "pass": true,
+          "reason": "S6 contracts not necessarily customers"
+        }
+      ],
+      "answer_statuses": [
+        "unknown"
+      ],
+      "part_statuses": [
+        [
+          "unknown",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Second part ends mid-sentence; unknown/supported statuses reasonable."
+      ]
+    },
+    "quartz": {
+      "status": "success",
+      "ready_literal_rubric": false,
+      "criteria": [
+        {
+          "pass": false,
+          "reason": "Minus 5 and minus 25% correct but answer does not state 20→15; values only in excerpts"
+        },
+        {
+          "pass": false,
+          "reason": "R3 omits signed-agreement qualification; cited S5 describes agreement, not signed"
+        },
+        {
+          "pass": true,
+          "reason": "No cause claimed; S5 attached"
+        }
+      ],
+      "answer_statuses": [
+        "supported",
+        "supported",
+        "supported"
+      ],
+      "part_statuses": [
+        [],
+        [],
+        [
+          "supported",
+          "supported",
+          "supported",
+          "supported"
+        ]
+      ],
+      "other_quality_findings": [
+        "Exact planner spans What/do/the/Quartz are not meaningful deliverables; semantics of plan unverified."
+      ]
+    }
+  }
+}

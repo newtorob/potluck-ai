@@ -1,0 +1,79 @@
+{
+  "case_ids": [
+    "cedar_lantern",
+    "harbor_rivet",
+    "osprey_quay",
+    "copper_wren"
+  ],
+  "assessment": null,
+  "outputs": {
+    "cedar_lantern": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "'ReplayRuntime' object has no attribute 'validate_investigation_profile'"
+      },
+      "failure_stage": "pre_inference",
+      "latency_seconds": 0.0009737499058246613,
+      "setup_seconds": 0.023749375715851784,
+      "attempt_total_seconds": 0.024723125621676445,
+      "finished_at": "2026-10-30T18:08:31.885504+00:00"
+    },
+    "harbor_rivet": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "'ReplayRuntime' object has no attribute 'validate_investigation_profile'"
+      },
+      "failure_stage": "pre_inference",
+      "latency_seconds": 0.0001759994775056839,
+      "setup_seconds": 0.030923000536859035,
+      "attempt_total_seconds": 0.03109900001436472,
+      "finished_at": "2026-10-30T18:08:31.917037+00:00"
+    },
+    "osprey_quay": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "'ReplayRuntime' object has no attribute 'validate_investigation_profile'"
+      },
+      "failure_stage": "pre_inference",
+      "latency_seconds": 0.00019299983978271484,
+      "setup_seconds": 0.02314708288758993,
+      "attempt_total_seconds": 0.023340082727372646,
+      "finished_at": "2026-10-30T18:08:31.940797+00:00"
+    },
+    "copper_wren": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "'ReplayRuntime' object has no attribute 'validate_investigation_profile'"
+      },
+      "failure_stage": "pre_inference",
+      "latency_seconds": 0.00014079175889492035,
+      "setup_seconds": 0.018747875466942787,
+      "attempt_total_seconds": 0.018888667225837708,
+      "finished_at": "2026-10-30T18:08:31.960135+00:00"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "List one to four concise factual deliverable labels for each request, in order. Keep every requested aspect. Do not answer or use sources. Return JSON only."
+    },
+    {
+      "role": "user",
+      "content": "{\"operations\": [{\"id\": \"R1\", \"question_id\": \"Q1\", \"request\": \"When will Cedar’s new customer portal launch, who owns the launch, and what is confirmed about its scope?\", \"operation\": \"answer\"}]}"
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen3-8b-q4",
+    "expected_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "max_tokens": 800,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "R1": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "minItems": 1,
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "R1"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "generation_profile": "qwen3-non-thinking",
+    "seed": 7
+  },
+  "operation_mode": "fixture_supplied",
+  "plan_origin": "fixture_supplied"
+}
