@@ -259,3 +259,31 @@ describe("progress and verification recovery", () => {
     expect(await readFile(join(cwd, "x"), "utf8")).toBe("attempt 3");
   });
 });
+
+describe("read-only agent mode", () => {
+  it.each([
+    ["edit_file", { path: "x", old_string: "original", new_string: "changed" }],
+    ["write_file", { path: "x", content: "changed" }],
+    ["run_command", { command: "touch forbidden" }],
+  ])("stops before confirming or executing %s", async (tool, args) => {
+    await writeFile(join(cwd, "x"), "original");
+    script([action(tool, args), "Done."]);
+    const runVerify = vi.fn();
+    const opts = options({ readOnly: true, verifyCommand: "touch forbidden", runVerify });
+    expect(await runTask([], "inspect", opts)).toEqual({ status: "incomplete", reason: "read_only" });
+    expect(opts.confirm).not.toHaveBeenCalled();
+    expect(runVerify).not.toHaveBeenCalled();
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(await readFile(join(cwd, "x"), "utf8")).toBe("original");
+    await expect(readFile(join(cwd, "forbidden"))).rejects.toThrow();
+  });
+  it("allows reads and completes without running an inherited verification command", async () => {
+    await writeFile(join(cwd, "x"), "evidence");
+    script([action("read_file", { path: "x" }), "Found evidence."]);
+    const runVerify = vi.fn();
+    const opts = options({ readOnly: true, verifyCommand: "touch forbidden", runVerify });
+    expect(await runTask([], "inspect", opts)).toEqual({ status: "finished" });
+    expect(opts.callbacks.onToolResult).toHaveBeenCalledWith(expect.stringContaining("evidence"));
+    expect(runVerify).not.toHaveBeenCalled();
+  });
+});

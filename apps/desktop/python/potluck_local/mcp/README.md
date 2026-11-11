@@ -33,7 +33,16 @@ Add to `~/.claude.json` (or your project-level `.mcp.json`):
 }
 ```
 
-## Tools (13 total)
+## Tools (13 default; 15 with evidence enabled)
+
+### Company Brain evidence (2 opt-in tools)
+
+`POTLUCK_EVIDENCE_SCOPE` binds `evidence_search` and `evidence_resolve` to an
+owner-configured workspace and collection allowlist at process startup. These
+read-only tools return revision-bound raw evidence and explicitly reviewed claims,
+with freshness checks and missing-evidence notices. Callers cannot widen the scope.
+They do not approve knowledge or run a model. See the [local Company Brain guide](../../COMPANY_BRAIN.md)
+for configuration, review commands, limitations, and deletion behavior.
 
 ### Memory (5 tools)
 

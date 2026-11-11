@@ -8,6 +8,12 @@ describe("command dispatch", () => {
       .toMatchObject({ print: true, task: "fix the build", yes: true, scope: "local", model: "coder" });
     expect(parseArgs(["setup", "--help"])).toMatchObject({ command: "setup", help: true });
   });
+  it("accepts read-only agent tasks and rejects management or verification combinations", () => {
+    expect(parseArgs(["-p", "inspect", "--read-only", "--yes"]).readOnly).toBe(true);
+    expect(parseArgs(["--read-only"]).readOnly).toBe(true);
+    expect(() => parseArgs(["status", "--read-only"])).toThrow();
+    expect(() => parseArgs(["--read-only", "--verify", "test"])).toThrow();
+  });
   it("parses diagnostics and bounded log options", () => {
     expect(parseArgs(["doctor", "--json", "--timeout=700", "--scope", "mine"]))
       .toMatchObject({ command: "doctor", json: true, timeout: 700, scope: "mine" });

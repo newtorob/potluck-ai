@@ -37,6 +37,8 @@ export interface StreamOptions {
   requireSuccessfulFinish?: boolean;
   /** Synthetic readiness probes may deliberately exhaust a tiny output budget. Never use for coding actions. */
   allowLengthFinish?: boolean;
+  /** Opt-in native JSON-schema dialect; unsupported endpoints must refuse it. */
+  responseFormat?: { type: "json_object"; schema: Record<string, unknown> };
   /** Sees the response headers once the gateway accepted the request. Throwing stops the stream before any text is read. */
   onHeaders?: (headers: Headers) => void;
 }
@@ -174,6 +176,7 @@ export async function* streamChat(
       max_tokens: opts.maxTokens ?? 4096,
       stream: true,
       stop: opts.stop,
+      ...(opts.responseFormat ? { response_format: opts.responseFormat } : {}),
     }),
     signal: opts.signal,
     redirect: "error",
@@ -281,7 +284,9 @@ export async function* streamChat(
               if (reason === "length") {
                 if (!opts.allowLengthFinish) finishError ??= "The model hit its output limit, so this reply was not applied. Try a smaller change or a larger loaded context.";
               } else if (reason !== "stop") {
-                finishError ??= `Gateway generation ended with finish_reason: ${reason}; the reply was not accepted as complete.`;
+                const knownReason = ["content_filter", "tool_calls", "function_call", "error"].includes(reason)
+                  ? reason : "unknown";
+                finishError ??= `Gateway generation ended with finish_reason: ${knownReason}; the reply was not accepted as complete.`;
               }
             }
             // Drain through [DONE] even after an unsuccessful finish so the
@@ -293,7 +298,10 @@ export async function* streamChat(
         }
       }
     }
-    if (opts.requireDone || opts.requireSuccessfulFinish) throw new Error("Gateway stream ended before completion.");
+    if (opts.requireDone || opts.requireSuccessfulFinish) {
+      const detail = opts.requireSuccessfulFinish && finishError ? ` ${finishError}` : "";
+      throw new Error(`Gateway stream ended before completion.${detail}`);
+    }
   } finally {
     // Best-effort: release the stream if the consumer stops early.
     void reader.cancel().catch(() => {});

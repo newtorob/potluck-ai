@@ -12,6 +12,7 @@ interface Turn {
   finishReason?: string;
   metadata?: Record<string, unknown>;
   doneDelayMs?: number;
+  omitDone?: boolean;
 }
 
 let cwd: string;
@@ -56,6 +57,7 @@ beforeEach(async () => {
       res.once("close", () => { clearTimeout(timer); resolve(); });
     });
     if (res.destroyed) return;
+    if (turn.omitDone) { res.end(); return; }
     sentDone = true;
     doneSent++;
     res.end("data: [DONE]\n\n");
@@ -87,6 +89,23 @@ function options(): AgentOptions {
 }
 
 describe("generation completion before coding actions", () => {
+  it("never applies a complete-looking stop response without the completion marker", async () => {
+    turns.push({ content: action("write_file", { path: "blocked.txt", content: "must not be written" }),
+      finishReason: "stop", omitDone: true });
+    const opts = options();
+    const history: ChatMessage[] = [];
+    const outcome = await runTask(history, "Write a file.", opts).then(result => result, error => error);
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(outcome.message).toMatch(/ended before completion/);
+    expect(outcome.message).not.toMatch(/output limit/);
+    expect(opts.confirm).not.toHaveBeenCalled();
+    expect(opts.callbacks.onAction).not.toHaveBeenCalled();
+    expect(history.filter(message => message.role === "assistant")).toEqual([]);
+    await expect(readFile(join(cwd, "blocked.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+    expect(requests).toBe(1);
+  });
+
   it.each([true, false])("never approves or writes a length-limited JSON action (closing fence: %s)", async closeFence => {
     turns.push({ content: action("write_file", { path: "new.ts", content: "export const partial = true;\n" }, closeFence), finishReason: "length" });
     const opts = options();

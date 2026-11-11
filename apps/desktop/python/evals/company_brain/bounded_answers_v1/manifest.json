@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "id": "cedar_lantern",
+      "question": "What can Cedar Lantern customers do with the billing export today, what are its current limits, and what is planned next?",
+      "sources": [
+        "sources/cedar_lantern/source-1.md",
+        "sources/cedar_lantern/source-2.md",
+        "sources/cedar_lantern/source-3.md"
+      ],
+      "plan": [
+        {
+          "request": "What can Cedar Lantern customers do with the billing export today, what are its current limits, and what is planned next?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "harbor_rivet",
+      "question": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?",
+      "sources": [
+        "sources/harbor_rivet/source-1.md",
+        "sources/harbor_rivet/source-2.md",
+        "sources/harbor_rivet/source-3.md"
+      ],
+      "plan": [
+        {
+          "request": "How does Harbor Rivet handle a supplier safety incident from intake through closure, and who owns each stage and handoff?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "osprey_quay",
+      "question": "What is known about the Osprey Quay migration schedule, the scope of the disagreement, and who will decide between the dates? Distinguish the other dated events.",
+      "sources": [
+        "sources/osprey_quay/source-1.md",
+        "sources/osprey_quay/source-2.md",
+        "sources/osprey_quay/source-3.md"
+      ],
+      "plan": [
+        {
+          "request": "What is known about the Osprey Quay migration schedule, the scope of the disagreement, and who will decide between the dates? Distinguish the other dated events.",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "copper_wren",
+      "question": "For Copper Wren, how much did median resolution time change in business days and percent from the before period to the after period, and what exactly was measured?",
+      "sources": [
+        "sources/copper_wren/source-1.md",
+        "sources/copper_wren/source-2.md",
+        "sources/copper_wren/source-3.md"
+      ],
+      "plan": [
+        {
+          "request": "How much did median resolution time change in business days from the before period to the after period?",
+          "operation": "difference"
+        },
+        {
+          "request": "What was the percent change in median resolution time from the before period to the after period?",
+          "operation": "percent_change"
+        },
+        {
+          "request": "What exactly was measured, including population and exclusions?",
+          "operation": "answer"
+        }
+      ]
+    }
+  ]
+}

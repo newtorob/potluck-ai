@@ -23,6 +23,7 @@ import {
   Package,
   Brain,
   ListTodo,
+  Search,
   Activity,
   BarChart3,
   Globe2,
@@ -86,6 +87,7 @@ const PRIMARY_NAV: NavItem[] = [
 const WORKSPACE_NAV: NavItem[] = [
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
+  { to: '/investigations', label: 'Investigations', icon: Search },
   { to: '/agents', label: 'Agents', icon: Activity },
   { to: '/usage', label: 'Usage', icon: BarChart3 },
 ];

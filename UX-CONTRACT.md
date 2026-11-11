@@ -4,6 +4,18 @@ This contract covers entry, desktop chat routing, and the sign-in boundary. Othe
 
 Settings loading and recovery are covered below as a separate focused workflow.
 
+## Reviewed-answer reading
+
+`components/investigations/ReviewedPassageAnswer.tsx` owns reviewed-answer display
+using existing Markdown, safe links, Hearth tokens and native disclosures. The
+sidecar's `investigation_readable_presentation` supplies a deterministic V32 view:
+shared text retains its evidence-group scope, source table labels require exact
+support, and the original answer/citations stay available. A display projection
+must match the current text, status and snippet IDs; corrections take precedence.
+Source freshness and authority remain server-owned. See `docs/company-brain-pilot.md`.
+Component and service tests cover shared conditions, source ambiguity, escaped
+pipes, corrections and original-output access. No new tokens or navigation flow.
+
 ## Product rules and evidence
 
 | Rule | Source |
@@ -20,6 +32,7 @@ Component paths below are relative to `apps/desktop/frontend/src/`.
 
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 | --- | --- | --- | --- | --- |
+| Select/Listbox | Native loaded-model selectors in `PilotKnowledge` and `InvestigationsView` | Loaded sidecar model IDs and explicit selection | Native OS popup; no custom geometry or autocomplete | Pilot component tests and investigations browser checks |
 | Form | `components/auth/MagicLinkForm.tsx` | `hooks/useAuth.ts` and passwordless confirmation flow | Entry form without input autofocus; dedicated sign-in form with autofocus | AuthGate and localUse tests; browser error/keyboard checks |
 | Account entry | `components/auth/AuthGate.tsx`, `SignInWall.tsx` | Explicit local choice or confirmed/cached account | Account lookup, local entry, signed-in and cached offline access | `components/auth/AuthGate.test.tsx` |
 | Account-backed feature | `components/auth/AccountRequired.tsx` | `stores/authStore.ts` | Full feature or in-shell sign-in prompt | `lib/localUse.test.tsx` |
@@ -52,3 +65,118 @@ The existing universal minimum-version gate and server authorization policies re
 - Concurrent loads share one request; older responses cannot replace newer saved or hydrated settings. GET recovery does not change the existing save/rollback or authorization contract.
 - Tabs retain their URL selection and arrow-key behavior. The tab strip scrolls at narrow widths; controls and error guidance remain reachable in light and dark themes.
 - Browser evidence uses real components with simulated API responses and synthetic settings. It does not certify live inference, a native installer or a real service outage.
+
+
+## Local investigations
+
+`views/InvestigationsView.tsx` uses the shared `ViewHeader` and Hearth tokens.
+The workflow is single-owner and local; workspace strings and typed reviewer
+names are not company authentication. Its lifecycle is defined in the Python
+`COMPANY_BRAIN.md` guide and enforced by the sidecar, including current evidence
+validation on every read and write.
+
+- Choose the workspace, exact source collection set and already loaded model
+  explicitly. Changing the source scope clears the previous list and selection.
+- Disable scope/model/record switching while an operation is pending. Errors use
+  an alert. Recoverable review failures preserve the entered correction;
+  unavailable sources clear the displayed artifact and correction. Other operation
+  failures clear the displayed artifact. No operation silently retries or routes
+  to another model.
+- Review and outcome are separate one-shot actions. Corrections retain the original
+  draft; outcomes have no preselected result. Reviewed does not mean resolved.
+- Numbered citation links open the matching source disclosure; full IDs, source
+  revision and model identity remain inspectable. Knowledge proposals are available
+  only after accepted/corrected review and an outcome, and remain unapproved.
+- Textareas use fixed adequate rows and internal scrolling. Preserve entered text
+  during pending work; all controls have visible labels and normal keyboard access.
+
+The Investigations view uses native select controls for the loaded local model,
+answer profile, review decision, and outcome. The existing desktop Memory view uses the same
+platform-owned select pattern. Native popup geometry and keyboard behavior are
+accepted for this workflow; this decision does not establish a global select
+owner for other views. Verify keyboard operation and the popup in the desktop
+browser review.
+
+New investigation briefs show exact source excerpts beside claims and link to the
+matching raw or reviewed-claim source. Matching text is not a semantic correctness
+guarantee. Model questions and hypotheses are labeled unverified; retrieval notices
+are separate and cannot be edited. Historical combined missing-evidence lists keep
+their unknown provenance label. Corrections preserve the original draft and must
+include valid excerpts for facts and prior fixes. The investigation content panel
+owns scrolling; citation navigation must not scroll the outer desktop shell.
+
+The opt-in question-answer preview accepts up to eight optional questions; when
+left blank, questions are planned from the issue. Answers and exact excerpts are
+drafts for review: a supported status is a model claim, not proof of correctness.
+Corrections keep the original questions and choose source snippets from the saved
+catalog; the sidecar derives excerpts from those selections. Recoverable review
+errors preserve edits, while an unavailable source clears the displayed artifact.
+The preview defaults to the standard answer profile. Qwen3 non-thinking is an
+explicit selection requiring a compatible loaded Qwen3 model; incompatibility
+fails the request without falling back to another profile.
+
+Reviewed calculations are an opt-in experimental path. The owner may author or
+edit a plan of 1–12 distinct requests, or ask the loaded model to suggest one;
+only **Confirm plan and draft** sends it for generation. Confirmation approves
+neither the model's answers nor its source selections. Stale suggestions cannot
+replace edits, and planning or generation failures preserve the plan. Extraction
+notices and cited inputs remain inspectable. Calculation traces belong to the
+original draft and do not change when an answer is corrected.
+
+For v9 drafts, a correction may review each calculation using saved source
+quantities in their operation roles, plus catalog excerpts and an explanation of
+conflicts and authority. The preview is deterministic and does not establish
+source truth. Changes to selections or explanation invalidate the preview; save
+requires a fresh preview and retains its exact answer. Failed previews preserve
+edits. Reviewer assessments and their traces remain separate from the immutable
+original machine traces. Native selectors provide keyboard access to quantities.
+
+
+## Reviewed knowledge pilot
+
+`components/investigations/PilotKnowledge.tsx` owns folder consent, scanning,
+source-bound proposals and explicit knowledge approval/supersession.
+`views/InvestigationsView.tsx` owns pilot opt-in, selected scope, questions and
+existing answer review/export. `components/investigations/controls.ts` owns the
+shared Hearth field/button styles. The sidecar `company_brain_pilot` router is
+responsible for privacy, scope, freshness and fixed answer configuration.
+
+- Pilot mode is off by default. Registration, scanning, proposal creation and
+  approval are separate actions. Supersession requires an explicit matching-key
+  proposal, reviewer and reason; no background operation approves knowledge.
+- Knowledge status and replacement selectors use the existing native Select/Listbox
+  decision for Investigations. Labels, keyboard access, source disclosures, inline
+  alerts and busy/empty/truncated states stay in the local investigation panel.
+- A pending operation blocks duplicate activation and scope/model switches.
+  Remounting on workspace/collection change prevents a late result from restoring
+  old evidence. Errors preserve entered statement text while clearing potentially
+  stale source and authority selections. Scans and knowledge changes clear the
+  displayed answers; the sidecar revalidates saved records on access.
+- Folder permission is explicit and resets when the path changes. Scanning explains
+  invalidation. Typed reviewer names remain local-owner labels, not authenticated
+  company roles. Pilot questions use one fixed measured path with no fallback.
+
+Verification: `PilotKnowledge.test.tsx`, `InvestigationsView.test.tsx`, sidecar
+`test_company_brain_pilot.py`, and the isolated synthetic browser walkthrough.
+The browser preview certifies interaction only, not native inference or owner
+acceptance. See [pilot instructions](docs/company-brain-pilot.md).
+
+
+## Question-focused reviewed answers
+
+`ReviewedPassageAnswer.tsx` owns the V3/V4 draft and its evidence disclosures.
+Investigations owns the explicit, default-off **Focused passages (experimental)**
+selection inside the reviewed knowledge pilot. Switching it clears previous
+answers. It is unavailable during pending work. The older answer path is unchanged.
+
+The short model-written draft appears first. Selected exact passages, complete
+reviewed statements and exact source excerpts remain separately inspectable in
+closed native disclosures. Source links use existing citation navigation. Markdown
+uses the canonical safe external link; raw HTML and remote images do not execute.
+Tables scroll within the content panel; orphan rows render as readable records.
+
+A supported status is unverified. Unknown and conflicting leads describe only
+the selected statements. Human corrections preserve the immutable original
+presentation and appear without pretending that original selected prose was
+recomputed. Shortening must never be graded as correct using hidden source text
+to rescue missing prerequisites, exceptions or requested facts.

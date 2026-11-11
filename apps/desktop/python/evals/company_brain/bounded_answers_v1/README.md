@@ -1,0 +1,5 @@
+# Synthetic investigation evaluation draft
+
+These companies, requests, and source documents are fictional. Each case supplies exactly three allowed sources. The excluded canary is not a source and must not be passed into the investigation. `sources.json` records hashes for the individual inputs and identifies the excluded canary; this draft has not been frozen.
+
+`manifest.json` contains the question, source paths and separately reviewed operation plan. `rubric.json` is for independent evaluators only, never runtime input. Evaluate each requested part independently: a supported fact remains supported even when another part is unknown or conflicting. The Osprey case requires a supported description of a real conflict and explicit unknown decision authority, not a fabricated resolution. Require each material claim to be supported by actually attached, relevant evidence, including all documents needed for cross-document claims. Quotes are examples of supporting source text; answers need not use exact wording. A correct calculation must also cite the source values, and a descriptive answer must preserve relevant qualifications. Forbidden statements fail the case.

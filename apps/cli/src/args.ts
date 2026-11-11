@@ -9,6 +9,7 @@ export interface CliArgs {
   print: boolean;
   yes: boolean;
   noVerify: boolean;
+  readOnly?: boolean;
   json: boolean;
   model?: string;
   use?: ModelUse;
@@ -83,6 +84,7 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--version" || arg === "-v") out.version = true;
     else if (arg === "--yes" || arg === "-y") out.yes = true;
     else if (arg === "--json") out.json = true;
+    else if (arg === "--read-only") out.readOnly = true;
     else if (arg === "--no-verify") out.noVerify = true;
     else if (arg === "--wait") out.wait = true;
     else if (arg === "--no-wait") out.wait = false;
@@ -299,7 +301,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
   // --yes confirms joining, leaving or deleting a circle; elsewhere it is an agent option.
   const circleConfirm = out.command === "circle" && ["join", "leave", "delete"].includes(out.action || "");
-  if (out.command && (out.print || (out.model && !["setup", "launch", "run", "benchmark"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm && out.command !== "benchmark"))) {
+  if (out.command && (out.print || (out.model && !["setup", "launch", "run", "benchmark"].includes(out.command)) || out.verify || out.noVerify || out.readOnly || (out.yes && !circleConfirm && out.command !== "benchmark"))) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
@@ -321,6 +323,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.keep && out.restore) throw new UsageError("Choose --keep or --restore.");
   if (out.command === "benchmark" && out.model !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(out.model)) throw new UsageError("Use a model ID from potluck models list.");
   if (out.circle !== undefined && out.scope !== "circle") throw new UsageError("--circle requires --scope circle.");
+  if (out.readOnly && out.verify !== undefined) throw new UsageError("--read-only cannot run --verify.");
   if (out.verify !== undefined && out.noVerify) throw new UsageError("Choose --verify or --no-verify.");
   return out;
 }

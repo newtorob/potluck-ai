@@ -141,14 +141,23 @@ describe('household recovery', () => {
 
 describe('household recovery budgets and membership', () => {
   it('does not reset the total budget between attempts', async () => {
-    HOUSEHOLD_RECOVERY.totalMs = 60;
-    const first = stalled();
-    const second = stalled();
-    route({ '100.64.0.2': first.response, '100.64.0.3': second.response });
-    await expect(streamHouseholdInference(messages, peers)).rejects.toThrow();
-    expect(calls).toHaveLength(2);
-    expect(first.cancel).toHaveBeenCalledOnce();
-    expect(second.cancel).toHaveBeenCalledOnce();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      HOUSEHOLD_RECOVERY.totalMs = 60;
+      const first = stalled();
+      const second = stalled();
+      route({ '100.64.0.2': first.response, '100.64.0.3': second.response });
+      const check = expect(streamHouseholdInference(messages, peers)).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(40);
+      expect(calls).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(20);
+      await check;
+      expect(calls).toHaveLength(2);
+      expect(first.cancel).toHaveBeenCalledOnce();
+      expect(second.cancel).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('uses current household membership again on retry', async () => {

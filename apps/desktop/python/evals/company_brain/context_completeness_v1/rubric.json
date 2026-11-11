@@ -1,0 +1,66 @@
+{
+  "cases": {
+    "harbor": {
+      "required": [
+        "Delay was caused by inconsistent sensor readings after salt spray, supported by sources/harbor_a.md.",
+        "Mara Venn owns the revised schedule, supported by sources/harbor_b.md.",
+        "Three consecutive salt-spray calibration trials must pass before start, supported by sources/harbor_c.md."
+      ],
+      "forbidden": [
+        "Do not state a committed start date.",
+        "Do not claim Mara owns instrument testing."
+      ]
+    },
+    "cedar": {
+      "required": [
+        "Maple End and West Quay are included, supported by sources/cedar_a.md.",
+        "Pickup is Tuesday 2\u20135 p.m., supported by sources/cedar_b.md.",
+        "Residents report missed deliveries through the trial voicemail line, supported by sources/cedar_c.md."
+      ],
+      "forbidden": [
+        "Do not include other neighborhoods.",
+        "Do not claim the voicemail is monitored immediately."
+      ]
+    },
+    "mosaic": {
+      "required": [
+        "Two probe readings below 1\u00b0C at least ten minutes apart trigger an alert, supported by sources/mosaic_a.md.",
+        "The alert goes by text to the registered phone, supported by sources/mosaic_b.md.",
+        "The grower should inspect irrigation valves before deciding whether to run sprinklers, supported by sources/mosaic_c.md."
+      ],
+      "forbidden": [
+        "Do not claim one reading suffices.",
+        "Do not claim the service automatically operates the valves."
+      ]
+    },
+    "atlas": {
+      "required": [
+        "Atlas Loom pays postage via a prepaid label, supported by sources/atlas_a.md.",
+        "The printed order slip must be enclosed, supported by sources/atlas_b.md.",
+        "Credit is issued after depot check-in, supported by sources/atlas_c.md."
+      ],
+      "forbidden": [
+        "Do not require the cardboard sleeve.",
+        "Do not promise credit immediately on shipment."
+      ]
+    },
+    "quill": {
+      "required": [
+        "State that the approver is not identified in the available sources, supported by sources/quill_a.md and sources/quill_c.md.",
+        "Report the unresolved 06:40 versus 07:10 conflict, supported by sources/quill_a.md and sources/quill_b.md."
+      ],
+      "forbidden": [
+        "Do not invent an approver.",
+        "Do not present either departure as the settled final time."
+      ]
+    },
+    "birch": {
+      "required": [
+        "The increase was 30 deliveries (110 minus 80), supported by sources/birch_a.md and sources/birch_b.md."
+      ],
+      "forbidden": [
+        "Do not reverse the direction or treat 30 as a percentage."
+      ]
+    }
+  }
+}

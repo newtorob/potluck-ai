@@ -35,9 +35,40 @@ _TEMPLATE_KEYS = ("messages", "tools", "tool_choice", "parallel_tool_calls", "ad
 
 
 class SplitError(RuntimeError):
-    def __init__(self, detail: str, status: int = 409, *, code: str = "split_unavailable"):
+    def __init__(self, detail: str, status: int = 409, *, code: str = "split_unavailable",
+                 failure_category: str | None = None):
         self.status, self.code = status, code
+        self.failure_category = failure_category
         super().__init__(detail)
+
+    @property
+    def failure_category(self) -> str | None:
+        return self._failure_category
+
+    @failure_category.setter
+    def failure_category(self, value: str | None):
+        allowed = {"timeout", "connection", "transport", "http", "format", "cancelled", "unknown"}
+        self._failure_category = value if value is None or (isinstance(value, str) and value in allowed) else "unknown"
+
+
+def _failure_category(exc: Exception) -> str:
+    """Return only a fixed label; exception text can contain private request data."""
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    if isinstance(exc, httpx.NetworkError):
+        return "connection"
+    if isinstance(exc, httpx.TransportError):
+        return "transport"
+    if isinstance(exc, SplitError) and exc.failure_category in {"http", "format", "cancelled"}:
+        return exc.failure_category
+    return "unknown"
+
+
+def _response_json(response):
+    try:
+        return response.json()
+    except ValueError:
+        raise SplitError("The split engine returned an invalid response.", 502, failure_category="format") from None
 
 
 def binary(root: Path, name: str) -> Path:
@@ -284,7 +315,7 @@ class SplitModel:
 
     @staticmethod
     def _cancelled():
-        return SplitError("Split request was cancelled.", 499, code="split_cancelled")
+        return SplitError("Split request was cancelled.", 499, code="split_cancelled", failure_category="cancelled")
 
     def _begin(self, cancel_event: threading.Event | None) -> _SplitRequest:
         request = _SplitRequest(cancel_event if cancel_event is not None else threading.Event())
@@ -351,11 +382,14 @@ class SplitModel:
             request.prevented_send = True
             raise self._cancelled()
         response = client.post(self.base + path, headers=self.headers, json=body)
+        if request.cancelled.is_set():
+            request.prevented_send = True
+            raise self._cancelled()
         if response.status_code != 200:
-            raise SplitError("The split engine could not read this request.", 502)
-        return response.json()
+            raise SplitError("The split engine could not read this request.", 502, failure_category="http")
+        return _response_json(response)
 
-    def _prepare(self, request: _SplitRequest, body: dict):
+    def _prepare(self, request: _SplitRequest, body: dict, *, force_completion: bool = False):
         """``(path, body, ticket)`` for the request.
 
         llama-server renders the chat template itself and tokenizes the whole
@@ -370,9 +404,11 @@ class SplitModel:
         """
         guard = self._guard()
         if guard is None:
+            if force_completion:
+                raise SplitError("The native prompt guard is unavailable.", 503)
             return CHAT_PATH, body, prompt_guard.NO_TICKET
         clean, ticket = guard.sanitize({"messages": body.get("messages"), "tools": body.get("tools")})
-        if not ticket.active:
+        if not ticket.active and not force_completion:
             return CHAT_PATH, body, prompt_guard.NO_TICKET
         try:
             template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
@@ -506,10 +542,13 @@ class SplitModel:
                                        extensions={"trace": self._trace(request)})
                 if request.cancelled.is_set():
                     raise self._cancelled()
-                result = response.json()
-                if response.status_code != 200 or not isinstance(result, dict) or result.get("error") \
-                        or not result.get("choices") or not all(isinstance(c, dict) and c.get("finish_reason") for c in result["choices"]):
-                    raise SplitError("The split engine could not complete this request.", 502)
+                if response.status_code != 200:
+                    raise SplitError("The split engine could not complete this request.", 502, failure_category="http")
+                result = _response_json(response)
+                if not isinstance(result, dict) or result.get("error") \
+                        or not isinstance(result.get("choices"), list) or not result["choices"] \
+                        or not all(isinstance(c, dict) and c.get("finish_reason") for c in result["choices"]):
+                    raise SplitError("The split engine could not complete this request.", 502, failure_category="format")
                 done = True
                 if path == COMPLETION_PATH:
                     markers = self.tool_markers() if "logprobs" in body else {}
@@ -522,10 +561,12 @@ class SplitModel:
                     if isinstance(message, dict) and isinstance(message.get("content"), str):
                         message["content"] = tool_markers.escape(message["content"])
                 return result
-        except Exception:
+        except Exception as exc:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
-            raise self.failed("Split inference failed. Check worker status and start again.") from None
+            failure = self.failed("Split inference failed. Check worker status and start again.")
+            failure.failure_category = _failure_category(exc)
+            raise failure from None
         finally:
             ticket.close()
             self._cache_finish(ids, done)
@@ -543,7 +584,7 @@ class SplitModel:
                 with client.stream("POST", self.base + path, headers=self.headers, json=body,
                                    extensions={"trace": self._trace(request)}) as response:
                     if response.status_code != 200:
-                        raise SplitError("The split engine rejected the request.", 502)
+                        raise SplitError("The split engine rejected the request.", 502, failure_category="http")
                     first = path == COMPLETION_PATH
                     for line in response.iter_lines():
                         if request.cancelled.is_set():
@@ -553,13 +594,27 @@ class SplitModel:
                         data = line[5:].strip()
                         if data == "[DONE]":
                             if not terminal:
-                                raise SplitError("Split inference ended without a completion event.", 502)
+                                raise SplitError("Split inference ended without a completion event.", 502, failure_category="format")
                             done = True
                             return
-                        chunk = json.loads(data)
-                        if "error" in chunk:
-                            raise SplitError("Split inference failed.", 502)
-                        for choice in chunk.get("choices", []):
+                        try:
+                            chunk = json.loads(data)
+                        except ValueError:
+                            raise SplitError("Split inference failed.", 502, failure_category="format") from None
+                        if not isinstance(chunk, dict) or "error" in chunk:
+                            raise SplitError("Split inference failed.", 502, failure_category="format")
+                        choices = chunk.get("choices", [])
+                        if not isinstance(choices, list) or any(
+                            not isinstance(choice, dict)
+                            or any(key in choice and not isinstance(choice[key], dict) for key in ("message", "delta"))
+                            or any(isinstance(choice.get(key), dict)
+                                   and choice[key].get("content") is not None
+                                   and not isinstance(choice[key]["content"], str)
+                                   for key in ("message", "delta"))
+                            for choice in choices
+                        ):
+                            raise SplitError("Split inference failed.", 502, failure_category="format")
+                        for choice in choices:
                             if choice.get("finish_reason") is not None:
                                 terminal = True
                         if path == COMPLETION_PATH:
@@ -575,11 +630,13 @@ class SplitModel:
                                 if isinstance(delta, dict) and isinstance(delta.get("content"), str):
                                     delta["content"] = tool_markers.escape(delta["content"])
                             yield chunk
-            raise SplitError("Split inference was interrupted before completion.", 502)
-        except Exception:
+            raise SplitError("Split inference was interrupted before completion.", 502, failure_category="format")
+        except Exception as exc:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
-            raise self.failed("Split inference was interrupted. Check worker status and start again.") from None
+            failure = self.failed("Split inference was interrupted. Check worker status and start again.")
+            failure.failure_category = _failure_category(exc)
+            raise failure from None
         finally:
             ticket.close()
             self._cache_finish(ids, done)

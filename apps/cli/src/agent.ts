@@ -12,7 +12,7 @@ import type { GatewayConfig } from "./config.js";
 import { createHash } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import { streamChat, type ChatMessage } from "./gateway.js";
+import { streamChat, type ChatMessage, type StreamOptions } from "./gateway.js";
 import { parseRelaxedJson } from "./relaxedJson.js";
 import { ContextBudgetError, prepareContext } from "./context.js";
 export { trimHistory } from "./context.js";
@@ -302,6 +302,7 @@ export function systemPrompt(
   cwd: string,
   verifyCommand?: string | null,
   brief?: string | null,
+  readOnly = false,
 ): string {
   const lines = [
     "You are Potluck, a precise, safe terminal coding agent.",
@@ -334,7 +335,12 @@ export function systemPrompt(
     "A failed edit/write stays unresolved until an actual file change succeeds. Passing checks alone do not resolve it. A declined action stops this task.",
   ];
 
-  if (verifyCommand) {
+  if (readOnly) {
+    lines.splice(lines.indexOf('edit_file {"path":string,"old_string":string,"new_string":string,"replace_all"?:bool}'));
+    lines.push("Read-only mode: use only search_files, glob, read_file, and list_dir. Report findings without changing files or running commands.");
+  }
+
+  if (verifyCommand && !readOnly) {
     lines.push(
       `Fixed check after edits and before completion after shell commands: ${verifyCommand}.`,
       "If VERIFY FAILED, fix errors before claiming completion. Four consecutive failures stop the task. Group corrections. Passing checks do not replace checking all original requirements.",
@@ -396,6 +402,10 @@ export interface AgentOptions {
   callbacks: AgentCallbacks;
   signal?: AbortSignal;
   maxSteps?: number;
+  /** Restrict actions to workspace reads and searches; never run verification commands. */
+  readOnly?: boolean;
+  /** Reject all model actions before any tool is invoked. */
+  toolsDisabled?: boolean;
   /** Routing scope forwarded to the gateway (X-Potluck-Scope). */
   scope?: string;
   /** Additional hard cap on characters sent to the model. */
@@ -404,6 +414,8 @@ export interface AgentOptions {
   contextWindowTokens?: number;
   /** Requested output allowance, capped at a quarter of context (at most 4096). */
   maxOutputTokens?: number;
+  /** Explicit native structured output for supplied-context, one-turn workers. */
+  responseFormat?: StreamOptions["responseFormat"];
   /**
    * The FIXED verify command run after a successful edit/write and before
    * completion after executed shell commands (the model can never choose it).
@@ -419,7 +431,7 @@ export interface AgentOptions {
 /** A final response is distinct from stopping with unfinished or unchecked work. */
 export type AgentResult =
   | { status: "finished" }
-  | { status: "incomplete"; reason: "verification_failed" | "mutation_failed" | "action_declined" | "repeated_tool_failure" | "stalled" | "invalid_action" | "step_limit" | "context_limit" };
+  | { status: "incomplete"; reason: "verification_failed" | "mutation_failed" | "action_declined" | "repeated_tool_failure" | "stalled" | "invalid_action" | "step_limit" | "context_limit" | "read_only" | "tools_disabled" };
 
 /**
  * Run one task to completion. Mutates `history` in place (the caller owns it so
@@ -432,7 +444,13 @@ export async function runTask(
 ): Promise<AgentResult> {
   const { cfg, model, cwd, confirm, callbacks } = opts;
   const maxSteps = opts.maxSteps ?? 24;
-  const verifyCommand = opts.verifyCommand ?? null;
+  if (opts.toolsDisabled && (!opts.readOnly || opts.verifyCommand)) {
+    throw new Error("Disabling tools requires read-only mode without verification commands.");
+  }
+  if (opts.responseFormat && (!opts.readOnly || maxSteps !== 1 || opts.verifyCommand)) {
+    throw new Error("Structured role output requires a single read-only turn without verification commands.");
+  }
+  const verifyCommand = opts.readOnly ? null : opts.verifyCommand ?? null;
   const maxVerifyFailures = opts.maxVerifyFailures ?? 4;
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
@@ -524,6 +542,7 @@ export async function runTask(
       requireDone: true,
       requireSuccessfulFinish: true,
       stop: ["\nTOOL_RESULT:"],
+      ...(opts.responseFormat ? { responseFormat: opts.responseFormat } : {}),
     })) {
       // Drain through [DONE] before acting. Closing the HTTP stream at the
       // action fence cancels inference and can stop a managed split runtime.
@@ -597,6 +616,14 @@ export async function runTask(
     }
     protocolFailures = 0;
 
+    if (opts.toolsDisabled) {
+      callbacks.onNotice?.("Task incomplete: tools are disabled. Nothing was executed.");
+      return { status: "incomplete", reason: "tools_disabled" };
+    }
+    if (opts.readOnly && !["search_files", "glob", "read_file", "list_dir"].includes(parsed.action.tool)) {
+      callbacks.onNotice?.("Task incomplete: action is unavailable in read-only mode. Nothing was executed.");
+      return { status: "incomplete", reason: "read_only" };
+    }
     callbacks.onAction(parsed.action);
     let result = await runTool(parsed.action.tool, parsed.action.args, {
       cwd,

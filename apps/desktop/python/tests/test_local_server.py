@@ -1,13 +1,16 @@
 """Native local backend contracts, without downloading weights or starting inference."""
 import asyncio
+import hashlib
 import json
 import threading
+from dataclasses import replace
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
 from potluck_local.services import local_server as ns
+from potluck_local.services import investigation_profiles as profiles
 from potluck_local.services.acceptance import lending_allowed
 from potluck_local.services.model_identity import ModelIdentityError
 from potluck_local.services.model_traits import TemplateTraits
@@ -38,7 +41,7 @@ def server(monkeypatch):
              "chat_template": "enable_thinking <think>"}
     seen = []
     state = {"prompt": "tool: potluck_probe_zq91", "plain_prompt": "hi<think>", "busy": False}
-    client = httpx.Client
+    client = httpx._client.Client
 
     def handle(request):
         seen.append(request)
@@ -63,6 +66,136 @@ def test_native_renderer_establishes_tools_and_reasoning_contract(server):
     assert model.template_traits == TemplateTraits(supports_tools=True, opens_reasoning=True, thinks=True)
     assert all(r.headers["authorization"] == "Bearer private-test-key" for r in seen)
     assert json.loads(seen[-2].content)["tools"][0] == ns.PROBE_TOOL
+
+
+def test_investigation_template_identity_is_from_loaded_renderer(server):
+    model, props, _, _ = server
+    model.initialize(4096)
+    assert model.investigation_template_sha256 == hashlib.sha256(props["chat_template"].encode()).hexdigest()
+    props["chat_template"] = ""
+    model.initialize(4096)
+    assert model.investigation_template_sha256 is None
+
+
+def test_registered_native_profile_has_exact_pins_and_preserves_stock_profile():
+    native = profiles.resolve_profile(profiles.QWEN38_27B_NATIVE_NON_THINKING)
+    assert isinstance(native, profiles.NativeInvestigationProfile)
+    assert native.backend == 'llama-server' and native.enable_thinking is False
+    assert native.model_sha256 == '96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3'
+    assert native.engine_commit == 'd80619397c2ba5cf1366c29f7d43699ca3a159b9'
+    assert native.template_sha256 == 'c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041'
+    assert native.render_hashes == (
+        '9f81e9d717249bef5fc543518009ba0e427864fbe56fe8c3e43db5a5a1fb8092',
+        '0a7393b3d4d034f93bf43512915604111ad1b8ac27edf386602eaf776556b061')
+    stock = profiles.resolve_profile(profiles.QWEN3_NON_THINKING)
+    assert stock.backend == 'llama-cpp-python' and not isinstance(stock, profiles.NativeInvestigationProfile)
+    assert set(stock.metadata()) == {'name', 'temperature', 'top_p', 'top_k', 'min_p',
+                                    'template_sha256', 'backend', 'enable_thinking', 'repeat_penalty'}
+
+
+def test_native_profile_requires_exact_identity_and_switch_render(server, monkeypatch):
+    model, _, _, _ = server
+    model.initialize(4096)
+    hashes = tuple(hashlib.sha256(s.encode()).hexdigest() for s in ("off", "on"))
+    profile = profiles.NativeInvestigationProfile("test", .7, .8, 20, 0,
+        model.investigation_template_sha256, backend="llama-server", model_sha256="sha",
+        engine_commit="commit", render_hashes=hashes)
+    client = httpx._client.Client
+    requests = []
+    def render(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        enabled = body["chat_template_kwargs"]["enable_thinking"]
+        return httpx.Response(200, json={"prompt": "on" if enabled else "off"})
+    monkeypatch.setattr(ns.httpx, "Client", lambda **kw: client(transport=httpx.MockTransport(render), **kw))
+    options = dict(model_sha256="sha", engine_commit="commit")
+    profiles.validate_native(model, profile, **options)
+    assert [r["chat_template_kwargs"]["enable_thinking"] for r in requests] == [False, True]
+    for key in ("model_sha256", "engine_commit"):
+        with pytest.raises(RuntimeError):
+            profiles.validate_native(model, profile, **{**options, key: "wrong"})
+    with pytest.raises(RuntimeError):
+        profiles.validate_native(model, replace(profile, template_sha256="wrong"), **options)
+    with pytest.raises(RuntimeError):
+        profiles.validate_native(model, replace(profile, enable_thinking=True), **options)
+    with pytest.raises(RuntimeError):
+        profiles.validate_native(model, replace(profile, render_hashes=(hashes[0], hashes[0])), **options)
+    with pytest.raises(RuntimeError):
+        profiles.validate_native(model, replace(profile, render_hashes=hashes[::-1]), **options)
+
+
+def test_native_profile_runtime_forwards_schema_and_sampling_without_python_binding(server, monkeypatch):
+    import builtins
+    model, _, _, _ = server
+    profile = profiles.NativeInvestigationProfile("test-native", .7, .8, 20, 0, "template",
+        backend="llama-server", model_sha256="sha", engine_commit="commit", render_hashes=("off", "on"))
+    monkeypatch.setattr(profiles, "resolve_profile", lambda name: profile)
+    monkeypatch.setattr(profiles, "validate_native", lambda *a, **kw: None)
+    original_import = builtins.__import__
+    def no_binding(name, *args, **kwargs):
+        if name.startswith("llama_cpp"):
+            raise ImportError("blocked")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", no_binding)
+    seen = {}
+    model.create_chat_completion = lambda **kw: seen.update(kw) or {"choices": [{"finish_reason": "stop"}]}
+    runtime = LLMRuntime()
+    runtime._model = model
+    runtime._load_report = {"engine_commit": "commit"}
+    monkeypatch.setattr(runtime, "current_model_sha256", lambda: "sha")
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    fmt = {"type": "json_object", "schema": schema}
+    async def exercise():
+        metadata = await runtime.validate_investigation_profile("test-native")
+        assert metadata["backend"] == "llama-server" and metadata["model_sha256"] == "sha"
+        await runtime.chat([{"role": "user", "content": "hi"}], generation_profile="test-native",
+                           response_format=fmt, seed=7)
+        with pytest.raises(ValueError):
+            await runtime.chat([{"role": "user", "content": "hi"}], generation_profile="test-native",
+                               response_format=fmt, tools=[{"type": "function"}])
+    asyncio.run(exercise())
+    assert seen["response_format"] == fmt
+    assert seen["chat_template_kwargs"] == {"enable_thinking": False}
+    assert seen["_potluck_investigation_completion"] is True
+    assert (seen["temperature"], seen["top_p"], seen["top_k"], seen["min_p"],
+            seen["repeat_penalty"], seen["seed"]) == (.7, .8, 20, 0, 1.0, 7)
+
+
+def test_cancelled_native_profile_preflight_drains_before_unlock(server, monkeypatch):
+    model, _, _, _ = server
+    profile = profiles.NativeInvestigationProfile("test-native", .7, .8, 20, 0, "template",
+        backend="llama-server", model_sha256="sha", engine_commit="commit", render_hashes=("off", "on"))
+    monkeypatch.setattr(profiles, "resolve_profile", lambda name: profile)
+    started, release = threading.Event(), threading.Event()
+    def validate(*args, **kwargs):
+        started.set()
+        assert release.wait(2)
+    monkeypatch.setattr(profiles, "validate_native", validate)
+    runtime = LLMRuntime()
+    runtime._model = model
+    monkeypatch.setattr(runtime, "current_model_sha256", lambda: "sha")
+    async def exercise():
+        task = asyncio.create_task(runtime.validate_investigation_profile("test-native"))
+        assert await asyncio.to_thread(started.wait, 1)
+        task.cancel()
+        await asyncio.sleep(.01)
+        assert runtime._inference_lock.locked() and not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not runtime._inference_lock.locked()
+    asyncio.run(exercise())
+
+
+def test_python_profile_is_rejected_on_native_without_import(server, monkeypatch):
+    model, _, _, _ = server
+    runtime = LLMRuntime()
+    runtime._model = model
+    monkeypatch.setattr(profiles, "stock_handler", lambda *a: pytest.fail("Python handler called"))
+    async def exercise():
+        with pytest.raises(ValueError, match="Python backend"):
+            await runtime.validate_investigation_profile(profiles.QWEN3_NON_THINKING)
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("change", ["capability", "render", "calls"])
@@ -261,4 +394,141 @@ def test_native_token_count_keeps_event_loop_live_and_drains_on_cancel(server, c
             assert not runtime._admission_lock.locked()
         finally:
             release.set()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("stream,kind,category", [
+    (False, "timeout", "timeout"), (True, "timeout", "timeout"),
+    (False, "connection", "connection"), (True, "connection", "connection"),
+    (False, "protocol", "transport"),
+    (False, "http", "http"), (True, "http", "http"),
+    (False, "format", "format"), (True, "format", "format"),
+    (False, "unexpected", "unknown"),
+])
+def test_native_failure_category_is_safe_and_preserves_public_error(monkeypatch, stream, kind, category):
+    secret = "private prompt and host: secret.example"
+    client = httpx.Client
+    def handle(request):
+        if kind == "timeout":
+            raise httpx.ReadTimeout(secret, request=request)
+        if kind == "connection":
+            raise httpx.ConnectError(secret, request=request)
+        if kind == "protocol":
+            raise httpx.RemoteProtocolError(secret, request=request)
+        if kind == "http":
+            return httpx.Response(503, text=secret)
+        if kind == "unexpected":
+            raise RuntimeError(secret)
+        return httpx.Response(200, content=(b"data: not-json\n\n" if stream else b"not-json"))
+    monkeypatch.setattr(ns.httpx, "Client", lambda **kw: client(transport=httpx.MockTransport(handle), **kw))
+    model = ns.LocalServerModel(Process(), 19999, "key")
+    try:
+        with pytest.raises(ns.SplitError) as caught:
+            result = model.create_chat_completion(messages=[{"role": "user", "content": secret}], stream=stream)
+            if stream:
+                list(result)
+        error = caught.value
+        assert error.failure_category == category
+        assert error.code == "native_inference_failed" and error.status == 502
+        assert str(error) == "The native local engine could not complete the request. Reload the model and retry."
+        assert secret not in str(error) and secret not in error.failure_category
+    finally:
+        model.close()
+
+
+def test_native_cancelled_has_fixed_category():
+    error = ns.LocalServerModel._cancelled()
+    assert (error.code, error.status, error.failure_category) == ("native_cancelled", 499, "cancelled")
+
+
+@pytest.mark.parametrize("chunk", [
+    {"choices": {}}, {"choices": [None]}, {"choices": [{"delta": "bad"}]},
+    {"choices": [{"message": []}]}, {"choices": [{"delta": {"content": [1]}}]},
+    {"choices": [{"message": {"content": 42}}]},
+])
+def test_native_stream_malformed_choices_are_format_errors(monkeypatch, chunk):
+    client = httpx.Client
+    data = ("data: " + json.dumps(chunk) + "\n\n").encode()
+    monkeypatch.setattr(ns.httpx, "Client", lambda **kw: client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, content=data)), **kw))
+    model = ns.LocalServerModel(Process(), 19999, "key")
+    try:
+        with pytest.raises(ns.SplitError) as caught:
+            list(model.create_chat_completion(messages=[{"role": "user", "content": "hi"}], stream=True))
+        assert caught.value.failure_category == "format"
+    finally:
+        model.close()
+
+
+def test_native_stream_accepts_empty_usage_chunk(monkeypatch):
+    client = httpx.Client
+    data = b'data: {"choices": [], "usage": {"total_tokens": 1}}\n\ndata: {"choices": [{"delta": {}, "finish_reason": "stop"}]}\n\ndata: [DONE]\n\n'
+    monkeypatch.setattr(ns.httpx, "Client", lambda **kw: client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, content=data)), **kw))
+    model = ns.LocalServerModel(Process(), 19999, "key")
+    try:
+        assert len(list(model.create_chat_completion(messages=[{"role": "user", "content": "hi"}], stream=True))) == 2
+    finally:
+        model.close()
+
+
+def test_split_error_category_rejects_untrusted_values():
+    error = ns.SplitError("message", failure_category="private host or prompt")
+    assert error.failure_category == "unknown"
+    error.failure_category = {"private": "payload"}
+    assert error.failure_category == "unknown"
+    error.failure_category = None
+    assert error.failure_category is None
+
+
+def test_native_budget_uses_prepared_tokens_and_closes_ticket(server, monkeypatch):
+    model, _, _, _ = server
+    tickets = []
+    class Ticket:
+        closed = False
+        def close(self): self.closed = True
+    def prepare(self, request, body, *, force_completion=False):
+        assert force_completion and '_potluck_input_token_limit' not in body
+        ticket=Ticket(); tickets.append(ticket)
+        return '/completion', {'prompt': [1, 2, 3, 4]}, ticket
+    monkeypatch.setattr(ns.SplitModel, '_prepare', prepare)
+    fmt={'type': 'json_object', 'schema': {'type': 'object'}}
+    assert model.measure_investigation_prompt([{'role': 'user', 'content': 'hi'}], fmt) == 4
+    assert tickets[-1].closed
+    with pytest.raises(ns.SplitError, match='exceeds'):
+        model._prepare(None, {'messages': [], 'response_format': fmt, '_potluck_investigation_completion': True,
+                              '_potluck_input_token_limit': 3})
+    assert tickets[-1].closed
+
+
+def test_runtime_measurement_identity_context_and_drain(server, monkeypatch):
+    model, _, _, _ = server
+    profile=profiles.NativeInvestigationProfile('test-native', .7, .8, 20, 0, 'template',
+        backend='llama-server', model_sha256='sha', engine_commit='commit', render_hashes=('off', 'on'))
+    monkeypatch.setattr(profiles, 'resolve_profile', lambda name: profile)
+    monkeypatch.setattr(profiles, 'validate_native', lambda *a, **kw: None)
+    runtime=LLMRuntime(); runtime._model=model; runtime._model_id='model'; runtime._loaded_n_ctx=8192
+    monkeypatch.setattr(runtime, 'current_model_sha256', lambda: 'sha')
+    fmt={'type': 'json_object', 'schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}}
+    seen=[]
+    model.measure_investigation_prompt=lambda messages, response_format: seen.append((messages, response_format)) or 400
+    model.create_chat_completion=lambda **kw: {'choices': [{'finish_reason': 'stop'}]}
+    args=dict(expected_model='model', expected_sha256='sha', generation_profile='test-native', response_format=fmt)
+    async def run():
+        measured=await runtime.measure_investigation_prompt([{'role': 'user', 'content': 'hi'}], **args)
+        assert measured == {'input_tokens': 400, 'context_tokens': 8192} and len(seen)==1
+        with pytest.raises(ModelIdentityError):
+            await runtime.measure_investigation_prompt([], **{**args, 'expected_model': 'other'})
+        with pytest.raises(ValueError, match='context changed'):
+            await runtime.chat([], **args, expected_context_tokens=4096)
+        entered=threading.Event(); release=threading.Event()
+        def blocked(*a): entered.set(); release.wait(2); return 400
+        model.measure_investigation_prompt=blocked
+        task=asyncio.create_task(runtime.measure_investigation_prompt([], **args))
+        await asyncio.to_thread(entered.wait, 1)
+        task.cancel(); await asyncio.sleep(.01)
+        assert runtime._admission_lock.locked() and runtime._inference_lock.locked()
+        release.set()
+        with pytest.raises(asyncio.CancelledError): await task
+        assert not runtime._admission_lock.locked() and not runtime._inference_lock.locked()
     asyncio.run(run())

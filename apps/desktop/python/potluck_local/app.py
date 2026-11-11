@@ -25,6 +25,7 @@ from potluck_local import __version__
 from potluck_local.routers import account, agents, anthropic, batches, chat, chat_circle, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, responses, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 from potluck_local.routers import split
+from potluck_local.routers import investigations, company_brain_pilot
 from potluck_local.services import anthropic_messages, peer_trust, responses_api
 from potluck_local.services.split_native import SplitError
 
@@ -508,6 +509,8 @@ def create_app() -> FastAPI:
     app.include_router(hardware.router, prefix="/hardware", tags=["hardware"])
     app.include_router(memory.router, prefix="/memory", tags=["memory"])
     app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+    app.include_router(investigations.router)
+    app.include_router(company_brain_pilot.router)
     app.include_router(agents.router, prefix="/agents", tags=["agents"])
     app.include_router(usage.router, prefix="/usage", tags=["usage"])
     app.include_router(vault.router, prefix="/vault", tags=["vault"])

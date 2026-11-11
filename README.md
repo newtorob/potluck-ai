@@ -20,6 +20,8 @@
 
 ## Guided tour
 
+Company Brain reviewed-pilot progress and its limits are recorded in the [local evaluation milestone summary](bench/results/company-brain-milestones-20261111/README.md). The explicit pilot guide covers [reviewed knowledge, cited answers and readable exports](docs/company-brain-pilot.md).
+
 Every chat shows where it will run, and you can change it before you send.
 
 ![The chat routing selector showing Local only, My machines, Trusted circle and Cooperative network](docs/images/getting-started/06-chat-scopes.png)
@@ -178,3 +180,23 @@ Potluck builds on work from the open-source community:
 - [Tailscale](https://tailscale.com/)'s DERP, which the relay is modeled on
 - [LongMemEval](https://github.com/xiaowu0162/LongMemEval) for the retrieval benchmark data
 - The [Model Context Protocol](https://modelcontextprotocol.io/) for agent integration
+
+Internal investigation prototype: `fixed-part-selection-v7` keeps the two bounded source-selection calls and independently reviews the full catalog without first-proposal IDs. Both raw replies and exact input receipts remain replay-bound; this is unqualified and leaves defaults unchanged.
+
+Internal `fixed-part-selection-v8` adds a bounded provisional evidence check to each independent review part. Checks are replay-bound untrusted metadata and excluded from source-backed answers and presentation parts; exact evidence and semantic qualification remain required.
+
+Internal `fixed-part-selection-v9` adds an advisory list of IDs for quantified source statements to the independent review payload. It does not infer applicability, select evidence, add dependencies or certify completeness; the same source, budget and review gates apply.
+
+Experimental `fixed-part-selection-v10` adds exact-source request-wide context independent of part verdicts, and shorter provenance-only evidence checks. It remains opt-in and unqualified; defaults are unchanged.
+
+Experimental `fixed-part-selection-v11` classifies every source unit in a fallible applicability inventory before final review. Inventory metadata is not selected answer evidence; existing source/render/output limits and opt-in status remain.
+
+Experimental `fixed-part-selection-v12` encodes review roles once per source unit across fixed question parts, retaining exact-source rendering and existing limits. Applicability remains fallible; the mode is unqualified and opt-in.
+
+Experimental `fixed-part-selection-v13` assigns per-part exact-source groups. It is opt-in and unqualified.
+
+Experimental `fixed-part-selection-v25` uses one bounded review call with generic guidance to select minimal sufficient source text, preserving exact source ranges, dependency closure and explicit unknown/conflict scope. It remains opt-in and unqualified, with unchanged defaults, profile, resources and output limits. The separate development fixture adds independently selectable literal table labels/cells through a primary-reviewed supplied plan; automatic table parsing and plan authoring remain outside this qualification. Earlier outputs and their scores remain preserved.
+
+Experimental `fixed-part-selection-v26` selects exact source units and writes concise per-part model drafts in one bounded call. The raw reply, selected passages, source ranges and dependency closure remain bound to correction/export provenance; application-generated citation numbers refer to the preserved units. Draft prose is unverified: mechanical source linkage establishes neither entailment nor completeness, and human assessment grades the answer itself. Scoped unknown wording and unresolved-conflict framing remain explicit. This opt-in candidate is unqualified, with unchanged defaults/resources/caps and all earlier modes preserved.
+
+Experimental `fixed-part-selection-v27` displays exact selected evidence, transitive declared dependencies and request-wide safeguards. Optional background remains bound in provenance and source excerpts for inspection; it cannot fulfill a requested fact or hide a declared prerequisite. This is an explicit new role contract, with no generated answer prose or checks. Relevance, background classification and dependency-plan completeness still require human review. The mode remains opt-in and unqualified, with unchanged defaults/profile/resources/caps and all older modes preserved.

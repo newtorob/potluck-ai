@@ -317,6 +317,16 @@ completion. Declining an edit, write or command stops the task incomplete;
 give a follow-up instruction to continue with a different approach.
 After four consecutive verification failures the task stops incomplete, before
 further unverified edits; the fixed verify command and existing limits still apply.
+Use `--read-only` with an interactive or one-shot coding agent to allow only
+searches and reads. An attempted edit, write, or command stops the task as
+incomplete without asking for approval, including with `--yes`. Automatic
+verification commands, `/verify`, and `/snapshot` are disabled in this mode;
+`--verify` cannot be combined with it. Session saving is a separate explicit
+option and can still write session data.
+
+If a stream closes before its completion marker, the CLI reports that it was
+incomplete and includes a known unsuccessful finish reason when available. No
+action from that response is executed.
 
 One-shot agent runs (`-p`) exit with status 1 when they exhaust the step limit,
 stop after repeated tool failures, have an unresolved failed file change or a
@@ -1130,3 +1140,26 @@ See [architecture and recovery semantics](../../docs/architecture/household-batc
 Run `potluck models available` (or add `--json`) to see models currently loaded on your own responding machines, exact model hashes, idle serving-machine counts, and compatible split workers. In a project, the report checks `potluck.lock`; the same model name with different bytes does not satisfy a pin.
 
 Discovery does not enable sharing or change request scope. Choose `--scope mine` explicitly for owned-machine inference. For a split, enable workers on their computers, pin the installed model on the head, then preview with `potluck split plan <pinned-model> --peer <owned-machine>`. Start remains a separate explicit command. `potluck split status` reports elapsed time, loading phase, and transferred bytes; remote placement is verified before the model becomes ready.
+
+### Shared context and queued agent work
+
+The opt-in developer harness runs bounded read-only assignments through the
+existing CLI agent. A reviewed project brain supplies direction, priorities and
+constraints; each job receives only its selected source files. Prepare up to 64
+jobs with `npm run agents -- prepare PLAN HUB`, then inspect or run that batch.
+Concurrency defaults to one, results require primary review, and interrupted
+work is preserved without automatic retries. Use an explicitly owned local
+test runtime; the harness does not change the normal gateway or load models.
+See [setup, context freshness and recovery](../../docs/potluck-agent-harness.md).
+
+For small self-contained reviews, plan v2 offers explicit context-handoff,
+evidence-review and test-design roles with all selected evidence supplied in
+one request. These roles reject tools and require a bounded, quoted JSON result;
+format validation still requires primary factual review. See the harness guide.
+
+Typed Company Brain reviews can use the opt-in resumable `potluck-agent-plan-v4`
+harness with an explicitly configured local Python domain bridge. It persists raw
+model output separately from validated source-bound findings; validation can resume
+without rerunning inference. Every result still requires human/primary review.
+See [`docs/potluck-agent-harness.md`](../../docs/potluck-agent-harness.md) for the
+fixed source names, implementation identity checks, limits and environment setup.

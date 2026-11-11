@@ -1,0 +1,63 @@
+{
+  "qualification_v191": {
+    "known_historical_documents": 6,
+    "factual_passes": 69,
+    "presentation_passes": 69,
+    "joint_diagnostics_passed": 2,
+    "native_answer_calls": 138,
+    "diagnostic_calls": 2,
+    "retries": 0,
+    "review": "primary AI, unblinded; known-source/fixed-plan scope",
+    "archive_manifest_sha256": "203c130b55d7cffa1c54260ce52040106dafc63cbbbb810c756da0e09c206d46"
+  },
+  "native_pilot_v195": {
+    "questions": 1,
+    "answers_before_after_identical_content_revision": 2,
+    "factual_passes": 2,
+    "presentation_passes": 2,
+    "answer_calls": 4,
+    "local_cli_agent_calls": 1,
+    "cli_new_findings_credited": 0,
+    "generation_retries": 0,
+    "watchdog_seconds": 196.270667644,
+    "cleanup_verified": true,
+    "review_export_and_disposable_copy_source_invalidation_passed": true,
+    "archive_manifest_sha256": "b6fc60da140bd7ac5c725a563fd2f504f732a9ca9d89f792b8c39cd2f1e4e4dc"
+  },
+  "readable_projection": {
+    "native_calls": 0,
+    "pilot_visible_repeated_introductions_before": 3,
+    "pilot_visible_repeated_introductions_after": 1,
+    "source_table_labels": 5,
+    "consumed_qualification_originals_preserved": 69,
+    "derived_views": 45,
+    "safe_original_fallbacks": 24,
+    "stored_answer_or_prompt_changes": false
+  },
+  "validation": {
+    "python_passed": 9329,
+    "python_skipped": 5,
+    "existing_dependency_warning": 1,
+    "python_seconds": 796.37,
+    "frontend_unit_tests": 540,
+    "cli_unit_tests": 1351,
+    "landing_unit_tests": 44,
+    "typechecks_and_privacy_lint": true,
+    "frontend_production_build": true,
+    "browser_widths": [
+      800,
+      1152
+    ],
+    "publication_tests_collect": 9334,
+    "publication_focused_frontend_tests": 11
+  },
+  "limits": [
+    "Known historical internal Markdown sources; not unseen-company qualification.",
+    "Fixed supplied question/source plans for qualification; whole-statement fallback in native pilot.",
+    "Owner-reviewed bounded output does not establish enterprise role authorization or production readiness.",
+    "The CLI job echoed supplied requirements; valid JSON earned no independent findings or quality credit.",
+    "Raw company documents, replies, local databases and full run archives are retained locally, not redistributed.",
+    "Public summary is not independently reproducible without private source data; synthetic fixtures and unit tests are included.",
+    "The earlier wrapper launch failed before model loading/inference; failure evidence and older scores are preserved."
+  ]
+}

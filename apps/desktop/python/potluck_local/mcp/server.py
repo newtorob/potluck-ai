@@ -232,8 +232,13 @@ def _wrap_tool_fn(
         finally:
             duration_ms = int((time.monotonic() - start) * 1000)
             # Collect args for summarization from kwargs (FastMCP passes by kwarg)
-            all_args: dict[str, Any] = dict(kwargs)
-            memory_ids = _extract_memory_ids(tool_name, all_args, captured_result)
+            all_args: dict[str, Any] = (
+                {} if tool_name in {"evidence_search", "evidence_resolve"} else dict(kwargs)
+            )
+            memory_ids = (
+                None if tool_name in {"evidence_search", "evidence_resolve"}
+                else _extract_memory_ids(tool_name, all_args, captured_result)
+            )
             if session_id is not None:
                 asyncio.create_task(
                     observer.log_tool_call(
@@ -537,6 +542,12 @@ def _build_mcp(host: str = _LOOPBACK, port: int = _DEFAULT_TCP_PORT) -> FastMCP:
     register_memory_tools(mcp)
     register_task_tools(mcp)
     register_session_tools(mcp)
+    # Scope is fixed for the lifetime of this server.
+    from potluck_local.mcp.tools.evidence import configured_scope, register_evidence_tools
+
+    scope = configured_scope()
+    if scope is not None:
+        register_evidence_tools(mcp, scope)
     return mcp
 
 

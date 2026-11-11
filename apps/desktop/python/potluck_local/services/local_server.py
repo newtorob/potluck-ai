@@ -5,6 +5,7 @@ pass through the runtime's admission, identity and gateway policy checks.
 """
 from __future__ import annotations
 
+import hashlib
 import secrets
 import sys
 import threading
@@ -15,7 +16,7 @@ import httpx
 
 from potluck_local.services import prompt_guard
 from potluck_local.services.model_traits import TemplateTraits
-from potluck_local.services.split_native import NativeProcess, SplitError, SplitModel, binary, engine_bundle, free_port
+from potluck_local.services.split_native import NativeProcess, SplitError, SplitModel, _SplitRequest, binary, engine_bundle, free_port
 
 LOAD_TIMEOUT = 180.0
 HEARTBEAT_INTERVAL = 5.0
@@ -42,11 +43,46 @@ class LocalServerModel(SplitModel):
     managed_split = False
     managed_native = True
 
+    def _prepare(self, request, body):
+        # Chat transport feeds the assistant thinking prefix into the output grammar;
+        # the verified profile uses the guarded completion path instead.
+        force = body.pop("_potluck_investigation_completion", False)
+        input_limit = body.pop("_potluck_input_token_limit", None)
+        if input_limit is not None and (force is not True or type(input_limit) is not int or input_limit < 1):
+            raise SplitError("Invalid native input budget.", 400)
+        if force:
+            response_format = body.get("response_format")
+            if (force is not True or body.get("stream") or body.get("tools")
+                    or body.get("tool_choice") is not None
+                    or not isinstance(response_format, dict)
+                    or set(response_format) != {"type", "schema"}
+                    or response_format.get("type") != "json_object"
+                    or not isinstance(response_format.get("schema"), dict)):
+                raise SplitError("Invalid native investigation request.", 400)
+        endpoint, prepared, ticket = super()._prepare(request, body, force_completion=force is True)
+        if input_limit is not None and len(prepared['prompt']) > input_limit:
+            ticket.close()
+            raise SplitError("Native investigation input exceeds its measured budget.", 400)
+        return endpoint, prepared, ticket
+
+    def measure_investigation_prompt(self, messages, response_format):
+        """Count the exact guarded native template without dispatching generation."""
+        _, prepared, ticket = self._prepare(_SplitRequest(threading.Event()), {
+            'messages': messages, 'response_format': response_format, 'stream': False,
+            'chat_template_kwargs': {'enable_thinking': False},
+            '_potluck_investigation_completion': True,
+        })
+        try:
+            return len(prepared['prompt'])
+        finally:
+            ticket.close()
+
     def __init__(self, process, port, key, protected_tokens=None):
         self._stopped = threading.Event()
         # protected_tokens feeds prompt_guard, as it does for the managed split path.
         super().__init__(process, port, key, self._stopped.set, protected_tokens)
         self.template_traits = TemplateTraits()
+        self.investigation_template_sha256 = None
         self._monitor = threading.Thread(target=self._watch, daemon=True)
         self._monitor.start()
 
@@ -66,7 +102,7 @@ class LocalServerModel(SplitModel):
 
     @staticmethod
     def _cancelled():
-        return SplitError("Native inference was cancelled.", 499, code="native_cancelled")
+        return SplitError("Native inference was cancelled.", 499, code="native_cancelled", failure_category="cancelled")
 
     def initialize(self, context: int):
         """Require the engine's effective context and probe its own renderer.
@@ -103,6 +139,10 @@ class LocalServerModel(SplitModel):
             opens = prompt.rstrip().endswith("<think>")
             # Preserve raw reasoning for the gateway's per-request formatting policy.
             template = props.get("chat_template", "")
+            self.investigation_template_sha256 = (
+                hashlib.sha256(template.encode()).hexdigest()
+                if isinstance(template, str) and template else None
+            )
             self.template_traits = TemplateTraits(
                 supports_tools=supports, opens_reasoning=opens,
                 thinks=opens or isinstance(template, str) and "enable_thinking" in template,

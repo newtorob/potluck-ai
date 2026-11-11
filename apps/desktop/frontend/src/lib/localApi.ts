@@ -1,3 +1,5 @@
+import type { PilotClaim, PilotEvidence } from '@/types/companyBrainPilot';
+import type { Brief, CalculationPreview, CalculationReviewInput, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
  *
@@ -765,7 +767,108 @@ export interface UsageRecordInput {
 // API surface
 // ---------------------------------------------------------------------------
 
+function investigationQuery(scope: InvestigationScope): string {
+  const query = new URLSearchParams({ workspace: scope.workspace });
+  scope.collection_ids.forEach((id) => query.append('collection_ids', id));
+  return query.toString();
+}
+
 export const localApi = {
+  registerPilotCollection(input: { workspace: string; name: string; folder: string; scan_confirmed: true }): Promise<{ collection_id: string }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/collections`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<{ collection_id: string }>);
+  },
+  scanPilotCollection(id: string, input: { workspace: string; scan_confirmed: true }): Promise<{ files_scanned: number; chunks_inserted: number }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/collections/${encodeURIComponent(id)}/scan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 120_000).then(handleResponse<{ files_scanned: number; chunks_inserted: number }>);
+  },
+  pilotEvidence(input: InvestigationScope & { query: string }): Promise<PilotEvidence> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/evidence`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<PilotEvidence>);
+  },
+  pilotClaims(input: InvestigationScope & { status: PilotClaim['status'] }): Promise<{ claims: PilotClaim[]; truncated: boolean }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claims/list`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<{ claims: PilotClaim[]; truncated: boolean }>);
+  },
+  proposePilotClaim(input: InvestigationScope & { claim_key: string; content: string; citation_ids: string[] }): Promise<{ claim_id: string }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claims`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<{ claim_id: string }>);
+  },
+  approvePilotClaim(id: string, input: InvestigationScope & { reviewer: string; reason: string }): Promise<{ ok: boolean }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claims/${encodeURIComponent(id)}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<{ ok: boolean }>);
+  },
+  supersedePilotClaim(id: string, input: InvestigationScope & { replacement_id: string; reviewer: string; reason: string }): Promise<{ ok: boolean }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claims/${encodeURIComponent(id)}/supersede`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<{ ok: boolean }>);
+  },
+  askPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; focused_passages?: true }): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/ask`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 360_000).then(handleResponse<Investigation>);
+  },
+
+  sourceCollections(workspace: string): Promise<{ collections: SourceCollection[] }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/collections?${new URLSearchParams({ workspace })}`)
+      .then(handleResponse<{ collections: SourceCollection[] }>);
+  },
+  investigations(scope: InvestigationScope): Promise<{ investigations: Investigation[] }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations?${investigationQuery(scope)}`)
+      .then(handleResponse<{ investigations: Investigation[] }>);
+  },
+  investigation(id: string, scope: InvestigationScope): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}?${investigationQuery(scope)}`)
+      .then(handleResponse<Investigation>);
+  },
+  planInvestigation(input: InvestigationScope & { issue: string; model_slug: string; generation_profile?: string }): Promise<{ operations: ReviewedOperation[]; model_slug: string; model_sha256: string; generation_profile: Record<string, unknown> | null; notices: string[] }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/plan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 360_000).then(handleResponse<{ operations: ReviewedOperation[]; model_slug: string; model_sha256: string; generation_profile: Record<string, unknown> | null; notices: string[] }>);
+  },
+  createInvestigation(input: InvestigationScope & { issue: string; query: string; model_slug: string; answer_each_question?: boolean; questions?: string[]; generation_profile?: string; reviewed_operations?: ReviewedOperation[]; plan_confirmed?: boolean }): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 360_000).then(handleResponse<Investigation>);
+  },
+  previewCalculationReview(id: string, input: InvestigationScope & { calculation_reviews: CalculationReviewInput[] }): Promise<CalculationPreview> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/calculation-preview`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<CalculationPreview>);
+  },
+  reviewInvestigation(id: string, input: InvestigationScope & { decision: string; reviewer: string; reason: string; corrected_brief?: Brief; calculation_reviews?: CalculationReviewInput[] }): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/review`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<Investigation>);
+  },
+  recordInvestigationOutcome(id: string, input: InvestigationScope & { reviewer: string; result: string; notes: string }): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/outcome`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<Investigation>);
+  },
+  exportInvestigation(id: string, scope: InvestigationScope): Promise<{ markdown: string }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/export?${investigationQuery(scope)}`)
+      .then(handleResponse<{ markdown: string }>);
+  },
+  evaluationCase(id: string, scope: InvestigationScope): Promise<Record<string, unknown>> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/evaluation-case`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...scope, owner_confirmed: true }),
+    }).then(handleResponse<Record<string, unknown>>);
+  },
+  knowledgeProposal(id: string, scope: InvestigationScope, claim_key: string, content: string,
+    citation_ids: string[]): Promise<{ claim_id: string; status: string }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/knowledge-proposal`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...scope, owner_confirmed: true, claim_key, content, citation_ids }),
+    }).then(handleResponse<{ claim_id: string; status: string }>);
+  },
   modelAvailability(signal?: AbortSignal): Promise<ModelAvailability> {
     return timedFetch(`${LOCAL_BASE}/models/available`, signal ? { signal } : {}).then(handleResponse<ModelAvailability>);
   },

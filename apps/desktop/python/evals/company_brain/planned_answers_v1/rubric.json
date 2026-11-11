@@ -1,0 +1,69 @@
+{
+  "readiness_scoring": "For each case, mark ready only when every required criterion is met and no forbidden criterion occurs. Required factual claims must cite an attached supporting filename listed by the criterion; an unsupported or wrong-file citation fails that criterion. Score each case independently and report the number ready out of six.",
+  "cases": {
+    "harbor": {
+      "required": [
+        "Identify CSV exports of completed orders and paid workspace administrators, supported by harbor_guide.md.",
+        "State five active schedules, at most daily cadence, and exclusion of pending and cancelled orders, supported by harbor_limits.md.",
+        "Identify weekly/monthly cadence and optional cancelled orders as planned, not shipped, supported by harbor_roadmap.md.",
+        "Identify the requested schedule API as undecided and unscheduled, supported by harbor_roadmap.md."
+      ],
+      "forbidden": [
+        "Claim planned items have shipped or the API is approved."
+      ]
+    },
+    "orchard": {
+      "required": [
+        "Describe accounts payable coordinator receipt, checks, ledger entry and routing, supported by orchard_receipt.md.",
+        "Describe budget owner checks, approval and mismatch investigation, supported by orchard_approval.md.",
+        "Describe treasury specialist Thursday payment run, fourteen-day eligibility, payment and reference, supported by orchard_payment.md."
+      ],
+      "forbidden": [
+        "Claim all approved invoices are paid on the next Thursday regardless of due date."
+      ]
+    },
+    "lumen": {
+      "required": [
+        "State the four consecutive hour production outage threshold, paid workspace, exclusions, ten percent amount and thirty-day request window, supported by lumen_policy.md.",
+        "Describe portal request and support verification and decision, supported by lumen_process.md.",
+        "Describe next invoice application, invoice adjustment tracking, no cash payout and carryforward, supported by lumen_billing.md."
+      ],
+      "forbidden": [
+        "Treat planned maintenance or solely customer-caused outages as eligible."
+      ]
+    },
+    "cedar": {
+      "required": [
+        "Report conflicting October 18 and October 25 targets without choosing a launch date, citing cedar_product_update.md and cedar_operations_update.md.",
+        "Identify Mira Chen as launch readiness coordinator, supported by cedar_product_update.md or cedar_operations_update.md.",
+        "Identify open support case viewing and contact detail updates as first release scope, supported by cedar_launch_note.md.",
+        "Do not assert a customer launch has occurred; employee preview is distinct, supported by cedar_launch_note.md."
+      ],
+      "forbidden": [
+        "Resolve the conflicting dates without evidence.",
+        "Claim invoice downloads or payment history are approved for first release."
+      ]
+    },
+    "maple": {
+      "required": [
+        "Say customer retention rate cannot be determined from the provided documents, citing maple_snapshot.md and maple_process.md.",
+        "Report twelve expiring contracts, eight renewed, two not renewed and two unresolved, supported by maple_pipeline.md.",
+        "Explain that contracts are not necessarily distinct customers, supported by maple_pipeline.md or maple_snapshot.md."
+      ],
+      "forbidden": [
+        "Present eight divided by twelve as the enterprise customer retention rate.",
+        "Treat unresolved negotiations as definitively lost."
+      ]
+    },
+    "quartz": {
+      "required": [
+        "State the average fell from 20 to 15 calendar days, a decrease of 5 days and 25 percent relative to the first period, supported by quartz_first.md and quartz_second.md.",
+        "Explain that the measure is elapsed calendar days from signed agreement to completed setup for completed cohorts, supported by quartz_first.md and quartz_second.md.",
+        "Avoid claiming a cause from this comparison, supported by quartz_context.md."
+      ],
+      "forbidden": [
+        "Reverse the direction or use 15 as the percentage denominator."
+      ]
+    }
+  }
+}

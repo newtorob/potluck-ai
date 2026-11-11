@@ -155,3 +155,26 @@ it("refreshes each REPL task and /clear, and a refresh error cannot continue wit
     child.stdin.write("/exit\n"); await exited;
   } finally { if (child.exitCode === null) { child.kill("SIGTERM"); await exited; } }
 }, 20_000);
+
+it("identifies read-only mode and suppresses an inherited verify command in the REPL banner", async () => {
+  const env = { ...await gateway(), POTLUCK_VERIFY: "secret-verify-command" };
+  await writeFile(join(data, "cli.json"), JSON.stringify({ model: "fixture", scope: "local" }));
+  const preload = join(directory, "tty-read-only.mjs");
+  await writeFile(preload, 'Object.defineProperty(process.stdin, "isTTY", { value: true });\n');
+  const child = spawn(process.execPath, ["--import", preload, entry, "--read-only", "-m", "fixture", "--scope", "local"], { cwd: project, env });
+  let output = "";
+  const exited = new Promise<void>(resolve => child.on("exit", () => resolve()));
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("REPL prompt missing")), 5000);
+      child.stdout.on("data", chunk => {
+        output += String(chunk);
+        if (output.includes("you ▸ ")) { clearTimeout(timer); resolve(); }
+      });
+    });
+    expect(output).toContain("read-only · verify: off");
+    expect(output).not.toContain("secret-verify-command");
+    child.stdin.write("/exit\n");
+    await exited;
+  } finally { if (child.exitCode === null) { child.kill("SIGTERM"); await exited; } }
+}, 10_000);

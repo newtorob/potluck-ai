@@ -14,6 +14,7 @@ import pytest
 
 from potluck_local.services import gateway_reply, prompt_guard
 from potluck_local.services import split_native as sn
+from potluck_local.services.local_server import LocalServerModel
 
 START, END, BOS = 1, 2, 0
 SPECIAL = {"<|im_start|>": START, "<|im_end|>": END}
@@ -134,6 +135,143 @@ def test_clean_request_uses_the_chat_endpoint_unchanged(monkeypatch):
     assert engine.requests[0][1] == {**kwargs, "cache_prompt": True}
     assert result["choices"][0]["message"]["content"] == "Hello there"
     assert result["object"] == "chat.completion"
+
+
+@pytest.mark.parametrize("content,guarded", [("hello", False), (INJECTED, True)])
+def test_native_profile_template_and_schema_reach_both_routes(monkeypatch, content, guarded):
+    model, engine, _ = build(monkeypatch)
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    sampling = {"temperature": .7, "top_p": .8, "top_k": 20, "min_p": 0, "repeat_penalty": 1.0}
+    switch = {"enable_thinking": False}
+    model.create_chat_completion(messages=[{"role": "user", "content": content}],
+        response_format={"type": "json_object", "schema": schema},
+        chat_template_kwargs=switch, **sampling)
+    if guarded:
+        assert engine.body("/apply-template")["chat_template_kwargs"] == switch
+        completion = engine.body("/v1/completions")
+        assert completion["json_schema"] == schema
+    else:
+        completion = engine.body("/v1/chat/completions")
+        assert completion["chat_template_kwargs"] == switch
+        assert completion["response_format"]["schema"] == schema
+    assert all(completion[k] == v for k, v in sampling.items())
+
+
+@pytest.mark.parametrize("content", ["hello", INJECTED])
+def test_schema_rejection_does_not_retry_with_generic_json(monkeypatch, content):
+    def fail_completion(engine):
+        def handle(request):
+            if request.url.path in ("/v1/completions", "/v1/chat/completions"):
+                engine.requests.append((request.url.path, json.loads(request.content)))
+                return httpx.Response(400, json={"error": "invalid schema"})
+            return engine(request)
+        return handle
+    model, engine, _ = build(monkeypatch, wrap=fail_completion)
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    with pytest.raises(sn.SplitError):
+        model.create_chat_completion(messages=[{"role": "user", "content": content}],
+            response_format={"type": "json_object", "schema": schema},
+            chat_template_kwargs={"enable_thinking": False})
+    assert sum(p in ("/v1/completions", "/v1/chat/completions") for p in engine.paths()) == 1
+
+
+def local_model(monkeypatch, *, protected=True, wrap=None):
+    engine = Engine('{"answer":"ok"}')
+    real_client = httpx.Client
+    monkeypatch.setattr(sn.httpx, "Client", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(wrap(engine) if wrap else engine), **kwargs))
+    process = Process()
+    model = object.__new__(LocalServerModel)
+    sn.SplitModel.__init__(model, process, 12345, "fixture-key", lambda: None,
+                           (lambda: list(SPECIAL)) if protected else None)
+    return model, engine, process
+
+
+@pytest.mark.parametrize("content", ["hello", INJECTED])
+def test_native_investigation_forces_guarded_completion(monkeypatch, content):
+    model, engine, _ = local_model(monkeypatch)
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    sampling = {"temperature": .7, "top_p": .8, "top_k": 20, "min_p": 0, "repeat_penalty": 1.0}
+    result = model.create_chat_completion(messages=[{"role": "user", "content": content}],
+        response_format={"type": "json_object", "schema": schema},
+        chat_template_kwargs={"enable_thinking": False}, _potluck_investigation_completion=True, **sampling)
+    assert engine.paths()[0] == "/apply-template" and engine.paths()[-1] == "/v1/completions"
+    assert engine.body("/apply-template")["chat_template_kwargs"] == {"enable_thinking": False}
+    completion = engine.body("/v1/completions")
+    assert completion["json_schema"] == schema and all(completion[k] == v for k, v in sampling.items())
+    assert all("_potluck_investigation_completion" not in body for _, body in engine.requests)
+    assert result["choices"][0]["message"]["content"] == '{"answer":"ok"}'
+    if content == INJECTED:
+        assert INJECTED in content_span(completion["prompt"])
+
+
+@pytest.mark.parametrize("missing", ["guard", "schema", "tools", "stream"])
+def test_native_investigation_fails_closed_before_completion(monkeypatch, missing):
+    model, engine, _ = local_model(monkeypatch, protected=missing != "guard")
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    kwargs = {"messages": [{"role": "user", "content": "hello"}],
+              "response_format": {"type": "json_object", "schema": schema},
+              "_potluck_investigation_completion": True}
+    if missing == "schema":
+        kwargs.pop("response_format")
+    elif missing == "tools":
+        kwargs["tools"] = TOOLS
+    elif missing == "stream":
+        kwargs["stream"] = True
+    with pytest.raises(sn.SplitError):
+        result = model.create_chat_completion(**kwargs)
+        if missing == "stream":
+            list(result)
+    assert not any(p in ("/v1/completions", "/v1/chat/completions") for p in engine.paths())
+
+
+def test_native_investigation_cancel_during_tokenization_sends_no_completion(monkeypatch):
+    model, engine, process = local_model(monkeypatch)
+    cancelled = threading.Event()
+    entered, release = threading.Event(), threading.Event()
+    def hold():
+        entered.set()
+        release.wait(5)
+    engine.on_tokenize = hold
+    errors = []
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    def run():
+        try:
+            model.create_chat_completion(messages=[{"role": "user", "content": "hello"}],
+                response_format={"type": "json_object", "schema": schema},
+                _potluck_investigation_completion=True, cancel_event=cancelled)
+        except sn.SplitError as exc:
+            errors.append(exc.code)
+    worker = threading.Thread(target=run)
+    worker.start()
+    assert entered.wait(5)
+    canceller = threading.Thread(target=model.cancel, args=(cancelled,))
+    canceller.start()
+    assert cancelled.wait(5)
+    release.set()
+    worker.join(10)
+    canceller.join(10)
+    assert not worker.is_alive() and not canceller.is_alive()
+    assert errors == ["native_cancelled"] and "/v1/completions" not in engine.paths()
+    assert process.closes == 0 and not model.closed and model._guard()._open == {}
+
+
+def test_native_investigation_schema_error_never_retries(monkeypatch):
+    def reject(engine):
+        def handle(request):
+            if request.url.path == "/v1/completions":
+                engine.requests.append((request.url.path, json.loads(request.content)))
+                return httpx.Response(400, json={"error": "schema rejected"})
+            return engine(request)
+        return handle
+    model, engine, _ = local_model(monkeypatch, wrap=reject)
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    with pytest.raises(sn.SplitError):
+        model.create_chat_completion(messages=[{"role": "user", "content": "hello"}],
+            response_format={"type": "json_object", "schema": schema},
+            _potluck_investigation_completion=True)
+    assert engine.paths().count("/v1/completions") == 1
+    assert "/v1/chat/completions" not in engine.paths()
 
 
 def test_clean_stream_and_tools_use_the_chat_endpoint_unchanged(monkeypatch):
@@ -435,3 +573,36 @@ def test_quoted_marker_text_in_a_tool_result_is_cut_in_two_before_the_server_tok
 def tc_auth():
     from potluck_local.services.tool_calls import AUTH
     return AUTH
+
+
+@pytest.mark.parametrize("target", ["/apply-template", "/tokenize", "/v1/completions"])
+def test_native_strict_completion_preserves_safe_timeout_category(monkeypatch, target):
+    def fail(engine):
+        def handle(request):
+            if request.url.path == target:
+                raise httpx.ReadTimeout("private prompt and host", request=request)
+            return engine(request)
+        return handle
+    model, _, _ = local_model(monkeypatch, wrap=fail)
+    schema = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    with pytest.raises(sn.SplitError) as caught:
+        model.create_chat_completion(messages=[{"role": "user", "content": "private prompt"}],
+            response_format={"type": "json_object", "schema": schema},
+            _potluck_investigation_completion=True)
+    assert caught.value.code == "native_inference_failed"
+    assert caught.value.failure_category == "timeout"
+    assert "private" not in str(caught.value)
+
+
+def test_native_cancel_takes_precedence_over_transport_timeout(monkeypatch):
+    cancelled = threading.Event()
+    def fail(engine):
+        def handle(request):
+            cancelled.set()
+            raise httpx.ReadTimeout("private data", request=request)
+        return handle
+    model, _, _ = local_model(monkeypatch, wrap=fail)
+    with pytest.raises(sn.SplitError) as caught:
+        model.create_chat_completion(messages=[{"role": "user", "content": "hello"}], cancel_event=cancelled)
+    assert caught.value.code == "native_cancelled"
+    assert caught.value.failure_category == "cancelled"

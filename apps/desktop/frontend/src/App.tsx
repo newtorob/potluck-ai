@@ -15,6 +15,7 @@ import { ModelLibrary } from '@/views/ModelLibrary';
 import { MemoryView } from '@/views/MemoryView';
 import { MemoryMapView } from '@/views/MemoryMapView';
 import { TaskStateView } from '@/views/TaskStateView';
+import { InvestigationsView } from '@/views/InvestigationsView';
 import { AgentsView } from '@/views/AgentsView';
 import { UsageView } from '@/views/UsageView';
 import { NetworkView } from '@/views/NetworkView';
@@ -265,6 +266,7 @@ export default function App() {
               <Route path="/memory" element={<MemoryView />} />
               <Route path="/memory/map" element={<MemoryMapView />} />
               <Route path="/tasks" element={<TaskStateView />} />
+              <Route path="/investigations" element={<InvestigationsView />} />
               <Route path="/agents" element={<AgentsView />} />
               <Route path="/usage" element={<UsageView />} />
               <Route path="/household" element={<AccountRequired feature="connect your machines"><HouseholdView /></AccountRequired>} />

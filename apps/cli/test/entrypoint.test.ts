@@ -138,3 +138,35 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
     } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
   },
 );
+
+it("enforces --read-only in the installed one-shot agent even with --yes", async () => {
+  await writeFile(join(dir, "f.txt"), "original");
+  let requests = 0;
+  let prompt = "";
+  const server = createServer(async (req, res) => {
+    if (req.url?.startsWith("/v1/potluck/context?")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ model: "test-model", scope: "local", context_window: 8192 })); return;
+    }
+    let body = ""; for await (const part of req) body += part;
+    requests++;
+    prompt = JSON.parse(body).messages[0].content;
+    const content = '```action\n{"tool":"edit_file","args":{"path":"f.txt","old_string":"original","new_string":"changed"}}\n```';
+    res.setHeader("Content-Type", "text/event-stream");
+    res.end(`data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const port = (server.address() as import("node:net").AddressInfo).port;
+    const result = await run(["-p", "Inspect", "-m", "test-model", "--scope", "local", "--read-only", "--yes"], {
+      POTLUCK_GATEWAY_KEY: "test", POTLUCK_GATEWAY_URL: `http://127.0.0.1:${port}/v1`,
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("unavailable in read-only mode");
+    expect(prompt).toContain("Read-only mode");
+    expect(prompt).not.toContain('run_command {');
+    expect(requests).toBe(1);
+    expect(await readFile(join(dir, "f.txt"), "utf8")).toBe("original");
+    expect((await run(["--help"])).stdout).toContain("--read-only");
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+});

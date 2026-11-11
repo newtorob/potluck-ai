@@ -1,0 +1,34 @@
+{
+  "provenance": "fixture_supplied; author-scripted, not owner accepted",
+  "description": "Frozen scripted operation plans for source-review qualification.",
+  "cases": {
+    "zero-baseline": [
+      {
+        "question_id": "Q1",
+        "request": "What was the percentage change in support tickets from Monday to Tuesday?",
+        "operation": "percent_change"
+      }
+    ],
+    "conflicting-capacity": [
+      {
+        "question_id": "Q1",
+        "request": "How has the number of available workshop seats changed since the prior count?",
+        "operation": "difference"
+      }
+    ],
+    "incomplete-share": [
+      {
+        "question_id": "Q1",
+        "request": "What percentage of the enrolled volunteers completed orientation?",
+        "operation": "percentage"
+      }
+    ],
+    "compound-count": [
+      {
+        "question_id": "Q1",
+        "request": "How many more customer visits did the north studio record than the south studio?",
+        "operation": "difference"
+      }
+    ]
+  }
+}

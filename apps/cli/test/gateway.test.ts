@@ -184,6 +184,17 @@ describe("streamChat successful coding completion", () => {
     await expect(consumeStream(strict)).rejects.toThrow("ended before completion");
   });
 
+  it("reports a known unsuccessful finish when the stream closes without DONE", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("length")])));
+    await expect(consumeStream(strict)).rejects.toThrow(/ended before completion.*model hit its output limit/);
+  });
+
+  it("does not expose untrusted finish reasons in diagnostics", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("private-token\u001b[31m"), doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow("finish_reason: unknown");
+    await expect(consumeStream(strict)).rejects.not.toThrow("private-token");
+  });
+
   it("accepts reasoning deltas, a final content delta with stop, and trailing usage", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
       jsonFrame({ choices: [{ index: 0, delta: { role: "assistant", content: null }, finish_reason: null }] }),

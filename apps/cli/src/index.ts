@@ -115,6 +115,7 @@ function printHelp(): void {
       "      --resume <id>      Continue saved history with the same project/model/scope",
       '  -p, --print "task"     Run a single task non-interactively, then exit',
       "  -y, --yes              In -p mode, auto-approve edits/writes/commands",
+      "  --read-only            Allow only reads and searches for agent tasks",
       "  -h, --help             Show this help",
       "  -v, --version          Show version",
       "",
@@ -146,13 +147,14 @@ function printBanner(
   scope: Scope,
   cfg: GatewayConfig,
   verify: VerifyResolution,
+  readOnly = false,
 ): void {
   stdout.write(
     `\n${c.bold("potluck")} ${c.dim("·")} ${c.cyan(model)} ${c.dim("·")} ${c.yellow(
       `scope: ${scope}`,
     )} ${c.dim("·")} ${c.green("running on the Potluck mesh")}\n`,
   );
-  const verifyLabel = verify.command
+  const verifyLabel = readOnly ? "read-only · verify: off" : verify.command
     ? `verify: ${verify.command}${verify.autoDetected ? " (auto)" : ""}`
     : "verify: off (pass --verify '<test/build cmd>' so edits are checked)";
   stdout.write(`${c.dim(cfg.baseURL)} ${c.dim("·")} ${c.dim(verifyLabel)}\n`);
@@ -211,6 +213,7 @@ async function runOneShot(
     scope: Scope;
     cwd: string;
     yes: boolean;
+    readOnly?: boolean;
     verifyCommand: string | null;
     session?: SavedSession;
   },
@@ -225,14 +228,14 @@ async function runOneShot(
     const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
     const { brief } = await loadBrief(opts.cwd, (line) => stderr.write(`${line}\n`));
     const conversation: ChatMessage[] = [
-      { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
+      { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief, opts.readOnly) },
     ];
     const repoMap = await buildRepoMap(opts.cwd, 200, 512);
     const instructions = new ProjectInstructions(opts.cwd);
     if (opts.session) conversation.push(...opts.session.history);
     const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope,
       instructions, line => stderr.write(`${line}\n`), cancellation.signal);
-    if (!opts.verifyCommand) {
+    if (!opts.verifyCommand && !opts.readOnly) {
       stderr.write(
         c.dim(
           "no verify command: pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
@@ -248,6 +251,7 @@ async function runOneShot(
       contextWindowTokens,
       signal: cancellation.signal,
       verifyCommand: opts.verifyCommand,
+      readOnly: opts.readOnly,
       callbacks: {
         onToken: (t) => stdout.write(t),
         onTurnEnd: () => stdout.write("\n"),
@@ -353,7 +357,7 @@ async function main(): Promise<void> {
     cliVerify: cli.verify,
     envVerify: process.env.POTLUCK_VERIFY,
     flag: args.verify,
-    noVerify: args.noVerify,
+    noVerify: args.noVerify || args.readOnly,
   });
 
   // ---- One-shot (-p / --print) ------------------------------------------
@@ -402,6 +406,7 @@ async function main(): Promise<void> {
         cwd,
         yes: args.yes,
         verifyCommand: verify.command,
+        readOnly: args.readOnly,
         session,
       });
     } catch (err) {
@@ -434,7 +439,7 @@ async function main(): Promise<void> {
       cliVerify: cli.verify,
       envVerify: process.env.POTLUCK_VERIFY,
       flag: args.verify,
-      noVerify: args.noVerify,
+      noVerify: args.noVerify || args.readOnly,
     });
     stdout.write("\n");
   }
@@ -476,7 +481,7 @@ async function main(): Promise<void> {
   const confirm = makeConfirm((q) => ask(q, active?.signal).then((a) => a ?? "n"));
   const briefState = await loadBrief(cwd, (line) => stdout.write(`${line}\n`));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
+    { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief, args.readOnly) },
   ];
   const repoMap = await buildRepoMap(cwd, 200, 512);
   const instructions = new ProjectInstructions(cwd);
@@ -496,7 +501,7 @@ async function main(): Promise<void> {
     }
   });
 
-  printBanner(model, scope, cfg, verify);
+  printBanner(model, scope, cfg, verify, args.readOnly);
 
   while (true) {
     const answer = await ask(c.green("you ▸ "));
@@ -547,6 +552,10 @@ async function main(): Promise<void> {
           stdout.write(`${c.red("could not list models:")} ${c.dim(message)}\n`);
         }
       }
+      continue;
+    }
+    if (args.readOnly && (line === "/snapshot" || line === "/verify")) {
+      stdout.write(`${c.yellow("This command is unavailable in read-only mode.")}\n`);
       continue;
     }
     if (line === "/snapshot") {
@@ -613,7 +622,7 @@ async function main(): Promise<void> {
     }
     if (line === "/clear") {
       const fresh = await loadBrief(cwd, (l) => stdout.write(`${l}\n`));
-      const cleared: ChatMessage[] = [{ role: "system", content: systemPrompt(cwd, verify.command, fresh.brief) }];
+      const cleared: ChatMessage[] = [{ role: "system", content: systemPrompt(cwd, verify.command, fresh.brief, args.readOnly) }];
       try { await instructions.refresh(cleared, message => stdout.write(`${message}\n`)); }
       catch (error) { stdout.write(`${c.red((error as Error).message)}\n`); continue; }
       briefState.brief = fresh.brief;
@@ -672,6 +681,7 @@ async function main(): Promise<void> {
         contextWindowTokens,
         signal: active.signal,
         verifyCommand: verify.command,
+        readOnly: args.readOnly,
         callbacks: {
           onToken: (t) => stdout.write(t),
           onTurnEnd: () => stdout.write("\n"),
