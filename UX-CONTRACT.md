@@ -16,6 +16,14 @@ Source freshness and authority remain server-owned. See `docs/company-brain-pilo
 Component and service tests cover shared conditions, source ambiguity, escaped
 pipes, corrections and original-output access. No new tokens or navigation flow.
 
+The existing Investigations pilot also owns the opt-in question-parts editor.
+One to six distinct parts require explicit confirmation bound to the current
+question, parts, model and collection context. Edits and request errors clear
+confirmation; entered parts survive recoverable errors. Native fieldsets and the
+shared investigation controls lock during dispatch; a ref guard rejects duplicate
+clicks before React commits the busy state. The server retains final validation,
+source freshness, part IDs and model identity authority.
+
 ## Product rules and evidence
 
 | Rule | Source |

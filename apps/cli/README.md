@@ -1163,3 +1163,10 @@ model output separately from validated source-bound findings; validation can res
 without rerunning inference. Every result still requires human/primary review.
 See [`docs/potluck-agent-harness.md`](../../docs/potluck-agent-harness.md) for the
 fixed source names, implementation identity checks, limits and environment setup.
+
+For bounded scalar test-design proposals, an opt-in `test-matrix-v5` job uses
+`potluck-test-matrix-result-v5`. It returns scenario inputs, a question, an
+expected answer and source references per criterion, without authored
+`testRequirements`. Successful reference validation remains `needs_review`;
+primary review checks factual correctness and usefulness. It never runs tests
+or approves knowledge. See [the role contract](../../docs/potluck-agent-harness.md).

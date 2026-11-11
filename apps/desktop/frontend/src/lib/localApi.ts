@@ -815,6 +815,12 @@ export const localApi = {
     }, 360_000).then(handleResponse<Investigation>);
   },
 
+  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true }): Promise<Investigation> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/ask-reviewed`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 360_000).then(handleResponse<Investigation>);
+  },
+
   sourceCollections(workspace: string): Promise<{ collections: SourceCollection[] }> {
     return timedFetch(`${LOCAL_BASE}/company-brain/collections?${new URLSearchParams({ workspace })}`)
       .then(handleResponse<{ collections: SourceCollection[] }>);

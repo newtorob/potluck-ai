@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
   investigations: vi.fn(),
   createInvestigation: vi.fn(),
   askPilot: vi.fn(),
+  askReviewedPilot: vi.fn(),
   planInvestigation: vi.fn(),
   reviewInvestigation: vi.fn(),
   previewCalculationReview: vi.fn(),
@@ -759,4 +760,105 @@ describe('Reviewed knowledge pilot mode', () => {
       await waitFor(() => expect(api.investigations).toHaveBeenCalled());
     },
   );
+});
+
+describe('Confirmed desktop question parts', () => {
+  const item = {
+    id: 'parts1',
+    issue: 'Which rule and exception?',
+    model_slug: 'local-model',
+    status: 'draft',
+    created_at: 'today',
+    evidence: [],
+    review: null,
+    outcome: null,
+    brief: { facts: [], prior_fixes: [], hypotheses: [], recommended_checks: [] },
+  };
+  async function setupParts() {
+    vi.clearAllMocks();
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Pilot docs', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    api.askReviewedPilot.mockResolvedValue(item);
+    render(<InvestigationsView />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Reviewed knowledge pilot' }));
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Pilot docs/ }));
+    fireEvent.change(screen.getByLabelText('Question'), {
+      target: { value: 'Which rule and exception?' },
+    });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Review question parts before answering' }),
+    );
+    return screen.getByRole('button', { name: 'Ask reviewed knowledge' });
+  }
+  it('sends only confirmed edited parts to the reviewed endpoint, with no double dispatch', async () => {
+    const ask = await setupParts();
+    expect(screen.getByLabelText('Part 1')).toHaveValue('Which rule and exception?');
+    expect(ask).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Part 1'), { target: { value: 'Which rule?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add question part' }));
+    fireEvent.change(screen.getByLabelText('Part 2'), { target: { value: 'Which exception?' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }));
+    let resolve!: (value: unknown) => void;
+    api.askReviewedPilot.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    fireEvent.click(ask);
+    fireEvent.click(ask);
+    expect(api.askReviewedPilot).toHaveBeenCalledTimes(1);
+    expect(api.askReviewedPilot).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      question: 'Which rule and exception?',
+      model_slug: 'local-model',
+      pilot_confirmed: true,
+      question_parts: ['Which rule?', 'Which exception?'],
+      question_parts_confirmed: true,
+    });
+    expect(api.askPilot).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Part 1')).toBeDisabled();
+    resolve(item);
+    await waitFor(() => expect(screen.getByLabelText('Part 1')).not.toBeDisabled());
+  });
+  it('clears confirmation after question, model, source or workspace changes', async () => {
+    const ask = await setupParts();
+    const confirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+    for (const change of [
+      () =>
+        fireEvent.change(screen.getByLabelText('Question'), {
+          target: { value: 'Which changed rule?' },
+        }),
+      () =>
+        fireEvent.change(screen.getByLabelText('Loaded local model'), { target: { value: '' } }),
+      () => fireEvent.click(screen.getByRole('checkbox', { name: /Pilot docs/ })),
+      () => fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'other' } }),
+    ]) {
+      fireEvent.click(confirm);
+      expect(confirm).toBeChecked();
+      change();
+      expect(confirm).not.toBeChecked();
+      expect(ask).toBeDisabled();
+    }
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('retains editable parts after an error and requires review again without retrying', async () => {
+    const ask = await setupParts();
+    api.askReviewedPilot.mockRejectedValue(new Error('Source changed; review again.'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }));
+    fireEvent.click(ask);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Source changed');
+    expect(screen.getByLabelText('Part 1')).toHaveValue('Which rule and exception?');
+    expect(
+      screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }),
+    ).not.toBeChecked();
+    expect(api.askReviewedPilot).toHaveBeenCalledTimes(1);
+  });
 });

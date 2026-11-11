@@ -507,3 +507,20 @@ v2 semantics. This opt-in input contract does not alter prior roles or defaults.
 ### Opt-in test matrix V4
 
 `test-matrix-v4` uses `potluck-test-matrix-result-v4` with the V3 typed requirements and evidence binding. Authored scenarios provide abstract test operations and fixture preconditions; cited source policy supplies behavioral invariants. A complete result is a proposal requiring review, not evidence that a test executed or that its expectation is entailed. Source limits apply to the supplied operations unless explicitly scoped otherwise; satisfying a necessary condition alone does not establish success. Returned setup, action and expected fields must retain supplied preconditions and intermediate checks as well as outcomes; they may reuse source-supported requirement wording. Input requirements and the criterion echo alone are not test coverage. The overall generated-word limit still applies. V1–V3 remain unchanged.
+
+`test-matrix-v5`, output `potluck-test-matrix-result-v5`, proposes applied
+question-test cases for scalar scenarios. Each criterion has named hypothetical
+inputs, a specific question, a concrete expected answer and bound source IDs.
+Unlike V3/V4, its plan does not accept authored `testRequirements`. The host
+rejects missing inputs, duplicate identifiers, unknown references, exact
+instruction echoes and expected answers framed as checking instructions. Use
+short scalar literals without spaces; this role does not describe procedural
+browser or integration tests. An unresolved check has empty inputs/references,
+`Unresolved` question/expected text and an explicit limitation.
+
+A successful receipt says `passed_concrete_reference_checks_only` and remains
+`needs_review`. Validation does not establish arithmetic, source entailment,
+prerequisite completeness or test usefulness. Primary review must compare every
+case to its cited rules before using it. No tests execute, no source approval is
+created and no model retries or automatic field repairs are added. Existing
+roles, messages and schemas remain unchanged.

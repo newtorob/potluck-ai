@@ -1,6 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ReviewedPassageAnswer } from '@/components/investigations/ReviewedPassageAnswer';
 import { PilotKnowledge } from '@/components/investigations/PilotKnowledge';
+import {
+  QuestionPartsEditor,
+  questionPartsError,
+} from '@/components/investigations/QuestionPartsEditor';
 import {
   investigationButton as button,
   investigationField as field,
@@ -56,6 +60,9 @@ export function InvestigationsView() {
   const [answerEach, setAnswerEach] = useState(false);
   const [pilot, setPilot] = useState(false);
   const [focusedPassages, setFocusedPassages] = useState(false);
+  const [reviewParts, setReviewParts] = useState(false);
+  const [questionParts, setQuestionParts] = useState(['']);
+  const [partsAcknowledgement, setPartsAcknowledgement] = useState('');
   const [reviewedPlan, setReviewedPlan] = useState(false);
   const [operations, setOperations] = useState<ReviewedOperation[]>([
     { request: '', operation: 'answer' },
@@ -117,6 +124,7 @@ export function InvestigationsView() {
   const [claimContent, setClaimContent] = useState('');
   const [claimCitations, setClaimCitations] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [citationsOpen, setCitationsOpen] = useState(false);
@@ -127,7 +135,22 @@ export function InvestigationsView() {
     .map((q) => q.trim())
     .filter(Boolean);
   const questionsError = questions.length > 8 || questions.some((q) => q.length > 500);
-  const ready = loadedWorkspace !== '' && selected.length > 0;
+  const ready =
+    loadedWorkspace !== '' && loadedWorkspace === workspace.trim() && selected.length > 0;
+  const partsContext = JSON.stringify({
+    issue,
+    questionParts,
+    model,
+    activeModel,
+    loadedWorkspace,
+    workspaceInput: workspace,
+    pilot,
+    reviewParts,
+    selected: [...selected].sort(),
+    sources: collections.map((c) => [c.id, c.scan_status, c.last_scan_at]),
+  });
+  const partsConfirmed = partsAcknowledgement === partsContext;
+  useEffect(() => setPartsAcknowledgement(''), [partsContext]);
   const requestErrors = operations.map((row, index) => {
     const request = row.request.trim();
     if (!request) return 'Enter a request.';
@@ -179,12 +202,15 @@ export function InvestigationsView() {
   }
 
   async function run(action: () => Promise<void>, preserveInvalidReview = false) {
+    if (inFlight.current || busy) return;
+    inFlight.current = true;
     setBusy(true);
     setError('');
     setNotice('');
     try {
       await action();
     } catch (e) {
+      setPartsAcknowledgement('');
       const invalidReview =
         preserveInvalidReview &&
         e instanceof Error &&
@@ -207,10 +233,12 @@ export function InvestigationsView() {
             : 'Operation failed',
       );
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
   async function loadWorkspace() {
+    if (inFlight.current || busy) return;
     const name = workspace.trim();
     if (!name) {
       setError('Enter a workspace.');
@@ -232,6 +260,7 @@ export function InvestigationsView() {
     });
   }
   function invalidatePilotAnswers() {
+    setPartsAcknowledgement('');
     setCurrent(null);
     setCorrected(null);
     setItems([]);
@@ -462,7 +491,7 @@ export function InvestigationsView() {
               </>
             )}
           </section>
-          {pilot && (
+          {pilot && !reviewParts && (
             <div className="rounded-lg border border-border bg-card p-5 space-y-2">
               <label className="flex items-start gap-2 text-sm">
                 <input
@@ -513,6 +542,44 @@ export function InvestigationsView() {
                 }}
               />
             </label>
+            {pilot && (
+              <>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={reviewParts}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setReviewParts(event.target.checked);
+                      if (
+                        event.target.checked &&
+                        questionParts.length === 1 &&
+                        !questionParts[0]?.trim()
+                      ) {
+                        setQuestionParts([issue.trim()]);
+                      }
+                      setFocusedPassages(false);
+                      invalidatePilotAnswers();
+                    }}
+                  />
+                  Review question parts before answering
+                </label>
+                {reviewParts && (
+                  <QuestionPartsEditor
+                    parts={questionParts}
+                    disabled={busy}
+                    confirmed={partsConfirmed}
+                    onChange={(parts) => {
+                      setQuestionParts(parts);
+                      invalidatePilotAnswers();
+                    }}
+                    onConfirm={(confirmed) =>
+                      setPartsAcknowledgement(confirmed ? partsContext : '')
+                    }
+                  />
+                )}
+              </>
+            )}
             {!pilot && (
               <>
                 <label className="block text-sm">
@@ -756,19 +823,31 @@ export function InvestigationsView() {
                     ))) ||
                 !model ||
                 model !== activeModel ||
+                (pilot &&
+                  reviewParts &&
+                  (!partsConfirmed || !!questionPartsError(questionParts))) ||
                 (answerEach && questionsError) ||
                 (reviewedPlan && (!planValid || planning))
               }
               onClick={() =>
                 void run(async () => {
                   const item = pilot
-                    ? await localApi.askPilot({
-                        ...scope,
-                        question: issue.trim(),
-                        model_slug: model,
-                        pilot_confirmed: true,
-                        ...(focusedPassages ? { focused_passages: true as const } : {}),
-                      })
+                    ? reviewParts
+                      ? await localApi.askReviewedPilot({
+                          ...scope,
+                          question: issue.trim(),
+                          model_slug: model,
+                          pilot_confirmed: true,
+                          question_parts: questionParts.map((part) => part.trim()),
+                          question_parts_confirmed: true,
+                        })
+                      : await localApi.askPilot({
+                          ...scope,
+                          question: issue.trim(),
+                          model_slug: model,
+                          pilot_confirmed: true,
+                          ...(focusedPassages ? { focused_passages: true as const } : {}),
+                        })
                     : await localApi.createInvestigation({
                         ...scope,
                         issue,

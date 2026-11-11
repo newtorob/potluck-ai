@@ -176,12 +176,12 @@ test-frontend: ## Run the desktop frontend vitest suite, then typecheck app, tes
 	fi
 	@cd apps/desktop/frontend && pnpm exec vitest run && pnpm run typecheck
 
-test-cli: ## Run the CLI vitest suite, then typecheck it
+test-cli: ## Build the CLI entrypoints, then run its vitest suite
 	@if [ ! -d apps/cli/node_modules ]; then \
 		echo "==> apps/cli/node_modules missing: run 'cd apps/cli && pnpm install' first"; \
 		exit 1; \
 	fi
-	@cd apps/cli && pnpm exec vitest run && pnpm exec tsc --noEmit
+	@cd apps/cli && pnpm test
 
 LANDING_BUILD ?= 1
 test-landing: ## Run the landing vitest suite + typecheck, then a production next build (LANDING_BUILD=0 skips the build)

@@ -161,6 +161,8 @@ const calculationDraft = {
 };
 
 type Controls = {
+  reviewedCalls?: Array<Record<string, unknown>>;
+  failReviewed?: boolean;
   current?: Record<string, unknown>;
   unavailable: boolean;
   empty: boolean;
@@ -216,6 +218,12 @@ async function setup(page: Page, controls: Controls) {
         generation_profile: null,
         notices: [],
       });
+    }
+    if (path === '/company-brain/pilot/ask-reviewed') {
+      controls.reviewedCalls?.push(request.postDataJSON());
+      if (controls.failReviewed) return fulfill({ detail: 'Source changed; review again.' }, 400);
+      current = structuredClone(answerDraft);
+      return fulfill(current);
     }
     if (path === '/company-brain/investigations' && request.method() === 'POST') {
       if (controls.createGate) await controls.createGate;
@@ -814,3 +822,65 @@ for (const display of [
     ).toBe(true);
   });
 }
+
+test('desktop question parts require current confirmation and preserve edits after source errors', async ({
+  page,
+}) => {
+  const controls: Controls = {
+    unavailable: false,
+    empty: false,
+    failCreate: false,
+    reviewedCalls: [],
+    failReviewed: true,
+  };
+  await setup(page, controls);
+  await page.getByRole('checkbox', { name: 'Reviewed knowledge pilot', exact: true }).check();
+  await scope(page);
+  await page
+    .getByRole('textbox', { name: 'Question', exact: true })
+    .fill('What happened and which deadline is known?');
+  await page.getByLabel('Loaded local model').selectOption('local-model');
+  await page.getByRole('checkbox', { name: 'Review question parts before answering' }).check();
+  await page.getByRole('textbox', { name: 'Part 1', exact: true }).fill('What happened?');
+  await page.getByRole('button', { name: 'Add question part' }).click();
+  const ask = page.getByRole('button', { name: 'Ask reviewed knowledge', exact: true });
+  await expect(ask).toBeDisabled();
+  await page.getByRole('textbox', { name: 'Part 2', exact: true }).fill('Which deadline is known?');
+  const confirmation = page.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+  await confirmation.check();
+  await page
+    .getByRole('textbox', { name: 'Question', exact: true })
+    .fill('What happened and what exact deadline is known?');
+  await expect(confirmation).not.toBeChecked();
+  await expect(ask).toBeDisabled();
+  await confirmation.check();
+  await ask.click();
+  await expect(page.getByRole('alert')).toContainText('Source changed');
+  await expect(confirmation).not.toBeChecked();
+  await expect(page.getByRole('textbox', { name: 'Part 2', exact: true })).toHaveValue('Which deadline is known?');
+  expect(controls.reviewedCalls).toEqual([
+    {
+      workspace: 'workspace',
+      collection_ids: ['docs'],
+      question: 'What happened and what exact deadline is known?',
+      model_slug: 'local-model',
+      pilot_confirmed: true,
+      question_parts: ['What happened?', 'Which deadline is known?'],
+      question_parts_confirmed: true,
+    },
+  ]);
+  controls.failReviewed = false;
+  await confirmation.check();
+  await ask.click();
+  await expect(page.getByText('The worker restarted.', { exact: true }).first()).toBeVisible();
+  await page.setViewportSize({ width: 800, height: 600 });
+  await page.getByRole('group', { name: 'Question parts', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: `${output}/desktop-question-parts.png`,
+    fullPage: true,
+    animations: 'disabled',
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});

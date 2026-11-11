@@ -15,6 +15,20 @@ To replace approved knowledge, save a new proposal under the same key. Load Appr
 
 ## Ask, inspect and hand off
 
+To use the reviewed fixed-parts path from the desktop, enable **Review question
+parts before answering** under Question. Edit the initial part, add up to six
+parts, then check **I reviewed these question parts**. Parts must be nonblank,
+distinct and at most 500 characters each. The server assigns the IDs and checks
+the exact question binding; confirming parts does not verify their coverage.
+
+Changing the question, parts, model, workspace or collection context clears that
+confirmation. An unavailable source or failed request keeps the entered parts
+and requires confirmation again. The controls lock while a request is in flight;
+duplicate clicks do not dispatch another request. This opt-in selects the V32
+native profile through `/company-brain/pilot/ask-reviewed`, with no planning call,
+automatic model load, fallback or retry. The earlier pilot options remain
+available when this control is off.
+
 Choose the already loaded compatible Qwen3.8 27B native model, enter one question (up to 500 characters), then **Ask reviewed knowledge**. This explicit pilot fixes the measured V73 answer configuration; it does not load a model, change the ordinary gateway, or fall back to another route. If the runtime is unavailable or incompatible, the request fails with no automatic retry.
 
 For a question-focused draft, explicitly enable **Focused passages (experimental)** before asking. This selects the separately versioned focused presentation (currently V4, V75 correction). It writes a short answer, saves exact selected passages with their governing structural context, and preserves full reviewed statements. The checkbox defaults off; changing it clears the displayed answer. It does not change retrieval, approve any statement or verify the generated answer.
@@ -43,7 +57,7 @@ caller must inspect and explicitly confirm those parts. The application assigns
 part IDs and stores the exact question-bound plan with `reviewer_supplied`
 origin and `coverage: not_verified`; confirmation does not prove completeness
 or approve knowledge. Authentication, privacy and current-source checks apply.
-This is an API integration; the desktop does not yet offer a fixed-parts editor.
+The desktop question-parts editor uses this same explicit API integration.
 
 The route fixes the native profile, seed, approved-collection retrieval and V32
 contract. The service makes two bounded 256-token model calls, preserves both
@@ -106,3 +120,11 @@ Detailed source corpora, raw model replies and local databases are retained with
 the owner. The public summary states conditions and limits without redistributing
 those company documents. Public synthetic fixtures and regression tests live in
 `apps/desktop/python/evals/company_brain` and `apps/desktop/python/tests`.
+
+When preparing reviewed excerpts, retain the source title and its stated date or
+status alongside each selected section. A document's verification date, draft
+label or historical scope can change how its claims apply. A citation to the
+full document does not restore a qualification omitted from the text supplied
+to the model. Keep prerequisite and exception paragraphs with their governing
+rule. If the document gives no date, say so during review rather than inventing
+one. Knowledge review still decides whether the excerpt is suitable to admit.
