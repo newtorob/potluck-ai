@@ -64,7 +64,7 @@ it("loads scoped instructions in the installed one-shot CLI while preserving the
   const guidance = request.body.messages.find(message => message.content.includes("Current project instructions"));
   expect(guidance?.role).toBe("system");
   expect(guidance?.content).toContain("ROOT STYLE"); expect(guidance?.content).toContain("NESTED STYLE");
-  expect(request.body.messages.at(-1)).toEqual({ role: "user", content: "Use the explicitly requested format." });
+  expect(request.body.messages.at(-2)).toEqual({ role: "user", content: "Use the explicitly requested format." });
   expect(request.headers["x-potluck-scope"]).toBe("local");
 });
 

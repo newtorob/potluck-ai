@@ -39,7 +39,7 @@ import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -48,6 +48,8 @@ from pydantic import BaseModel, Field
 
 from potluck_local.services import (
     gateway_reply, gateway_request, gateway_routing, inference_errors, pool_routing, token_estimate,
+    reasoning_controls,
+    native_tool_controls,
 )
 from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.model_traits import traits_of_runtime
@@ -89,6 +91,10 @@ class ChatCompletionRequest(BaseModel):
     # <think> block in `content`, as the gateway did before. "auto" and "deepseek"
     # (and leaving it out) move the reasoning to `reasoning_content`.
     reasoning_format: Literal["auto", "deepseek", "none"] | None = None
+    chat_template_kwargs: Any = None
+    reasoning_effort: Any = None
+    reasoning_budget_tokens: Any = None
+    parallel_tool_calls: bool | None = Field(default=None, strict=True)
 
 
 def _normalise_stop(stop: list[str] | str | None) -> list[str] | None:
@@ -153,9 +159,15 @@ async def list_models_openai() -> dict:
 @router.get("/potluck/capabilities")
 async def model_lock_capabilities() -> dict:
     # supports_tools is about the model loaded on this machine now.
-    traits = traits_of_runtime(get_runtime())
-    return {"model_lock_version": 1, "scopes": ["local", "mine"], "artifact_format": "gguf",
-            "supports_tools": bool(traits and traits.supports_tools)}
+    runtime = get_runtime()
+    traits = traits_of_runtime(runtime)
+    return {"prompt_count_version": 1, "model_lock_version": 1, "scopes": ["local", "mine"], "artifact_format": "gguf",
+            "supports_tools": bool(traits and traits.supports_tools),
+            "reasoning_controls_version": 1 if reasoning_controls.supported(runtime) else None,
+            "reasoning_budget_request_version": 1,
+            "parallel_tool_calls_request_version": 1,
+            "parallel_tool_calls_version": 1 if reasoning_controls.supported(runtime) else None,
+            "reasoning_budget_version": 1 if reasoning_controls.supported(runtime) else None}
 
 
 async def _circle_id(selector: str | None) -> str:
@@ -256,6 +268,8 @@ def _remote_too_long(failure: object) -> bool:
 def _stream_error(failure: object) -> dict:
     """The error object of a stream that failed after it began (the route sends it in a
     ``data:`` line, then ``[DONE]``). ``failure`` is the exception or the ``__error__`` chunk."""
+    if isinstance(failure, gateway_request.RequestError):
+        return {"message": failure.message, "type": "invalid_request_error", "code": failure.code}
     found = context_overflow(failure)
     if found is not None:
         detail = _context_length(found)
@@ -337,6 +351,8 @@ class ChatJob:
     stop: list[str] | None = None
     split_reasoning: bool = True
     digest: str | None = None
+    reasoning: reasoning_controls.ReasoningControls | None = None
+    parallel_tool_calls: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -379,8 +395,14 @@ class ChatPlan:
         return {"stop": self.stop} if self.stop else {}
 
     @property
+    def reasoning_kwargs(self) -> dict:
+        return {"reasoning": self.job.reasoning} if self.job.reasoning is not None else {}
+
+    @property
     def tool_kwargs(self) -> dict:
         kwargs = self.job.prepared.runtime_kwargs()  # empty unless the request offered tools
+        if kwargs and self.job.parallel_tool_calls is not None:
+            kwargs["parallel_tool_calls"] = self.job.parallel_tool_calls
         if kwargs and self.options.proven:
             kwargs["tool_proof"] = True  # the engine marks the markers it saw sampled as the token
         return kwargs
@@ -456,9 +478,33 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
     if refusal is not None:
         raise refusal
 
+    if job.parallel_tool_calls is not None and prepared.tools:
+        if use_pool or (peer is not None and not native_tool_controls.peer_supported(peer.get("_capabilities") or {})):
+            raise _refusal(gateway_request.RequestError("tool_concurrency_unsupported",
+                                                       "This route cannot preserve tool concurrency. Use an updated native local or household engine."))
+        if peer is None:
+            try:
+                native_tool_controls.require(runtime)
+            except gateway_request.RequestError as exc:
+                raise _refusal(exc) from exc
+    if job.reasoning is not None:
+        if use_pool or (peer is not None and not reasoning_controls.peer_supported(peer.get("_capabilities") or {}, job.reasoning)):
+            raise _refusal(gateway_request.RequestError(
+                "reasoning_controls_unsupported",
+                "This route cannot preserve thinking controls. Use a native local or updated household engine."))
+        if peer is None:
+            try:
+                reasoning_controls.require(runtime)
+            except gateway_request.RequestError as exc:
+                raise _refusal(exc) from exc
+
     served_model = job.model if (peer or use_pool) else local
     options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool), model=served_model,
                              peer=peer)
+    if job.reasoning is not None:
+        # The native adapter makes an implicit opening explicit using the actual
+        # rendered prompt, which can differ from the model's default template.
+        options = replace(options, starts_in_reasoning=False)
     if use_pool:
         served_by = coordinator_scope  # "pool" or "circle"
     elif peer:
@@ -505,6 +551,36 @@ async def model_context(
             "source": plan.served_by}
 
 
+@router.post("/potluck/count-tokens")
+async def count_prompt_tokens(req: ChatCompletionRequest,
+                              x_potluck_scope: Literal["local", "mine"] = Header(default="local")) -> dict:
+    """Exact local native prompt size. Household-only routes explicitly fall back.
+
+    Reuse chat validation and routing, but never forward prompt content to a peer
+    for this optional count and never load a model or run generation.
+    """
+    try:
+        reasoning = reasoning_controls.parse(req.chat_template_kwargs, req.reasoning_effort,
+                                             req.reasoning_budget_tokens, max_tokens=req.max_tokens)
+        prepared = gateway_request.prepare(
+            [gateway_request.normalise_message(m.role, m.content, tool_calls_=m.tool_calls,
+                                               tool_call_id=m.tool_call_id, name=m.name)
+             for m in req.messages], req.tools, req.tool_choice,
+        )
+        plan = await plan_chat(ChatJob(prepared, req.model, req.temperature, req.max_tokens, False,
+                                      digest=req.potluck_model_sha256, reasoning=reasoning,
+                                      parallel_tool_calls=req.parallel_tool_calls), x_potluck_scope, None)
+        counter = getattr(plan.runtime, "count_chat_tokens", None)
+        result = None if plan.peer is not None or not callable(counter) else await counter(
+            plan.messages, **plan.identity, **plan.tool_kwargs, **plan.reasoning_kwargs)
+        return {"model": plan.served_model, "scope": x_potluck_scope,
+                "prompt_tokens": None, "context_window": None, **(result or {})}
+    except gateway_request.RequestError as exc:
+        raise _refusal(exc) from exc
+    except ModelIdentityError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
 def shaped_chunks(plan: ChatPlan):
     """The reply to ``plan`` as OpenAI chat.completion.chunk dicts, with reasoning
     and tool calls shaped (services/gateway_reply.py). An async iterator.
@@ -525,11 +601,11 @@ def shaped_chunks(plan: ChatPlan):
     if plan.peer:
         return gateway_reply.shape_stream(gateway_routing.stream_peer_openai(
             plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
-            **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs
+            **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs, **plan.reasoning_kwargs
         ), plan.options)
     return gateway_reply.shape_stream(plan.runtime.stream_chat_raw(
         plan.messages, temperature=job.temperature, max_tokens=plan.max_tokens, stop=plan.stop,
-        **plan.identity, **plan.tool_kwargs
+        **plan.identity, **plan.tool_kwargs, **plan.reasoning_kwargs
     ), plan.options)
 
 
@@ -545,6 +621,8 @@ def http_failure(exc: BaseException, plan: ChatPlan) -> HTTPException:
     """The HTTP error for an inference that failed before it produced a reply."""
     if isinstance(exc, ModelIdentityError):
         return HTTPException(409, str(exc))
+    if isinstance(exc, gateway_request.RequestError):
+        return _refusal(exc)
     if isinstance(exc, InferenceFailure):
         # This machine's own GPU: the caller is this machine's user or agent.
         return HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message})
@@ -580,12 +658,12 @@ async def infer_chat(plan: ChatPlan) -> dict:
         elif plan.peer:
             result = await gateway_routing.complete_peer_openai(
                 plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
-                **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs
+                **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs, **plan.reasoning_kwargs
             )
         else:
             result = await plan.runtime.chat(plan.messages, temperature=job.temperature,
                                              max_tokens=plan.max_tokens, **plan.identity,
-                                             **plan.tool_kwargs, **plan.stop_kwargs)
+                                             **plan.tool_kwargs, **plan.stop_kwargs, **plan.reasoning_kwargs)
     except Exception as exc:  # noqa: BLE001
         raise http_failure(exc, plan) from exc
     return gateway_reply.shape_completion(result, plan.options)
@@ -625,6 +703,8 @@ async def chat_completions_openai(
       absent / any other value - default: local -> household -> pool-if-enabled.
     """
     try:
+        reasoning = reasoning_controls.parse(req.chat_template_kwargs, req.reasoning_effort,
+                                             req.reasoning_budget_tokens, max_tokens=req.max_tokens)
         prepared = gateway_request.prepare(
             [gateway_request.normalise_message(m.role, m.content, tool_calls_=m.tool_calls,
                                                tool_call_id=m.tool_call_id, name=m.name)
@@ -638,7 +718,7 @@ async def chat_completions_openai(
     plan = await plan_chat(
         ChatJob(prepared, req.model, req.temperature, req.max_tokens, req.stream,
                 stop=_normalise_stop(req.stop), split_reasoning=req.reasoning_format != "none",
-                digest=digest),
+                digest=digest, reasoning=reasoning, parallel_tool_calls=req.parallel_tool_calls),
         x_potluck_scope, x_potluck_circle,
     )
 

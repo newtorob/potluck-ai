@@ -75,3 +75,16 @@ it("the installed coding agent saves and resumes history without replaying old a
     expect(requests).toHaveLength(2);
   } finally { await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }); }
 }, 35000);
+it("preserves native call identities on resume and refuses orphan tool results", async () => {
+  const session = await beginSession(project, lock, "local");
+  const native = [...history, { role: "assistant" as const, content: "", tool_calls: [{ id: "call_a", type: "function" as const, function: { name: "list_dir", arguments: "{}" } }] },
+    { role: "tool" as const, content: "TOOL_RESULT: a.py", tool_call_id: "call_a" }];
+  await saveSession(session, native);
+  expect((await beginSession(project, lock, "local", await loadSession(session.id))).history).toEqual(native.slice(1));
+  native[native.length - 1] = { role: "tool", content: "TOOL_RESULT: a.py", tool_call_id: "wrong" };
+  await expect(saveSession(session, native)).rejects.toThrow("incomplete tool history");
+  const file = join(directory, "sessions", session.id + ".json");
+  const damaged = JSON.parse(await readFile(file, "utf8")); damaged.history = native;
+  await writeFile(file, JSON.stringify(damaged));
+  await expect(loadSession(session.id)).rejects.toThrow("invalid");
+});

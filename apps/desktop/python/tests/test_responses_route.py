@@ -88,7 +88,8 @@ class TestNonStreaming:
         assert rt.calls[0]["temperature"] == 0.2 and rt.calls[0]["max_tokens"] == 9 and "top_p" not in rt.calls[0]
 
     def test_reasoning_is_hidden(self, client, monkeypatch):
-        serve(monkeypatch, FakeRuntime(THINKING))
+        runtime = serve(monkeypatch, FakeRuntime(THINKING))
+        runtime.supports_reasoning_controls = lambda: True
         reply = post(client, body(reasoning={"effort": "high", "summary": "auto"})).json()
         assert [c["text"] for i in reply["output"] for c in i["content"]] == [ANSWER]
         assert "Every node relays" not in json.dumps(reply)

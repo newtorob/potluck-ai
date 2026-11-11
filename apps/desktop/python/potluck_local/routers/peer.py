@@ -58,13 +58,13 @@ import os
 import socket
 import time
 from contextlib import aclosing
-from typing import AsyncGenerator, Literal
+from typing import Any, AsyncGenerator, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from potluck_local.services import gateway_request, inference_errors
+from potluck_local.services import gateway_request, inference_errors, reasoning_controls, native_tool_controls
 from potluck_local.services.hardware_detect import detect_hardware
 from potluck_local.services.model_traits import traits_of_runtime
 from potluck_local.services.runtime import get_runtime
@@ -197,6 +197,10 @@ class PeerCapabilities(BaseModel):
     # must read a missing value as false). A requester never sends tools to a node
     # that does not say true.
     supports_tools: bool = False
+    # Additive transport capability; missing means controls cannot be preserved.
+    reasoning_controls_version: int | None = None
+    reasoning_budget_version: int | None = None
+    parallel_tool_calls_version: int | None = None
 
     # Tool-call markers this node's model can prove were sampled as the marker token
     # (additive; older nodes omit it, which a requester reads as none). A requester that
@@ -311,6 +315,9 @@ async def peer_capabilities() -> PeerCapabilities:
         link_type=link_type,
         answers_verified=runtime.answers_verified() if loaded else None,
         supports_tools=bool(loaded and getattr(traits_of_runtime(runtime), "supports_tools", False)),
+        reasoning_controls_version=1 if reasoning_controls.supported(runtime) else None,
+        reasoning_budget_version=1 if reasoning_controls.supported(runtime) else None,
+        parallel_tool_calls_version=1 if reasoning_controls.supported(runtime) else None,
         tool_markers=_tool_markers(runtime) if loaded else [],
     )
 
@@ -452,6 +459,10 @@ class PeerChatRequest(BaseModel):
     # Mark, in the reply text, the tool-call markers the model sampled as the marker
     # token (see PeerCapabilities.tool_markers). Only meaningful with `tools`.
     potluck_tool_proof: bool = Field(default=False, strict=True)
+    chat_template_kwargs: Any = None
+    reasoning_effort: Any = None
+    reasoning_budget_tokens: Any = None
+    parallel_tool_calls: bool | None = Field(default=None, strict=True)
 
 
 @router.post("/chat/completions")
@@ -502,6 +513,22 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
     identity = {"expected_model": request.model or runtime.current_model_id(), "expected_sha256": digest}
     messages_for_runtime = [m.model_dump(exclude_none=True) for m in request.messages]
     tool_kwargs = _peer_tool_kwargs(request, runtime, messages_for_runtime)
+    try:
+        if request.tools and request.parallel_tool_calls is not None:
+            native_tool_controls.require(runtime)
+            if request.potluck_batch or not request.stream:
+                raise gateway_request.RequestError("tool_concurrency_unsupported", "Tool concurrency requires an unbatched native peer stream.")
+            tool_kwargs["parallel_tool_calls"] = request.parallel_tool_calls
+        reasoning = reasoning_controls.parse(request.chat_template_kwargs, request.reasoning_effort,
+                                             request.reasoning_budget_tokens, max_tokens=request.max_tokens)
+        if reasoning is not None:
+            reasoning_controls.require(runtime)
+            if request.potluck_batch or not request.stream:
+                raise gateway_request.RequestError("reasoning_controls_unsupported",
+                                                   "Thinking controls require unbatched native streaming on the peer route.")
+            tool_kwargs["reasoning"] = reasoning
+    except gateway_request.RequestError as exc:
+        raise HTTPException(400, {"code": exc.code, "message": exc.message}) from exc
 
     logger.info(
         "peer_chat_request model=%s message_count=%d stream=%s",

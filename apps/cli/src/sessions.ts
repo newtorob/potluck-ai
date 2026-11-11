@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { NativeToolStream } from "./native-tools.js";
 import type { ChatMessage } from "./gateway.js";
 import type { Scope } from "./config.js";
 import type { ProjectModelLock } from "./model-lock.js";
@@ -14,6 +15,27 @@ export interface SavedSession {
   schemaVersion: 1; id: string; parentId: string | null; createdAt: string; updatedAt: string;
   project: string; cwd: string; model: string; sha256: string; sizeBytes: number; scope: Scope;
   history: ChatMessage[];
+}
+function validHistory(history: unknown): history is ChatMessage[] {
+  if (!Array.isArray(history)) return false;
+  let pending = new Set<string>();
+  try {
+    for (const m of history) {
+      if (!m || !["system", "user", "assistant", "tool"].includes(m.role) || typeof m.content !== "string") return false;
+      if (m.role === "tool") {
+        if (typeof m.tool_call_id !== "string" || !pending.delete(m.tool_call_id) || m.tool_calls !== undefined) return false;
+      } else {
+        if (pending.size || m.tool_call_id !== undefined) return false;
+        if (m.tool_calls !== undefined) {
+          if (m.role !== "assistant" || !Array.isArray(m.tool_calls)) return false;
+          const calls = new NativeToolStream();
+          calls.append(m.tool_calls.map((call: object, index: number) => ({ ...call, index })));
+          pending = new Set(calls.finish("tool_calls").map(call => call.id));
+        }
+      }
+    }
+    return pending.size === 0;
+  } catch { return false; }
 }
 async function directory(): Promise<string> {
   const path = join(dataDir(), "sessions");
@@ -34,7 +56,7 @@ export async function loadSession(id: string): Promise<SavedSession> {
     if (value.schemaVersion !== 1 || value.id !== id || typeof value.project !== "string" || typeof value.cwd !== "string"
       || typeof value.model !== "string" || !/^[a-f0-9]{64}$/.test(value.sha256) || !Number.isSafeInteger(value.sizeBytes) || value.sizeBytes <= 0
       || !["local", "mine"].includes(value.scope) || !Number.isFinite(Date.parse(value.createdAt)) || !Number.isFinite(Date.parse(value.updatedAt))
-      || !Array.isArray(value.history) || !value.history.every(m => m && ["system", "user", "assistant"].includes(m.role) && typeof m.content === "string")) throw new Error("invalid");
+      || !validHistory(value.history)) throw new Error("invalid");
     return value;
   } catch { throw new RuntimeError("Session is invalid, too large, or not private. It was not loaded."); }
   finally { await file.close(); }
@@ -49,10 +71,11 @@ export async function beginSession(cwd: string, lock: ProjectModelLock | undefin
   const now = new Date().toISOString();
   return { schemaVersion: 1, id: randomUUID(), parentId: previous?.id ?? null, createdAt: now, updatedAt: now,
     project, cwd: location, model: lock.model.id, sha256: lock.model.sha256, sizeBytes: lock.model.sizeBytes, scope,
-    history: previous?.history.filter(m => m.role !== "system").map(m => ({ role: m.role, content: m.content })) ?? [] };
+    history: previous?.history.filter(m => m.role !== "system").map(m => structuredClone(m)) ?? [] };
 }
 export async function saveSession(session: SavedSession, history: ChatMessage[]): Promise<void> {
   if (!validId(session.id)) throw new RuntimeError("Invalid session ID.");
+  if (!validHistory(history)) throw new RuntimeError("Session contains incomplete tool history. The previous save is unchanged.");
   const value = { ...session, updatedAt: new Date().toISOString(), history };
   const body = JSON.stringify(value);
   if (Buffer.byteLength(body) > LIMIT) throw new RuntimeError("Session exceeds the 8 MiB history limit. The previous save is unchanged; start a new session.");

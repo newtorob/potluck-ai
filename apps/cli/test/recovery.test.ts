@@ -240,7 +240,7 @@ describe("progress and verification recovery", () => {
     expect(runVerify).toHaveBeenCalledTimes(2);
     for (const index of [2, 3]) {
       const sent = stream.mock.calls[index][1] as ChatMessage[];
-      expect(sent.at(-1)?.content).toContain("b remains broken");
+      expect(sent.filter(m => !m.content.startsWith("POTLUCK RUNTIME CONTROL:")).at(-1)?.content).toContain("b remains broken");
       expect(sent.some(m => m.content === "repair both files")).toBe(true);
       expect(sent.reduce((sum, message) => sum + message.content.length, 0)).toBeLessThanOrEqual(600);
     }

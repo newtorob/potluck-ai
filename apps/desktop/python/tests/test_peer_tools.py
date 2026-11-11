@@ -333,7 +333,7 @@ def test_the_plan_asks_the_engine_for_proof_only_when_markers_are_proven():
 
     def plan(proven):
         options = gateway_reply.ShapeOptions(offered=prepared.offered_names, proven=frozenset(proven))
-        return SimpleNamespace(job=SimpleNamespace(prepared=prepared), options=options)
+        return SimpleNamespace(job=SimpleNamespace(prepared=prepared, parallel_tool_calls=None), options=options)
 
     assert "tool_proof" not in gateway.ChatPlan.tool_kwargs.fget(plan(set()))
     assert gateway.ChatPlan.tool_kwargs.fget(plan({"<tool_call>"}))["tool_proof"] is True

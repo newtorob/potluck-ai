@@ -2,18 +2,20 @@
  * Thin OpenAI-compatible client for the Potluck gateway (127.0.0.1).
  *
  * Uses native fetch + manual SSE parsing. The built-in coding agent uses
- * text actions on top of chat completions; the gateway also supports native
- * tools for other clients.
+ * text actions or explicitly selected native function tools.
  *
  * File contents only ever travel to this base URL (the local gateway).
  */
 
 import { pinnedModel } from "./model-lock.js";
 import type { GatewayConfig } from "./config.js";
+import { NativeToolStream, type NativeToolCall, type FunctionTool } from "./native-tools.js";
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_calls?: NativeToolCall[];
+  tool_call_id?: string;
 }
 
 export interface ModelInfo {
@@ -25,6 +27,9 @@ export interface StreamOptions {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  tools?: FunctionTool[];
+  onToolCalls?: (calls: NativeToolCall[]) => void;
+  reasoningBudget?: number;
   stop?: string[];
   signal?: AbortSignal;
   /** Routing scope sent as the X-Potluck-Scope header (e.g. "local" | "mine"). */
@@ -134,6 +139,59 @@ export async function modelContextWindow(
   return typeof window === "number" && Number.isSafeInteger(window) && window > 0 ? window : undefined;
 }
 
+/** A task-local counter; capability discovery never sends project content. */
+export function createPromptCounter(cfg: GatewayConfig, opts: Pick<StreamOptions,
+  "model" | "scope" | "tools" | "reasoningBudget" | "signal"> & { contextWindowTokens?: number }) {
+  let supported: boolean | undefined;
+  return async (messages: ChatMessage[], maxTokens: number, tools = opts.tools): Promise<number | undefined> => {
+    const scope = opts.scope ?? "local";
+    if (!["local", "mine"].includes(scope)) throw new Error("Prompt counts require local or mine scope.");
+    pinnedModel(cfg.modelLock, opts.model);
+    opts.signal?.throwIfAborted();
+    const headers = { ...authHeaders(cfg), "x-potluck-scope": scope };
+    const signal = () => AbortSignal.any([AbortSignal.timeout(12_000), ...(opts.signal ? [opts.signal] : [])]);
+    if (supported === undefined) {
+      const res = await fetch(`${cfg.baseURL}/potluck/capabilities`, { headers, redirect: "error", signal: signal() });
+      if (res.status === 404 || res.status === 405) supported = false;
+      else {
+        if (!res.ok) throw new GatewayContextError(res.status, await bodyText(res));
+        const caps = await res.json() as { prompt_count_version?: number; model_lock_version?: number };
+        if (cfg.modelLock && caps.model_lock_version !== 1) throw new Error("Gateway does not support project model locks.");
+        supported = caps.prompt_count_version === 1;
+      }
+    }
+    if (!supported) return undefined;
+    const res = await fetch(`${cfg.baseURL}/potluck/count-tokens`, {
+      method: "POST", headers, redirect: "error", signal: signal(),
+      body: JSON.stringify({ model: opts.model, messages: initialSystemMessage(messages), max_tokens: maxTokens,
+        ...(cfg.modelLock ? { potluck_model_sha256: cfg.modelLock.model.sha256 } : {}),
+        ...(tools ? { tools, tool_choice: "auto", parallel_tool_calls: false } : {}),
+        ...(opts.reasoningBudget !== undefined ? { reasoning_budget_tokens: opts.reasoningBudget } : {}) }),
+    });
+    if (!res.ok) throw new GatewayContextError(res.status, await bodyText(res));
+    const body = await res.json() as { model?: unknown; scope?: unknown; prompt_tokens?: unknown; context_window?: unknown };
+    if (body.model !== opts.model || body.scope !== scope) throw new Error("Prompt count belongs to a different model or scope.");
+    if (body.prompt_tokens === null) { supported = false; return undefined; }
+    if (!Number.isSafeInteger(body.prompt_tokens) || (body.prompt_tokens as number) < 0 ||
+        !Number.isSafeInteger(body.context_window) || (body.context_window as number) <= 0) {
+      throw new Error("Gateway returned an invalid prompt count.");
+    }
+    if (body.context_window !== opts.contextWindowTokens) throw new Error("The model context changed. Retry with its current context window.");
+    return body.prompt_tokens as number;
+  };
+}
+
+/** Some native templates accept only one initial system message. Keep the CLI's
+ * instructions, project rules and repo map in order without changing saved history
+ * or moving any later message across a user/assistant turn. */
+function initialSystemMessage(messages: ChatMessage[]): ChatMessage[] {
+  let end = 0;
+  while (messages[end]?.role === "system") end++;
+  if (end < 2) return messages;
+  return [{ role: "system", content: messages.slice(0, end).map(message => message.content).join("\n\n") },
+    ...messages.slice(end)];
+}
+
 /**
  * POST /v1/chat/completions (stream=true). Yields content deltas as they arrive.
  * Aborts cleanly when `signal` fires (Ctrl-C cancels the current turn).
@@ -143,17 +201,33 @@ export async function* streamChat(
   messages: ChatMessage[],
   opts: StreamOptions,
 ): AsyncGenerator<string, void, void> {
+  if (opts.tools && (!opts.tools.length || !opts.onToolCalls || !opts.requireSuccessfulFinish)) {
+    throw new Error("Native coding tools require a complete-stream handler.");
+  }
+  if (opts.reasoningBudget !== undefined && (!Number.isSafeInteger(opts.reasoningBudget) ||
+      opts.reasoningBudget < 0 || opts.reasoningBudget >= (opts.maxTokens ?? 4096))) {
+    throw new Error("Reasoning budget must be a nonnegative integer smaller than the output allowance.");
+  }
   const headers = authHeaders(cfg);
   const lock = cfg.modelLock;
   if (lock) {
     pinnedModel(lock, opts.model);
     if (!["local", "mine"].includes(opts.scope || "")) throw new Error("Project model locks require local or mine scope.");
+  }
+  if (lock || opts.reasoningBudget !== undefined || opts.tools) {
     // Check before sending project content to an older runtime that might ignore the lock.
     const caps = await fetch(`${cfg.baseURL}/potluck/capabilities`, {
       headers, redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(5000), ...(opts.signal ? [opts.signal] : [])]),
     });
-    if (!caps.ok || (await caps.json() as { model_lock_version?: number }).model_lock_version !== 1) {
+    const capability = caps.ok ? await caps.json() as { model_lock_version?: number; reasoning_budget_request_version?: number; parallel_tool_calls_request_version?: number } : {};
+    if (lock && capability.model_lock_version !== 1) {
       throw new Error("Gateway does not support project model locks. Upgrade the Potluck runtime before using this project.");
+    }
+    if (opts.tools && capability.parallel_tool_calls_request_version !== 1) {
+      throw new Error("Gateway cannot preserve native tool concurrency. Upgrade the Potluck runtime before using --native-tools.");
+    }
+    if (opts.reasoningBudget !== undefined && capability.reasoning_budget_request_version !== 1) {
+      throw new Error("Gateway cannot enforce reasoning budgets. Upgrade the Potluck runtime or omit --reasoning-budget.");
     }
   }
   // Keep the caller's explicit routing choice on every request.
@@ -166,7 +240,7 @@ export async function* streamChat(
     body: JSON.stringify({
       model: opts.model,
       ...(lock ? { potluck_model_sha256: lock.model.sha256 } : {}),
-      messages,
+      messages: initialSystemMessage(messages),
       temperature: opts.temperature ?? 0.2,
       // 2048 truncated any non-trivial write/edit mid-JSON (the model's output
       // is code embedded in a JSON string, which is verbose). 4096 fits a real
@@ -174,6 +248,8 @@ export async function* streamChat(
       max_tokens: opts.maxTokens ?? 4096,
       stream: true,
       stop: opts.stop,
+      ...(opts.tools ? { tools: opts.tools, tool_choice: "auto", parallel_tool_calls: false } : {}),
+      ...(opts.reasoningBudget !== undefined ? { reasoning_budget_tokens: opts.reasoningBudget } : {}),
     }),
     signal: opts.signal,
     redirect: "error",
@@ -197,6 +273,7 @@ export async function* streamChat(
   let buffer = "";
   let finishReason: string | undefined;
   let finishError: string | undefined;
+  const native = new NativeToolStream();
 
   try {
     while (true) {
@@ -219,10 +296,12 @@ export async function* streamChat(
           if (data === "[DONE]") {
             if (opts.requireSuccessfulFinish) {
               if (finishError) throw new Error(finishError);
-              if (finishReason !== "stop" && !(opts.allowLengthFinish && finishReason === "length")) {
+              if (finishReason !== "stop" && !(opts.tools && finishReason === "tool_calls") && !(opts.allowLengthFinish && finishReason === "length")) {
                 throw new Error("Gateway did not confirm a successful generation (missing finish_reason: stop).");
               }
             }
+            opts.signal?.throwIfAborted();
+            if (opts.tools) opts.onToolCalls!(native.finish(finishReason));
             return;
           }
           if (!data) continue;
@@ -275,12 +354,13 @@ export async function* streamChat(
             if (finishReason !== undefined && (delta?.content || delta?.reasoning_content || delta?.role || nativeTool || reason != null)) {
               finishError ??= "Gateway returned output after the generation had finished.";
             }
-            if (nativeTool) finishError ??= "Gateway returned native tool calls instead of a completed text response.";
+            if (delta?.function_call != null || nativeTool && !opts.tools) finishError ??= "Gateway returned native tool calls instead of a completed text response.";
+            if (delta?.tool_calls != null && opts.tools) native.append(delta.tool_calls);
             if (reason != null) {
               finishReason ??= reason;
               if (reason === "length") {
                 if (!opts.allowLengthFinish) finishError ??= "The model hit its output limit, so this reply was not applied. Try a smaller change or a larger loaded context.";
-              } else if (reason !== "stop") {
+              } else if (reason !== "stop" && !(opts.tools && reason === "tool_calls")) {
                 finishError ??= `Gateway generation ended with finish_reason: ${reason}; the reply was not accepted as complete.`;
               }
             }

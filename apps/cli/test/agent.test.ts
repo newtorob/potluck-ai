@@ -500,9 +500,9 @@ describe("runTask verify loop", () => {
       expect(text).not.toContain("passed.");
     }
     const finalRequest = streamChatMock.mock.calls.at(-1)![1] as ChatMessage[];
-    expect(finalRequest.some(message => /trimmed to fit/.test(message.content))).toBe(true);
-    expect(finalRequest.at(-1)?.content).toContain("FIXED CHECK PENDING");
-    expect(finalRequest.at(-1)?.content).not.toContain("STILL FAILS");
+    expect(estimateContextTokens(finalRequest) + 1024).toBeLessThanOrEqual(4096);
+    expect(finalRequest.at(-2)?.content).toContain("FIXED CHECK PENDING");
+    expect(finalRequest.at(-2)?.content).not.toContain("STILL FAILS");
   });
 
   it("does not start the fixed check when its start callback cancels the task", async () => {
@@ -672,7 +672,7 @@ describe("runTask context safety", () => {
       { role: "assistant", content: "old answer" },
     ];
     streamChatMock.mockImplementation((_cfg, messages: ChatMessage[]) => {
-      expect(messages.at(-1)).toEqual({ role: "user", content: task });
+      expect(messages.at(-2)).toEqual({ role: "user", content: task });
       expect(messages).not.toContain(history[1]);
       return (async function* () { yield "Explanation."; })();
     });
@@ -700,7 +700,7 @@ describe("runTask context safety", () => {
       contextWindowTokens: 8192,
       callbacks: { ...callbacks, onToolResult: result => results.push(result) },
     });
-    expect(streamChatMock.mock.calls[1][1].at(-1).content).toContain("Tool output truncated");
+    expect(streamChatMock.mock.calls[1][1].at(-2).content).toContain("Tool output truncated");
     expect(results[1]).toContain("without reading it first");
     expect(confirm).not.toHaveBeenCalled();
     expect(await readFile(join(dir, "large.ts"), "utf8")).toBe(original);

@@ -34,9 +34,9 @@ import {
   type Scope,
   type VerifyResolution,
 } from "./config.js";
-import { listModels, modelContextWindow, type ChatMessage } from "./gateway.js";
+import { listModels, modelContextWindow, createPromptCounter, type ChatMessage } from "./gateway.js";
 import { readProjectModelLock, pinnedModel, ModelLockError } from "./model-lock.js";
-import { runTask, systemPrompt } from "./agent.js";
+import { NATIVE_TOOLS, runTask, systemPrompt } from "./agent.js";
 import {
   briefSection,
   extractSnapshotBody,
@@ -110,6 +110,9 @@ function printHelp(): void {
       "  -m, --model <id>       Model to use (project lock takes precedence)",
       "      --scope <s>        Routing scope: local | mine (default from cli.json)",
       "      --verify <cmd>     Build/test command run after each edit (default: auto-detect)",
+      "      --native-tools     Use structured function calls (compatible model required)",
+      "      --bounded-repair   Experimental bounded investigation; requires verification",
+      "      --reasoning-budget N  Cap native reasoning within the output allowance",
       "      --no-verify        Disable the post-edit verify step",
       "      --save-session     Save completed turns privately (requires project pin)",
       "      --resume <id>      Continue saved history with the same project/model/scope",
@@ -211,6 +214,9 @@ async function runOneShot(
     scope: Scope;
     cwd: string;
     yes: boolean;
+    nativeTools?: boolean;
+    boundedRepair?: boolean;
+    reasoningBudget?: number;
     verifyCommand: string | null;
     session?: SavedSession;
   },
@@ -225,7 +231,7 @@ async function runOneShot(
     const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
     const { brief } = await loadBrief(opts.cwd, (line) => stderr.write(`${line}\n`));
     const conversation: ChatMessage[] = [
-      { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
+      { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief, opts.nativeTools) },
     ];
     const repoMap = await buildRepoMap(opts.cwd, 200, 512);
     const instructions = new ProjectInstructions(opts.cwd);
@@ -246,8 +252,13 @@ async function runOneShot(
       confirm,
       scope: opts.scope,
       contextWindowTokens,
+      measureTokens: opts.nativeTools ? createPromptCounter(opts.cfg, { model: opts.model, scope: opts.scope,
+        tools: NATIVE_TOOLS, reasoningBudget: opts.reasoningBudget, contextWindowTokens, signal: cancellation.signal }) : undefined,
       signal: cancellation.signal,
       verifyCommand: opts.verifyCommand,
+      nativeTools: opts.nativeTools,
+      boundedRepair: opts.boundedRepair,
+      reasoningBudget: opts.reasoningBudget,
       callbacks: {
         onToken: (t) => stdout.write(t),
         onTurnEnd: () => stdout.write("\n"),
@@ -347,6 +358,8 @@ async function main(): Promise<void> {
   pinnedModel(projectLock, args.model);
   cfg.modelLock = projectLock;
   const previousSession = args.resume ? await loadSession(args.resume) : undefined;
+  // Preserve a resumed session's native protocol, including tool/result IDs.
+  if (previousSession?.history.some(m => m.tool_calls?.length || m.role === "tool")) args.nativeTools = true;
 
   let verify = await resolveVerify({
     cwd,
@@ -401,6 +414,9 @@ async function main(): Promise<void> {
         scope,
         cwd,
         yes: args.yes,
+        nativeTools: args.nativeTools,
+        boundedRepair: args.boundedRepair,
+        reasoningBudget: args.reasoningBudget,
         verifyCommand: verify.command,
         session,
       });
@@ -476,7 +492,7 @@ async function main(): Promise<void> {
   const confirm = makeConfirm((q) => ask(q, active?.signal).then((a) => a ?? "n"));
   const briefState = await loadBrief(cwd, (line) => stdout.write(`${line}\n`));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
+    { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief, args.nativeTools) },
   ];
   const repoMap = await buildRepoMap(cwd, 200, 512);
   const instructions = new ProjectInstructions(cwd);
@@ -567,9 +583,13 @@ async function main(): Promise<void> {
           confirm,
           scope,
           contextWindowTokens,
+          measureTokens: args.nativeTools ? createPromptCounter(cfg, { model, scope, tools: NATIVE_TOOLS,
+            reasoningBudget: args.reasoningBudget, contextWindowTokens, signal: active.signal }) : undefined,
           signal: active.signal,
           verifyCommand: null,
           maxSteps: 4,
+          nativeTools: args.nativeTools,
+          reasoningBudget: args.reasoningBudget,
           callbacks: {
             onToken: (t) => stdout.write(t),
             onTurnEnd: () => stdout.write("\n"),
@@ -613,7 +633,7 @@ async function main(): Promise<void> {
     }
     if (line === "/clear") {
       const fresh = await loadBrief(cwd, (l) => stdout.write(`${l}\n`));
-      const cleared: ChatMessage[] = [{ role: "system", content: systemPrompt(cwd, verify.command, fresh.brief) }];
+      const cleared: ChatMessage[] = [{ role: "system", content: systemPrompt(cwd, verify.command, fresh.brief, args.nativeTools) }];
       try { await instructions.refresh(cleared, message => stdout.write(`${message}\n`)); }
       catch (error) { stdout.write(`${c.red((error as Error).message)}\n`); continue; }
       briefState.brief = fresh.brief;
@@ -670,8 +690,13 @@ async function main(): Promise<void> {
         confirm,
         scope,
         contextWindowTokens,
+        measureTokens: args.nativeTools ? createPromptCounter(cfg, { model, scope, tools: NATIVE_TOOLS,
+          reasoningBudget: args.reasoningBudget, contextWindowTokens, signal: active.signal }) : undefined,
         signal: active.signal,
         verifyCommand: verify.command,
+        nativeTools: args.nativeTools,
+        boundedRepair: args.boundedRepair,
+        reasoningBudget: args.reasoningBudget,
         callbacks: {
           onToken: (t) => stdout.write(t),
           onTurnEnd: () => stdout.write("\n"),

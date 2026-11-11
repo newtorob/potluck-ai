@@ -135,7 +135,8 @@ async def _create_response(request: Request, x_potluck_scope: str | None, x_potl
     parsed = await _parse(request)
     try:
         plan = await gateway.plan_chat(
-            gateway.ChatJob(parsed.prepared, parsed.model, parsed.temperature, parsed.max_tokens, parsed.stream),
+            gateway.ChatJob(parsed.prepared, parsed.model, parsed.temperature, parsed.max_tokens, parsed.stream,
+                            reasoning=parsed.reasoning),
             x_potluck_scope, x_potluck_circle,
         )
     except HTTPException as exc:

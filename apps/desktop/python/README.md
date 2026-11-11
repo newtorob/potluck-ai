@@ -23,6 +23,67 @@ model, scope, context window and the route category (`local` or `household`).
 Older serving engines may return a null window. This is a capacity snapshot,
 not a reservation: reloading the model or failing over can change it.
 
+### Per-request thinking controls
+
+Coding clients using `POST /v1/chat/completions` can send
+`"chat_template_kwargs": {"enable_thinking": false}` or
+`"reasoning_effort": "none"` to request a response without extra thinking.
+For `POST /v1/responses`, use `"reasoning": {"effort": "none"}`.
+Set `enable_thinking` to `true` to request thinking, or omit both controls to
+keep the model's default. This is separate from `reasoning_format: "none"`,
+which only keeps reasoning in the answer text and does **not** disable it.
+
+These controls require the native `llama-server` backend or a managed split
+head. Both whole and streamed gateway replies support them. Household routing
+also preserves them when the serving machine advertises
+`reasoning_controls_version: 1`; retries only use machines with that capability.
+`GET /v1/potluck/capabilities` reports the same field for the local engine.
+The internal peer route accepts them on unbatched streams (the gateway uses
+this transport for both response modes). The in-process Python backend,
+pipeline/batch mode, older household engines, and circle/pool routes return a
+clear `reasoning_controls_unsupported` error instead of ignoring the setting.
+
+Chat completions accept an explicit boolean `parallel_tool_calls` when offering
+function tools. The native runtime forwards it to the engine and template;
+`false` requests one call at a time. Gateway
+`parallel_tool_calls_request_version: 1` identifies the request contract, and
+native engine/peer `parallel_tool_calls_version: 1` identifies route support.
+Unsupported backends and older peers refuse the control; retries preserve it.
+Clients must still validate complete calls and enforce their execution policy.
+
+Both APIs also accept the Potluck extension `reasoning_budget_tokens` (integer
+0–65535), with an explicit larger output limit: `max_tokens` for chat, or
+`max_output_tokens` for Responses. The native engine caps reasoning inside that
+output limit; closing reasoning delimiters and the final answer also use tokens.
+This is not a guarantee of a completed answer. The gateway advertises
+`reasoning_budget_request_version: 1` for request validation. Native engines and
+updated household peers advertise `reasoning_budget_version: 1`; retries preserve
+the exact budget and skip older peers. Budget-only requests use the template's
+default thinking mode.
+
+`POST /v1/potluck/count-tokens` accepts the chat request shape and `local` or
+`mine` scope. `prompt_count_version: 1` advertises this optional endpoint. For a
+local native model it renders and tokenizes with the same tools, controls and
+prompt protection as generation, returning `prompt_tokens` and the loaded
+`context_window`. It checks model pins under the model lifecycle gate and never
+starts inference or records usage. Unsupported backends and remote household
+routes return null counts; they do not forward the prompt or invent an estimate.
+Counts describe the current model snapshot; generation still enforces its own
+context limit if the runtime changes between requests.
+
+A prompt containing protected control-token text needs a raw-token rendering
+path. Reasoning budgets currently fail explicitly on that path; prompt protection
+stays enabled and the engine remains running. Retry without the budget, or use a
+supported thinking toggle. Never interpret refusal as a successful generation.
+
+Effort values `none`, `minimal`, `low`, `medium`, `high`, and `xhigh` are passed
+to the native engine. Their effect depends on the loaded model's template;
+transport support does not establish that a model honors every effort level or
+can disable thinking. Only the boolean `enable_thinking` template variable is
+accepted. Invalid types, other template variables, and contradictory controls
+return 400 before inference. Turning thinking off can change answer quality;
+it is an explicit client choice, not an automatic speed optimization.
+
 ### Native local inference (experimental, opt-in)
 
 macOS and Linux builds containing Potluck's pinned native engine can use

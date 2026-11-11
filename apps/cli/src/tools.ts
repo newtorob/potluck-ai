@@ -24,6 +24,8 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { unifiedDiff } from "./diff.js";
+import { compactVerification } from "./repair-feedback.js";
+import { sourceNavigation, type SourceLocation } from "./source-navigation.js";
 import {
   escapeRegExp,
   globToRegExp,
@@ -42,12 +44,25 @@ export interface ConfirmContext {
 
 export type Confirm = (ctx: ConfirmContext) => Promise<boolean>;
 
+export interface FileReadObservation {
+  /** Canonical path, validated by the tool's workspace boundary. */
+  path: string;
+  startLine: number;
+  content: string;
+  truncatedLine: boolean;
+  navigation?: SourceLocation[];
+}
+
 export interface ToolDeps {
   cwd: string;
   confirm: Confirm;
   signal?: AbortSignal;
   /** The approved shell actually started; it may mutate files even if it exits nonzero. */
   onCommandStarted?: () => void;
+  /** Actual read metadata, kept separate from untrusted file text. */
+  onFileRead?: (observation: FileReadObservation) => void;
+  /** Opt-in repair navigation. Locations do not authorize whole-file replacement. */
+  repairSymbols?: readonly string[];
   /**
    * Absolute paths the agent has fully read this task. read_file adds to it; write_file
    * refuses to blind-overwrite an existing file that isn't in it. Optional so
@@ -91,9 +106,8 @@ const MAX_SEARCH_FILE_BYTES = 2_000_000; // skip very large files when searching
 // cycle (a -> b -> a), which realpath would report as ELOOP.
 const MAX_SYMLINK_HOPS = 32;
 
-// Verify output is tail-capped (build/type errors cluster at the END), unlike
-// run_command which keeps the head. A rolling buffer bounds memory on a runaway
-// build; the final result is trimmed to the last few KB / lines.
+// Successful checks keep a short tail. Failed checks retain literal assertion
+// evidence from a bounded head and rolling tail, even after long progress logs.
 const VERIFY_KEEP_BYTES = 3_000;
 const VERIFY_KEEP_LINES = 40;
 const VERIFY_BUFFER_BYTES = 256_000;
@@ -251,10 +265,22 @@ async function readFileTool(
   // A partial inspection cannot establish that a previous full read is current.
   forgetRead(deps, abs);
   const range = await readLineRange(abs, offset, limit);
+  let navigation: SourceLocation[] | undefined;
+  if (deps.repairSymbols && !range.truncatedLine && /\.(?:py|tsx?|jsx?)$/i.test(path)) {
+    // Only index this already-authorized file; never follow paths from test output.
+    const info = await lstat(abs);
+    if (info.isFile() && info.size <= MAX_SEARCH_FILE_BYTES) {
+      const text = await readFile(abs, "utf8");
+      navigation = sourceNavigation(text, range.content, deps.repairSymbols);
+    }
+  }
+  deps.onFileRead?.({ path: abs, startLine: offset, content: range.content, truncatedLine: range.truncatedLine, navigation });
+  const nav = navigation?.length ? "\n[Source navigation: static declaration candidates in this file; inspect the body before relying on it.]\n" +
+    navigation.map(item => `${item.name}: read_file offset=${item.line} limit=60`).join("\n") : "";
   if (offset === 1 && range.eof && !range.truncatedLine) {
     deps.readPaths?.add(abs);
     deps.readVersions?.set(abs, contentVersion(range.content));
-    return range.content;
+    return range.content + nav;
   }
   const next = range.lastLine + 1;
   const guidance = range.truncatedLine
@@ -266,7 +292,7 @@ async function readFileTool(
       : `Continue with read_file offset=${next} and limit=${limit}.`;
   return `[Partial read: lines ${offset}-${range.lastLine}. ${guidance} ` +
     `Use edit_file for targeted changes; this does not permit a whole-file overwrite.]\n` +
-    range.content;
+    range.content + nav;
 }
 
 function readPositiveInteger(
@@ -749,7 +775,19 @@ function resolveEdit(
 /** Bounded, literal file context. Never guess a different edit or target file. */
 function editContext(path: string, content: string, anchor = ""): string {
   const budget = 3000;
-  const offset = anchor ? Math.max(0, content.indexOf(anchor)) : 0;
+  let offset = anchor ? content.indexOf(anchor) : 0;
+  if (offset < 0) {
+    // A failed replacement is not permission to guess an edit. Locate a unique
+    // unchanged line solely to show useful current source beside the error.
+    const lines = anchor.split("\n").map(line => line.trim()).filter(line => line.length >= 12);
+    lines.sort((a, b) => Number(/^(?:async )?(?:def|class|function)\b/.test(b)) -
+      Number(/^(?:async )?(?:def|class|function)\b/.test(a)) || b.length - a.length);
+    for (const line of lines) {
+      const found = content.indexOf(line);
+      if (found >= 0 && content.indexOf(line, found + 1) < 0) { offset = found; break; }
+    }
+    offset = Math.max(0, offset);
+  }
   const start = content.length <= budget ? 0 : Math.max(0, content.lastIndexOf("\n", Math.max(0, offset - 500)) + 1);
   const end = Math.min(content.length, start + budget);
   const partial = start > 0 || end < content.length;
@@ -861,7 +899,7 @@ async function runCommandTool(
 
 export interface VerifyOutcome {
   code: number;
-  /** stdout+stderr, tail-capped to the last few lines / KB. */
+  /** Bounded stdout+stderr, retaining failure evidence on unsuccessful checks. */
   output: string;
 }
 
@@ -877,16 +915,20 @@ function tailCap(s: string): string {
 /**
  * Run the configured verify command (build/tests) after an edit. Same child_process
  * spawn as run_command, but it is not gated (the user configured it) and the
- * captured output is tail-capped - build errors land at the end.
+ * failed output retains literal failure evidence within a bounded excerpt.
  */
 export async function runVerify(command: string, cwd: string, signal?: AbortSignal): Promise<VerifyOutcome> {
   let buf = "";
+  let first = "";
+  let overflow = false;
   try {
     const code = await commandProcess(command, cwd, { signal, onData: b => {
-      buf += b.toString("utf8");
-      if (buf.length > VERIFY_BUFFER_BYTES) buf = buf.slice(buf.length - VERIFY_BUFFER_BYTES);
+      const text = b.toString("utf8");
+      if (first.length < 32000) first += text.slice(0, 32000 - first.length);
+      buf += text;
+      if (buf.length > VERIFY_BUFFER_BYTES) { overflow = true; buf = buf.slice(buf.length - VERIFY_BUFFER_BYTES); }
     } });
-    return { code, output: tailCap(buf) };
+    return { code, output: code === 0 ? tailCap(buf) : compactVerification(overflow ? first + "\n[intermediate process output omitted]\n" + buf : buf).trim() };
   } catch (error) {
     signal?.throwIfAborted();
     return { code: -1, output: `failed to start: ${(error as Error).message}` };

@@ -9,6 +9,9 @@ export interface CliArgs {
   print: boolean;
   yes: boolean;
   noVerify: boolean;
+  nativeTools?: boolean;
+  boundedRepair?: boolean;
+  reasoningBudget?: number;
   json: boolean;
   model?: string;
   use?: ModelUse;
@@ -83,6 +86,13 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--version" || arg === "-v") out.version = true;
     else if (arg === "--yes" || arg === "-y") out.yes = true;
     else if (arg === "--json") out.json = true;
+    else if (arg === "--native-tools") out.nativeTools = true;
+    else if (arg === "--bounded-repair") out.boundedRepair = true;
+    else if (flag === "--reasoning-budget") {
+      const v = value();
+      if (!/^\d+$/.test(v) || !Number.isSafeInteger(Number(v)) || Number(v) > 65535) throw new UsageError("--reasoning-budget must be an integer from 0 to 65535, below the output allowance.");
+      out.reasoningBudget = Number(v);
+    }
     else if (arg === "--no-verify") out.noVerify = true;
     else if (arg === "--wait") out.wait = true;
     else if (arg === "--no-wait") out.wait = false;
@@ -299,7 +309,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
   // --yes confirms joining, leaving or deleting a circle; elsewhere it is an agent option.
   const circleConfirm = out.command === "circle" && ["join", "leave", "delete"].includes(out.action || "");
-  if (out.command && (out.print || (out.model && !["setup", "launch", "run", "benchmark"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm && out.command !== "benchmark"))) {
+  if (out.command && (out.print || out.nativeTools || out.boundedRepair || out.reasoningBudget !== undefined || (out.model && !["setup", "launch", "run", "benchmark"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm && out.command !== "benchmark"))) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
@@ -322,5 +332,6 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "benchmark" && out.model !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(out.model)) throw new UsageError("Use a model ID from potluck models list.");
   if (out.circle !== undefined && out.scope !== "circle") throw new UsageError("--circle requires --scope circle.");
   if (out.verify !== undefined && out.noVerify) throw new UsageError("Choose --verify or --no-verify.");
+  if (out.boundedRepair && out.noVerify) throw new UsageError("--bounded-repair requires verification; remove --no-verify.");
   return out;
 }

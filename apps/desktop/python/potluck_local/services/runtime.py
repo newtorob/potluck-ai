@@ -30,6 +30,7 @@ from pathlib import Path
 
 from potluck_local.services import (
     acceptance,
+    native_tool_controls,
     inference_errors,
     investigation_profiles,
     memory_probe,
@@ -37,6 +38,7 @@ from potluck_local.services import (
     model_traits,
     prompt_cache,
     prompt_guard,
+    reasoning_controls,
     tool_calls,
     tool_markers,
 )
@@ -433,6 +435,9 @@ class LLMRuntime:
         """Return the n_ctx the currently loaded model was initialised with, or None."""
         return self._loaded_n_ctx
 
+    def supports_reasoning_controls(self) -> bool:
+        return self.is_loaded() and self._pipeline is None and self._batcher is None and _native_model(self._model)
+
     def template_traits(self) -> "model_traits.TemplateTraits | None":
         """What the loaded llama.cpp model's chat template can do (tools, an opened
         reasoning block). None when nothing is loaded or the backend cannot say."""
@@ -442,6 +447,29 @@ class LLMRuntime:
         if isinstance(native_traits, model_traits.TemplateTraits):
             return native_traits if self.is_loaded() else None
         return model_traits.traits_of_model(self._model)
+
+    async def count_chat_tokens(self, messages, *, expected_model=None, expected_sha256=None,
+                                reasoning=None, **kwargs) -> dict | None:
+        """Count a native rendered prompt under the model lifecycle gate.
+
+        Other backends return unavailable rather than a misleading text-only count.
+        Cancellation drains loopback rendering before allowing unload; no inference
+        slot, usage record or prompt cache is touched.
+        """
+        async with self._admission_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
+            counter = getattr(self._model, "count_chat_tokens", None)
+            if self._pipeline is not None or not _native_model(self._model) or not callable(counter):
+                return None
+            worker = asyncio.get_running_loop().run_in_executor(
+                None, partial(counter, messages=messages, **kwargs,
+                              **(reasoning.wire() if reasoning is not None else {})),
+            )
+            try:
+                count = await asyncio.shield(worker)
+                return {"prompt_tokens": count, "context_window": self.loaded_n_ctx()}
+            finally:
+                await self._drain_worker(worker)
 
     async def count_tokens(self, text: str) -> int | None:
         """Tokens in ``text`` by the loaded llama.cpp model's own tokenizer, or None
@@ -2135,6 +2163,8 @@ class LLMRuntime:
         tool_choice: str | dict | None = None,
         stop: list[str] | None = None,
         tool_proof: bool = False,
+        reasoning: reasoning_controls.ReasoningControls | None = None,
+        parallel_tool_calls: bool | None = None,
         response_format: dict | None = None,
         generation_profile: str | None = None,
         seed: int | None = None,
@@ -2151,10 +2181,14 @@ class LLMRuntime:
 
         async with self._inference_lock:
             self.assert_model_identity(expected_model, expected_sha256)
+            if reasoning is not None:
+                reasoning_controls.require(self)
+            if parallel_tool_calls is not None:
+                native_tool_controls.require(self)
             loop = asyncio.get_running_loop()
             model = self._model
             if response_format is not None:
-                if tools or tool_choice is not None:
+                if tools or tool_choice is not None or parallel_tool_calls is not None:
                     raise ValueError("Structured responses cannot be combined with tools")
                 response_format = _structured_response_format(model, response_format)
             model_id = self._model_id
@@ -2165,7 +2199,7 @@ class LLMRuntime:
                        if generation_profile is not None else None)
             profile_handler = None
             if profile is not None or bounded_generation:
-                if response_format is None or tools or tool_choice is not None:
+                if response_format is None or tools or tool_choice is not None or reasoning is not None:
                     raise ValueError("Bounded investigation generation requires structured output without tools or reasoning controls")
                 if profile is not None or not managed_split:
                     profile_handler = investigation_profiles.stock_handler(model, profile, cancel_event)
@@ -2186,7 +2220,10 @@ class LLMRuntime:
                             verbose=False,
                         )
                 safe_messages, extra, ticket = prompt_guard.protect_chat(
-                    model, messages, {**tool_calls.completion_kwargs(tools, tool_choice), **structured})
+                    model, messages, {**tool_calls.completion_kwargs(tools, tool_choice),
+                                      **(reasoning.wire() if reasoning is not None else {}),
+                                      **({"parallel_tool_calls": parallel_tool_calls} if parallel_tool_calls is not None else {}),
+                                      **structured})
                 try:
                     with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
                         kwargs = dict(
@@ -2259,6 +2296,8 @@ class LLMRuntime:
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
         tool_proof: bool = False,
+        reasoning: reasoning_controls.ReasoningControls | None = None,
+        parallel_tool_calls: bool | None = None,
     ):
         """Yield llama-cpp's native OpenAI-shaped streaming chunk dicts.
 
@@ -2278,6 +2317,10 @@ class LLMRuntime:
 
         async with self._inference_lock:
             self.assert_model_identity(expected_model, expected_sha256)
+            if reasoning is not None:
+                reasoning_controls.require(self)
+            if parallel_tool_calls is not None:
+                native_tool_controls.require(self)
             loop = asyncio.get_running_loop()
             queue: asyncio.Queue = asyncio.Queue()
             model = self._model
@@ -2291,7 +2334,9 @@ class LLMRuntime:
                 try:
                     # Control-token text in the request stays text (prompt_guard).
                     safe_messages, extra, ticket = prompt_guard.protect_chat(
-                        model, messages, tool_calls.completion_kwargs(tools, tool_choice))
+                        model, messages, {**tool_calls.completion_kwargs(tools, tool_choice),
+                                          **(reasoning.wire() if reasoning is not None else {}),
+                                      **({"parallel_tool_calls": parallel_tool_calls} if parallel_tool_calls is not None else {})})
                     with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
                         chunks = model.create_chat_completion(
                             messages=safe_messages,

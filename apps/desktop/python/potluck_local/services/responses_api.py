@@ -45,7 +45,11 @@ in ``ignored_tools``; the router reports them in X-Potluck-Ignored-Tools.
 {"type": "custom", "name"} and {"type": "allowed_tools", "mode"} (the mode only).
 ``parallel_tool_calls: false`` keeps only the first call of a reply.
 
-Accepted and ignored: ``store``, ``metadata`` (echoed), ``include``, ``reasoning``,
+``reasoning.effort`` and ``chat_template_kwargs.enable_thinking`` are forwarded
+on routes that advertise thinking controls. Unsupported routes refuse them.
+Reasoning summaries are ignored; the reply still omits reasoning text.
+
+Accepted and ignored: ``store``, ``metadata`` (echoed), ``include``,
 ``prompt_cache_key``, ``client_metadata``, ``service_tier``, ``truncation``, ``user``,
 ``top_p`` and any unknown field. ``top_p`` is not applied: the engine's chat path
 takes temperature only.
@@ -76,6 +80,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from potluck_local.services import anthropic_messages as am
+from potluck_local.services import reasoning_controls
 from potluck_local.services.anthropic_messages import Failure, shown_name
 from potluck_local.services.gateway_request import Prepared, RequestError, normalise_message, prepare
 from potluck_local.services.token_estimate import engine_count as _count
@@ -139,6 +144,7 @@ class ResponsesRequest:
     names: ToolNames
     ignored_tools: tuple[str, ...]
     echo: dict  # request settings a Response reports back
+    reasoning: reasoning_controls.ReasoningControls | None = None
 
 
 def _join_namespace(namespace: str, name: str) -> str:
@@ -388,6 +394,11 @@ def parse_request(body: Any, *, default_temperature: float) -> ResponsesRequest:
     if system:
         messages.insert(0, normalise_message("system", system))
     prepared = prepare(messages, tools, _tool_choice(body.get("tool_choice"), names))
+    reasoning = body.get("reasoning")
+    if reasoning is not None and not isinstance(reasoning, dict):
+        raise RequestError("invalid_reasoning_controls", "reasoning must be an object.")
+    controls = reasoning_controls.parse(body.get("chat_template_kwargs"), (reasoning or {}).get("effort"),
+                                        body.get("reasoning_budget_tokens"), max_tokens=body.get("max_output_tokens"))
 
     max_tokens = body.get("max_output_tokens")
     if max_tokens is not None and (type(max_tokens) is not int or max_tokens < 1):
@@ -404,7 +415,7 @@ def parse_request(body: Any, *, default_temperature: float) -> ResponsesRequest:
     parallel = body.get("parallel_tool_calls")
     return ResponsesRequest(
         model=model or None, prepared=prepared, max_tokens=max_tokens, temperature=float(temperature),
-        stream=stream, first_call_only=parallel is False, names=names, ignored_tools=ignored,
+        stream=stream, first_call_only=parallel is False, names=names, ignored_tools=ignored, reasoning=controls,
         echo={
             "instructions": instructions, "max_output_tokens": max_tokens,
             "metadata": metadata if isinstance(metadata, dict) else {},
@@ -471,7 +482,8 @@ def _response(request: ResponsesRequest, model: str, response_id: str, created_a
         "instructions": echo["instructions"], "max_output_tokens": echo["max_output_tokens"],
         "metadata": echo["metadata"], "model": model, "output": output,
         "parallel_tool_calls": echo["parallel_tool_calls"], "previous_response_id": None,
-        "reasoning": {"effort": None, "summary": None}, "store": False, "temperature": echo["temperature"],
+        "reasoning": {"effort": request.reasoning.effort if request.reasoning else None, "summary": None},
+        "store": False, "temperature": echo["temperature"],
         "text": {"format": {"type": "text"}}, "tool_choice": echo["tool_choice"], "tools": [],
         "top_p": echo["top_p"], "truncation": "disabled", "usage": usage, "user": None,
     }

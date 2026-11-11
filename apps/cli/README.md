@@ -58,6 +58,40 @@ To use the `potluck` command globally, link the built package:
 pnpm link --global   # then: potluck
 ```
 
+## Native coding actions (opt-in)
+
+For a model with function-call support on the current native runtime:
+
+```bash
+potluck --native-tools --reasoning-budget 256 --verify 'python3 -m unittest discover -s tests -v' -p 'Fix the failing behavior and preserve existing callers.'
+```
+
+`--native-tools` uses structured function calls for the same seven coding tools.
+The CLI verifies gateway support and sends `parallel_tool_calls: false` through
+the native runtime. Exactly one action runs per turn, only after a successful terminal stream frame
+and `[DONE]`. Calls retain edit/command approval, workspace containment, current
+file reads, and fixed verification. Parallel calls, invalid arguments, truncated
+responses and text/XML pretending to be native calls execute nothing. Invalid
+arguments receive bounded repair feedback. Saved sessions containing native calls
+retain their IDs and resume in native mode. The text-action protocol remains the default.
+
+`--reasoning-budget N` is optional and caps native reasoning within the total
+output allowance; it does not add tokens or guarantee that an edit will finish.
+Use a nonnegative integer below the output allowance (normally at most 4096,
+or a quarter of the loaded context window). The CLI checks gateway support before
+sending project content. Unsupported routes fail rather than silently ignoring
+the cap. Tool definitions and structured history count against context limits.
+
+Use the **loaded** context window when sizing a task, not the model's advertised
+maximum. Native schemas, source reads and failure feedback all need room.
+Repeated context-trimming notices during a multi-file repair mean you should
+load a larger window or narrow the task; a partial repair is still incomplete.
+
+The agent is prompted to preserve behavior across boundaries and independently
+varying inputs. Supply a fixed check that exercises those requirements: a passing
+example alone is not proof of a complete repair. Hidden evaluation checks are
+never fed back to the model. These options do not establish broad coding quality.
+
 ## Project instructions
 
 The built-in coding agent automatically reads `AGENTS.md` from the repository
@@ -74,6 +108,11 @@ each new REPL task and `/snapshot`, on `/clear`, and when starting or resuming a
 one-shot run. Changed instructions replace the previous copy. Saved sessions
 reload current files instead of restoring old system instructions. A failed
 refresh stops the next task; it never silently reuses stale rules.
+
+Before sending a request, the CLI combines its consecutive leading system
+messages into one, retaining the agent instructions, project guidance and
+repository map in order. This supports model templates that accept only one
+initial system message. Saved history and later conversation turns stay intact.
 
 Instruction files must be regular UTF-8 files, not symlinks. Each file is limited
 to 8 KiB; the combined message, including source labels, is limited to 16 KiB.
@@ -270,15 +309,72 @@ the entire file. A single oversized line is marked as truncated and needs a
 bounded character read through an approved shell command.
 
 Before each task, the CLI checks the loaded context window for the selected
-model and `local` or `mine` route. It reserves output space and uses a conservative
-UTF-8 byte estimate plus template overhead for history. This is not an exact
-tokenizer count. Older engines without window metadata use a clearly announced
+model and `local` or `mine` route. With native tools and a supported local native
+engine, it measures the rendered prompt with that model's tokenizer, including
+tool definitions and template overhead, before reserving output space. This lets
+fitting source stay in context instead of being discarded by a byte estimate.
+Older gateways, remote household routes and unsupported backends retain the
+conservative UTF-8 byte estimate plus template overhead. Tokenizer errors and
+changed model identities stop the request; they do not silently use an estimate.
+Older engines without window metadata use a clearly announced
 4,096-token fallback. A model reload or household failover can change capacity
 after the check; the gateway still rejects a request that exceeds the new window.
 Instructions and the current task are kept intact; older exchanges and oversized
 tool feedback may be shortened with explicit notices. If the required content
 cannot fit, the task stops incomplete and asks for a larger loaded context or a
-smaller task. Compacted file contents must be read again before a whole-file rewrite.
+smaller task. Compaction prioritizes observed ranges containing task-named
+declarations and relevant file paths ahead of unrelated output. Several ranges
+from the same file can survive a newer read; this is a bounded heuristic, not
+semantic understanding. Native calls and results stay together. Compacted file
+contents must be read again before a whole-file rewrite.
+
+Each request shows the remaining model-turn budget, including the current turn,
+when that guidance fits alongside the required task and latest feedback.
+This transient control appears at the end of the prompt, leaving the initial
+system instructions and saved transcript unchanged. Prompt sizing includes the
+control message and the exact tools offered on that turn.
+The agent is reminded to leave room for a targeted edit and its fixed check,
+without guessing when evidence is missing. Repeated reads compare actual lines
+and canonical paths, including overlapping ranges. Unchanged lines count as
+redundant only while their complete read results remain in the model's context;
+new lines, changed content and rereading omitted context are allowed. Two
+successive redundant rereads stop incomplete. Shell execution and successful
+edits invalidate affected source observations. These controls do not establish
+that a model can solve a particular coding task.
+
+For explicit bug-fix tasks, `--bounded-repair` enables an experimental decision
+stage. It requires a fixed `--verify` command or a detected project check;
+`--no-verify` is incompatible. With a normal turn budget, up to four inspection
+actions (reads, searches, listings or commands, including failures) are allowed
+before the agent must attempt a justified targeted edit or report the specific
+missing fact preventing one. In that stage, native requests offer only edit/write
+tools; all other tool calls are rejected before execution. Two violations stop
+incomplete. An actual file change reopens two inspection actions, and the fixed
+check runs as usual. Failed/no-op edits do not refill the allowance. A final
+answer without a source change is incomplete even if an unrelated check passes.
+Approval, workspace, overwrite and verification guards still apply; the mode
+never forces a speculative edit. Use ordinary mode for reviews or explanations.
+
+After a failed check, the bounded mode pins a literal excerpt of the current
+assertion/traceback in the measured runtime control message. If that evidence
+cannot fit, it stops incomplete rather than silently dropping it. Successful
+checks clear the failure. Matching source ranges get higher retention priority;
+edits and commands still invalidate stale observations. Repeated failures guide
+the agent to the observed function or branch controlling the behavior and to
+preserve neighboring inputs and independently varying parameters.
+
+Python and JavaScript/TypeScript reads can include up to eight same-file
+declaration locations for names in the task/failure or calls in the observed
+range. This bounded lexical index scans files up to 2 MB; it is navigation,
+not a call graph or proof of the cause. It does not follow traceback paths,
+read other files, or authorize whole-file replacement. The agent must inspect
+the relevant body. Verification output keeps bounded failure evidence instead
+of only a log tail; very long logs can still be excerpted and are labeled.
+This policy needs fresh coding evaluation before any default rollout.
+
+```bash
+potluck --native-tools --bounded-repair --verify 'python -m pytest' -p 'Fix the reported bug'
+```
 
 The initial repository map includes bounded Python and JavaScript/TypeScript
 declaration hints (names and line numbers), within a 512-byte initial map. These are a heuristic to locate the
@@ -299,8 +395,12 @@ This lets the agent inspect placement and repair stale or wrong-file edits witho
 guessing another target. It does not automatically redirect or apply failed edits.
 Failed verification stays in subsequent tool feedback, and an
 early final answer gets a chance to repair within the original turn budget.
-During repair, a bounded excerpt of the original request is also placed beside
-the latest feedback, consuming the existing context budget. Passing configured
+During repair, the original request stays pinned. The latest verification status
+and literal failure evidence appear once in the model's prompt; repeated copies
+are removed from older feedback, while the local transcript retains them. Long
+check output preserves failure excerpts and the final summary. Failed edit anchors
+may show a nearby uniquely matching source line but never apply an approximate edit.
+Passing configured
 checks is necessary but does not establish complete task correctness.
 When verification is configured but no check has run, a final response triggers
 the fixed check even if the model made no edits. An executed shell command makes

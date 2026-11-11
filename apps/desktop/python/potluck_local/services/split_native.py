@@ -17,6 +17,7 @@ import time
 import httpx
 
 from . import prompt_cache, prompt_guard, tool_markers
+from .gateway_request import RequestError
 
 logger = logging.getLogger(__name__)
 PIN = json.loads(importlib.resources.files("potluck_local.data").joinpath("split-engine.json").read_text())
@@ -139,6 +140,10 @@ class _SplitRequest:
     admitted: bool = False
     # Waiting on or running a slot restore: a bounded native call cancel() must not mistake for a hang.
     restoring: bool = False
+    # Explicit controls can change the assistant prefix. Keep the actual render
+    # with this request so reply parsing and disk-cache lookup use the same one.
+    rendered_prompt: str | None = None
+    opens_reasoning: bool = False
 
 
 class SplitModel:
@@ -368,13 +373,26 @@ class SplitModel:
         tokens, and /v1/completions gets the token ids. A request with no such
         text is returned untouched for /v1/chat/completions.
         """
+        controlled = any(key in body for key in ("chat_template_kwargs", "reasoning_effort", "reasoning_budget_tokens"))
         guard = self._guard()
         if guard is None:
+            if controlled:
+                self._render_controlled(request, body)
             return CHAT_PATH, body, prompt_guard.NO_TICKET
         clean, ticket = guard.sanitize({"messages": body.get("messages"), "tools": body.get("tools")})
         if not ticket.active:
+            if controlled:
+                self._render_controlled(request, body)
             return CHAT_PATH, body, prompt_guard.NO_TICKET
         try:
+            # Raw token completions lack the native chat session's reasoning
+            # delimiters. Never silently ignore a budget or bypass prompt guard.
+            if "reasoning_budget_tokens" in body:
+                # Admission has not reached native inference. A consumer may
+                # close the error stream immediately; cancellation can safely
+                # retain this engine without probing a nonexistent request.
+                request.prevented_send = True
+                raise RequestError("reasoning_budget_unsupported", "Reasoning budgets are unavailable for prompts requiring protected-token rendering; retry without the budget.")
             template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
             template["messages"] = clean["messages"]
             if "tools" in template:
@@ -383,6 +401,8 @@ class SplitModel:
             # its trace, so cancellation can reach it.
             with httpx.Client(timeout=httpx.Timeout(30, connect=3), trust_env=False) as client:
                 text = self._post(client, request, "/apply-template", template)["prompt"]
+                if controlled:
+                    self._remember_render(request, body, text)
                 tokens: list[int] = []
                 plain: dict[str, list[int]] = {}  # a protected text repeats; tokenize it once
                 # The template text has no BOS; the server adds it on the first piece.
@@ -417,6 +437,30 @@ class SplitModel:
             raise
 
     @staticmethod
+    def _remember_render(request: _SplitRequest, body: dict, text: str):
+        if not isinstance(text, str):
+            raise SplitError("The native engine could not render the requested thinking mode.", 502)
+        request.rendered_prompt = text
+        # Native servers start with reasoning-format none. An explicit native
+        # formatting override owns its own reasoning fields instead.
+        request.opens_reasoning = body.get("reasoning_format", "none") == "none" and text.rstrip().endswith("<think>")
+
+    def _render_controlled(self, request: _SplitRequest, body: dict):
+        template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
+        with httpx.Client(timeout=httpx.Timeout(30, connect=3), trust_env=False) as client:
+            text = self._post(client, request, "/apply-template", template)["prompt"]
+        self._remember_render(request, body, text)
+
+    @staticmethod
+    def _reasoning_prefix(text: str, request: _SplitRequest) -> str:
+        # Make the template's implicit opener visible to remote gateways, which
+        # cannot infer it from the split head's default template traits.
+        if request.opens_reasoning and text:
+            request.opens_reasoning = False
+            return "<think>" + text
+        return text
+
+    @staticmethod
     def _chat_reply(result: dict) -> dict:
         """A /v1/completions reply as the chat.completion the chat endpoint returns."""
         choices = [{"index": c.get("index", 0), "finish_reason": c.get("finish_reason"),
@@ -447,7 +491,9 @@ class SplitModel:
             return list(body["prompt"])
         template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
         with httpx.Client(timeout=httpx.Timeout(30, connect=3), trust_env=False) as client:
-            text = self._post(client, request, "/apply-template", template)["prompt"]
+            text = request.rendered_prompt
+            if text is None:
+                text = self._post(client, request, "/apply-template", template)["prompt"]
             return self._post(client, request, "/tokenize", {"content": text, "add_special": True, "parse_special": True})["tokens"]
 
     def _cache_begin(self, request: _SplitRequest, path: str, body: dict):
@@ -486,6 +532,18 @@ class SplitModel:
         except Exception:  # noqa: BLE001
             logger.warning("split_prompt_cache_final_save_failed", exc_info=True)
 
+    def count_chat_tokens(self, **body) -> int:
+        """Render the same guarded prompt without decoding or touching a slot."""
+        if self.closed:
+            raise SplitError("The native model is stopped.")
+        request = _SplitRequest(threading.Event())
+        ticket = prompt_guard.NO_TICKET
+        try:
+            path, prepared, ticket = self._prepare(request, body)
+            return len(self._prompt_ids(request, path, prepared))
+        finally:
+            ticket.close()
+
     def create_chat_completion(self, **kwargs):
         cancel_event = kwargs.pop("cancel_event", None)
         request = self._begin(cancel_event)
@@ -516,12 +574,18 @@ class SplitModel:
                     for choice in result["choices"]:
                         if markers:
                             choice["text"] = tool_markers.tag_whole(markers, choice)
-                    return self._chat_reply(result)
+                    result = self._chat_reply(result)
                 for choice in result["choices"]:
                     message = choice.get("message")
                     if isinstance(message, dict) and isinstance(message.get("content"), str):
-                        message["content"] = tool_markers.escape(message["content"])
+                        text = message["content"]
+                        if path != COMPLETION_PATH:
+                            text = tool_markers.escape(text)
+                        message["content"] = self._reasoning_prefix(text, request)
                 return result
+        except RequestError:
+            # A refused control is not an engine failure; keep the model alive.
+            raise
         except Exception:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
@@ -566,6 +630,9 @@ class SplitModel:
                             if "logprobs" in body and self.tool_markers():
                                 for choice in chunk.get("choices", []):
                                     choice["text"] = tool_markers.tag_chunk(self.tool_markers(), choice)
+                            for choice in chunk.get("choices", []):
+                                if isinstance(choice.get("text"), str):
+                                    choice["text"] = self._reasoning_prefix(choice["text"], request)
                             for shaped in self._chat_chunks(chunk, first):
                                 yield shaped
                             first = False
@@ -573,9 +640,12 @@ class SplitModel:
                             for choice in chunk.get("choices", []):
                                 delta = choice.get("delta") if isinstance(choice, dict) else None
                                 if isinstance(delta, dict) and isinstance(delta.get("content"), str):
-                                    delta["content"] = tool_markers.escape(delta["content"])
+                                    delta["content"] = self._reasoning_prefix(tool_markers.escape(delta["content"]), request)
                             yield chunk
             raise SplitError("Split inference was interrupted before completion.", 502)
+        except RequestError:
+            # A refused control is not an engine failure; keep the model alive.
+            raise
         except Exception:
             if request.cancelled.is_set():
                 raise self._cancelled() from None

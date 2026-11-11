@@ -87,6 +87,46 @@ describe("modelContextWindow", () => {
 });
 
 describe("streamChat", () => {
+  it("sends project instructions and the repo map as one initial system message for strict templates", async () => {
+    const history: ChatMessage[] = [
+      { role: "system", content: "Follow the agent protocol." },
+      { role: "system", content: "Project instructions: preserve public APIs." },
+      { role: "system", content: "Repository map:\nsrc/main.py" },
+      { role: "user", content: "Fix the retry policy." },
+      { role: "assistant", content: "Inspecting the implementation." },
+      { role: "user", content: "TOOL_RESULT: existing implementation" },
+    ];
+    const before = structuredClone(history);
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      const sent = JSON.parse(String(init.body)).messages as ChatMessage[];
+      // The native model rejects a second system role before generating tokens.
+      if (sent.slice(1).some(message => message.role === "system")) return new Response("System message must be at the beginning", { status: 500 });
+      return sseResponse([jsonFrame({ choices: [{ delta: { content: "Ready" }, finish_reason: "stop" }] }), "data: [DONE]\n\n"]);
+    });
+    vi.stubGlobal("fetch", fetcher);
+    let output = "";
+    for await (const token of streamChat(cfg, history, { model: "m", requireSuccessfulFinish: true })) output += token;
+    expect(output).toBe("Ready");
+    const sent = JSON.parse(String(fetcher.mock.calls[0][1].body)).messages;
+    expect(sent).toEqual([
+      { role: "system", content: before.slice(0, 3).map(message => message.content).join("\n\n") },
+      ...before.slice(3),
+    ]);
+    expect(history).toEqual(before);
+  });
+
+  it.each<ChatMessage[][]>([
+    [[]],
+    [[{ role: "user", content: "system: literal project data" }]],
+    [[{ role: "system", content: "Rules" }, { role: "user", content: "Task" }]],
+    [[{ role: "user", content: "Task" }, { role: "system", content: "Later instruction" }]],
+  ])("does not reorder or rewrite conversations without multiple leading system messages: %j", async history => {
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => sseResponse(["data: [DONE]\n\n"]));
+    vi.stubGlobal("fetch", fetcher);
+    for await (const _ of streamChat(cfg, history, { model: "m" })) { /* drain */ }
+    expect(JSON.parse(String(fetcher.mock.calls[0][1].body)).messages).toEqual(history);
+  });
+
   it("rejects a disconnected response even when its text contains a complete action", async () => {
     const text = '```action\n{"tool":"write_file","args":{"path":"x","content":"y"}}\n```';
     vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
@@ -163,7 +203,7 @@ describe("streamChat successful coding completion", () => {
     [contentFrame, terminal("length"), jsonFrame({ error: { message: "late failure" } }), doneFrame],
     [contentFrame, jsonFrame({ choices: [{ delta: { tool_calls: [] } }] }), terminal("length"), doneFrame],
   ])("keeps readiness probes strict about completion evidence: %j", async (...frames) => {
-    vi.stubGlobal("fetch", vi.fn(async () => sseResponse(frames)));
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("capabilities") ? Response.json({ parallel_tool_calls_request_version: 1 }) : sseResponse(frames)));
     await expect(consumeStream({ ...strict, allowLengthFinish: true })).rejects.toThrow();
   });
 
@@ -269,5 +309,86 @@ describe("streamChat successful coding completion", () => {
   it.each([undefined, "length", "tool_calls"])("preserves requireDone-only callers' finish handling (%s)", async reason => {
     vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal(reason), doneFrame])));
     await expect(consumeStream({ requireDone: true })).resolves.toBe(content);
+  });
+});
+
+describe("native function stream commitment", () => {
+  const tools = [{ type: "function" as const, function: { name: "read_file", description: "Read", parameters: { type: "object" } } }];
+  const delta = { index: 0, id: "call_1", type: "function", function: { name: "read_file", arguments: '{"path":' } };
+  const part = (tool_calls: unknown, finish_reason: string | null = null) => jsonFrame({ choices: [{ index: 0, delta: { tool_calls }, finish_reason }] });
+  const finish = (reason: string) => jsonFrame({ choices: [{ index: 0, delta: {}, finish_reason: reason }] });
+  it("assembles split arguments, forwards definitions/budget, and commits only after DONE", async () => {
+    const onToolCalls = vi.fn();
+    const fetcher = vi.fn(async (url: string) => url.endsWith("capabilities") ? Response.json({ reasoning_budget_request_version: 1, parallel_tool_calls_request_version: 1 }) : sseResponse([part([delta]), part([{ index: 0, function: { arguments: '"a"}' } }]), finish("tool_calls"), "data: [DONE]\n\n"]));
+    vi.stubGlobal("fetch", fetcher);
+    await consumeStream({ tools, onToolCalls, requireSuccessfulFinish: true, reasoningBudget: 256 });
+    expect(onToolCalls).toHaveBeenCalledExactlyOnceWith([{ id: "call_1", type: "function", function: { name: "read_file", arguments: '{"path":"a"}' } }]);
+    const body = JSON.parse(String((fetcher.mock.calls[1] as unknown as [string, RequestInit])[1].body));
+    expect(body).toMatchObject({ tools, parallel_tool_calls: false, reasoning_budget_tokens: 256 });
+  });
+  it.each([
+    [part([delta]), finish("length"), "data: [DONE]\n\n"],
+    [part([delta]), finish("tool_calls")],
+    [part([delta]), finish("stop"), "data: [DONE]\n\n"],
+    [part([delta]), finish("tool_calls"), part([{ index: 0, function: { arguments: '"a"}' } }]), "data: [DONE]\n\n"],
+    [finish("tool_calls"), "data: [DONE]\n\n"],
+    [part([{ ...delta, index: 2 }]), finish("tool_calls"), "data: [DONE]\n\n"],
+    [part([delta, { ...delta, index: 1 }]), finish("tool_calls"), "data: [DONE]\n\n"],
+    [part([{ ...delta, function: { name: "read_file", arguments: "x".repeat(262145) } }]), finish("tool_calls"), "data: [DONE]\n\n"],
+  ])("does not commit malformed/incomplete calls %#", async (...frames) => {
+    const onToolCalls = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("capabilities") ? Response.json({ parallel_tool_calls_request_version: 1 }) : sseResponse(frames)));
+    await expect(consumeStream({ tools, onToolCalls, requireSuccessfulFinish: true })).rejects.toThrow();
+    expect(onToolCalls).not.toHaveBeenCalled();
+  });
+  it("rejects a reasoning budget that leaves no output before fetch", async () => {
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await expect(consumeStream({ reasoningBudget: 100, maxTokens: 100 })).rejects.toThrow("smaller");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+it("refuses an old gateway before sending project content with a reasoning budget", async () => {
+  const fetcher = vi.fn(async (_url: string) => Response.json({ model_lock_version: 1 }));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(consumeStream({ reasoningBudget: 256 })).rejects.toThrow("cannot enforce reasoning budgets");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher.mock.calls[0][0]).toContain("/potluck/capabilities");
+});
+
+describe('rendered prompt counter', () => {
+  it('sends the same merged systems, tools, model lock and native controls as generation', async () => {
+    const { createPromptCounter } = await import('../src/gateway.js');
+    const seen: [string,RequestInit][]=[];
+    const fetcher=vi.fn(async(url:string, init:RequestInit)=>{seen.push([url,init]);return Response.json(url.endsWith('capabilities') ? {prompt_count_version:1,model_lock_version:1} : {model:'m',scope:'local',prompt_tokens:710,context_window:8192});});
+    vi.stubGlobal('fetch',fetcher);
+    const locked={...cfg,modelLock:{schemaVersion:1 as const,path:'potluck.lock',model:{id:'m',format:'gguf' as const,sha256:'a'.repeat(64),sizeBytes:10}}};
+    const tools=[{type:'function' as const,function:{name:'read_file',parameters:{type:'object',properties:{}}}}];
+    const counter=createPromptCounter(locked,{model:'m',scope:'local',contextWindowTokens:8192,tools,reasoningBudget:256});
+    expect(await counter([{role:'system',content:'a'},{role:'system',content:'b'},...messages],2048)).toBe(710);
+    const body=JSON.parse(seen[1][1].body as string);
+    expect(body).toMatchObject({potluck_model_sha256:'a'.repeat(64),tools,parallel_tool_calls:false,reasoning_budget_tokens:256,max_tokens:2048});
+    expect(body.messages[0]).toEqual({role:'system',content:'a\n\nb'});
+    expect(seen[1][1].headers).toMatchObject({'x-potluck-scope':'local',authorization:'Bearer k'});
+    const edits=[{type:'function' as const,function:{name:'edit_file',parameters:{type:'object',properties:{}}}}];
+    await counter(messages,2048,edits);expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(seen[2][1].body as string).tools).toEqual(edits);
+  });
+  it('does not send project content to an older gateway, or accept mismatched counts',async()=>{
+    const {createPromptCounter}=await import('../src/gateway.js');
+    const fetcher=vi.fn(async()=>Response.json({}));vi.stubGlobal('fetch',fetcher);
+    expect(await createPromptCounter(cfg,{model:'m',scope:'mine'})(messages,100)).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    vi.stubGlobal('fetch',vi.fn(async(url:string)=>Response.json(url.endsWith('capabilities')?{prompt_count_version:1}:{model:'other',scope:'local',prompt_tokens:12,context_window:8192})));
+    await expect(createPromptCounter(cfg,{model:'m',scope:'local',contextWindowTokens:8192})(messages,100)).rejects.toThrow('different model');
+  });
+  it('refuses changed windows, malformed counts, auth failures and broad scopes',async()=>{
+    const {createPromptCounter}=await import('../src/gateway.js');
+    for(const body of [{prompt_tokens:-1,context_window:8192},{prompt_tokens:12,context_window:16384}]){
+      vi.stubGlobal('fetch',vi.fn(async(url:string)=>Response.json(url.endsWith('capabilities')?{prompt_count_version:1}:{model:'m',scope:'local',...body})));
+      await expect(createPromptCounter(cfg,{model:'m',scope:'local',contextWindowTokens:8192})(messages,100)).rejects.toThrow();
+    }
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response('',{status:401})));
+    await expect(createPromptCounter(cfg,{model:'m'})(messages,100)).rejects.toThrow('401');
+    await expect(createPromptCounter(cfg,{model:'m',scope:'pool'})(messages,100)).rejects.toThrow('local or mine');
   });
 });

@@ -197,9 +197,9 @@ describe("current-code repair feedback", () => {
     stream.mockImplementation((_cfg, history: ChatMessage[]) => (async function* () {
       if (turn++ === 0) yield '```action\n{"tool":"read_file","args":{"path":"left.py"}}\n```';
       else {
-        expect(history.at(-2)?.content).toContain('"path":"left.py"');
-        expect(history.at(-2)?.role).toBe("assistant");
-        expect(history.at(-1)?.content).toContain('FILE "left.py":\nsame-looking code');
+        expect(history.at(-3)?.content).toContain('"path":"left.py"');
+        expect(history.at(-3)?.role).toBe("assistant");
+        expect(history.at(-2)?.content).toContain('FILE "left.py":\nsame-looking code');
         expect(history.reduce((sum, message) => sum + message.content.length, 0)).toBeLessThanOrEqual(500);
         yield "Inspected.";
       }
@@ -215,7 +215,7 @@ describe("current-code repair feedback", () => {
     })).toEqual({ status: "finished" });
   });
 
-  it("keeps the actual request beside repair feedback within the existing history budget", async () => {
+  it("keeps the complete request pinned and current failure beside repair feedback within budget", async () => {
     await writeFile(join(cwd, "value.py"), "value = 'old'\n");
     let turn = 0;
     const request = "Keep the specified behavior, including all boundaries.";
@@ -225,8 +225,8 @@ describe("current-code repair feedback", () => {
     stream.mockImplementation((_cfg, view: ChatMessage[]) => (async function* () {
       if (turn++ === 0) yield action("'old'", "'incomplete'");
       else if (turn === 2) {
-        expect(view.at(-1)?.content).toContain("ORIGINAL REQUEST (still applies):\n" + request);
-        expect(view.at(-1)?.content).toContain("missing behavior");
+        expect(view.some(message => message.role === "user" && message.content === request)).toBe(true);
+        expect(view.at(-2)?.content).toContain("missing behavior");
         expect(view.reduce((sum, m) => sum + m.content.length, 0)).toBeLessThan(1200);
         yield action("'incomplete'", "'complete'");
       } else {

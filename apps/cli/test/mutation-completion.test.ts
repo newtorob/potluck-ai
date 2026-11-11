@@ -73,7 +73,7 @@ describe("completion after file changes", () => {
       edit("one.txt", "original", "fixed"), "Everything is complete."]);
     expect(await h.run()).toEqual({ status: "finished" });
     expect(await readFile(join(cwd, "one.txt"), "utf8")).toBe("fixed");
-    expect(h.requests[2].at(-1)?.content).toContain("file change still failed");
+    expect(h.requests[2].at(-2)?.content).toContain("file change still failed");
   });
 
   it("allows an actual correction in another file after discovering the wrong target", async () => {

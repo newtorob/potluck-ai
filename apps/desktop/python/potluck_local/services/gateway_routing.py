@@ -35,6 +35,8 @@ from contextlib import aclosing
 import httpx
 
 from .inference_errors import CONTEXT_LENGTH_EXCEEDED
+from .reasoning_controls import ReasoningControls, peer_supported
+from . import native_tool_controls
 from .remote_stream import RemoteStreamError, collect_completion, openai_chunks
 from .peer_liveness import watch_peer_stream
 
@@ -121,7 +123,7 @@ def listed_markers(cap: dict) -> frozenset[str]:
 
 async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None, *,
                             tools: bool = False, markers: frozenset[str] | None = None,
-                            ask_again: bool = False) -> dict | None:
+                            ask_again: bool = False, reasoning: bool = False, reasoning_budget: bool = False, tool_concurrency: bool = False) -> dict | None:
     # Read current membership on every retry. Never route through the pool or
     # relax the requested model because an earlier household machine failed.
     # A request with tools only goes to a machine that says it supports them.
@@ -135,7 +137,12 @@ async def _replacement_peer(model: str, excluded: set[str], sha256: str | None =
         return bool(cap.get("available_for_inference") and cap.get("loaded_model") == model and (
             not tools or cap.get("supports_tools") is True
         ) and (
+            not tool_concurrency or native_tool_controls.peer_supported(cap)
+        ) and (
             markers is None or listed_markers(cap) == markers
+        ) and (
+            not reasoning or (cap.get("reasoning_controls_version") == 1 and (
+                not reasoning_budget or cap.get("reasoning_budget_version") == 1))
         ) and (
             sha256 is None or (cap.get("model_lock_version") == 1
                                and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
@@ -286,7 +293,8 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                              temperature: float, max_tokens: int, *, sha256: str | None = None,
                              retry: bool = True, batch: bool = False,
                              tools: list[dict] | None = None, tool_choice: str | dict | None = None,
-                             stop: list[str] | None = None, tool_proof: bool = False):
+                             stop: list[str] | None = None, tool_proof: bool = False,
+                             reasoning: ReasoningControls | None = None, parallel_tool_calls: bool | None = None):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
@@ -302,8 +310,16 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
         body["tool_choice"] = tool_choice
         if tool_proof:
             body["potluck_tool_proof"] = True
+    if parallel_tool_calls is not None:
+        if not native_tool_controls.peer_supported(peer.get("_capabilities") or {}):
+            raise RemoteStreamError("This household engine cannot preserve tool concurrency", "tool_concurrency_unsupported")
+        body["parallel_tool_calls"] = parallel_tool_calls
     if stop:
         body["stop"] = stop
+    if reasoning is not None:
+        if not peer_supported(peer.get("_capabilities") or {}, reasoning):
+            raise RemoteStreamError("This household engine cannot preserve thinking controls", "reasoning_controls_unsupported")
+        body.update(reasoning.wire())
     # A proof request's reply is read with this machine's markers, so a retry needs the same ones.
     markers = listed_markers(peer.get("_capabilities") or {}) if tools and tool_proof else None
     loop = asyncio.get_running_loop()
@@ -322,7 +338,9 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                 async with asyncio.timeout_at(deadline):
                     peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}),
                                                    **({"tools": True} if tools else {}),
-                                                   **({"markers": markers} if markers is not None else {}))
+                                                   **({"tool_concurrency": True} if parallel_tool_calls is not None else {}),
+                                                   **({"markers": markers} if markers is not None else {}),
+                                                   **({"reasoning": True, **({"reasoning_budget": True} if reasoning.budget_tokens is not None else {})} if reasoning is not None else {}))
                 if peer is None:
                     break
             excluded.add(peer["mesh_ip"])
@@ -369,12 +387,15 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
                                temperature: float, max_tokens: int, *, sha256: str | None = None,
                                tools: list[dict] | None = None, tool_choice: str | dict | None = None,
-                               stop: list[str] | None = None, tool_proof: bool = False) -> dict:
+                               stop: list[str] | None = None, tool_proof: bool = False,
+                               reasoning: ReasoningControls | None = None, parallel_tool_calls: bool | None = None) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
     return await collect_completion(
         stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}),
                            **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
                            **({"tool_proof": True} if tool_proof else {}),
+                           **({"reasoning": reasoning} if reasoning is not None else {}),
+                           **({"parallel_tool_calls": parallel_tool_calls} if parallel_tool_calls is not None else {}),
                            **({"stop": stop} if stop else {}))
     )

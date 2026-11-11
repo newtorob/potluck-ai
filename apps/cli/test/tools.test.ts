@@ -451,3 +451,13 @@ describe("runTool dispatch", () => {
     expect(out).toMatch(/unknown tool/);
   });
 });
+
+it('shows the unique target signature for a failed edit deep in a file without changing it',async()=>{
+  const contents='# unrelated header\n'.repeat(400)+'def important_function(value):\n    return value * 2\n';
+  await writeFile(join(cwd,'target.py'),contents);
+  const confirm=vi.fn(async()=>true);
+  const out=await runTool('edit_file',{path:'target.py',old_string:'def important_function(value):\n    return value * 3',new_string:'def important_function(value):\n    return value * 4'},{cwd,confirm});
+  expect(out).toContain('old_string not found');expect(out).toContain('return value * 2');
+  expect(out).toContain('[earlier content omitted]');expect(confirm).not.toHaveBeenCalled();
+  expect(await readFile(join(cwd,'target.py'),'utf8')).toBe(contents);
+});
