@@ -1,0 +1,98 @@
+{
+  "version": "company-brain-prepared-knowledge-v203-public-summary-v1",
+  "evaluated_source_commit": "c3a25e0aab184c36bf3c48c3a53266c26e1ca000",
+  "private_evidence_manifest_sha256": "8d4210ffc69111aaea304a80d929bbb36f90d05e2179e0ec49c03d2cdfae19fe",
+  "frozen_cases_rubric_sha256": "03973e9ac1165eb369667326eac293f2ccc94e6c7c61ef2b8adf8cab6255636f",
+  "frozen_workflow_sha256": "3398fdbb00c037eb1085e1ec8f8f90c495e8f4cdf0f88ab36b39c883677096c5",
+  "review": "Primary AI, source/rubric-aware and unblinded; no new owner acceptance",
+  "exposure": "Two consumed same-company document snapshots; five curated selectors and three supplied question-part plans. No fresh-document or autonomous-planning qualification.",
+  "results": {
+    "baseline_factual_scope_presentation": {
+      "passed": 3,
+      "total": 3
+    },
+    "same_question_refresh": {
+      "passed": 1,
+      "total": 1
+    },
+    "answers_invalidated_after_scope_source_rescan": 3,
+    "exports_invalidated": 3,
+    "unaffected_claim_retained": true,
+    "stale_citation_writes_rejected": true,
+    "same_historical_body_new_source_bindings": true,
+    "all_business_outcomes": "inconclusive"
+  },
+  "runtime": {
+    "host": "owned Linux machine",
+    "model": "qwen3.8-27b-iq4-xs",
+    "model_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "engine_commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+    "profile": "qwen3.8-27b-native-non-thinking",
+    "context_tokens": 8192,
+    "CPU_threads": 8,
+    "GPU_layers": 10,
+    "prompt_cache_MiB": 0,
+    "seed": 7,
+    "answer_calls": 8,
+    "answer_output_token_cap_per_call": 256,
+    "CLI_calls": 1,
+    "CLI_output_token_cap": 700,
+    "generation_retries": 0
+  },
+  "measurements": {
+    "API_requests": 55,
+    "expected_negative_API_checks": 9,
+    "API_transport": "authenticated httpx ASGITransport calling actual application routes, not browser clicks",
+    "answer_latency_seconds": [
+      46.552479756996036,
+      45.67789648799226,
+      46.21780819888227,
+      46.504977067001164
+    ],
+    "answer_latency_mean_seconds": 46.23829037771793,
+    "scripted_wall_seconds": 491.5619894999545,
+    "watchdog_elapsed_seconds": 499.9188884331379,
+    "load_and_profile_seconds": 27.193487982964143,
+    "AI_review_gate_wall_seconds": {
+      "baseline": 131.23426328599453,
+      "refresh": 100.43728096596897
+    },
+    "CLI_seconds": 44.046,
+    "answer_prompt_tokens": 15617,
+    "answer_output_tokens": 617,
+    "CLI_prompt_tokens": 618,
+    "CLI_output_tokens": 210,
+    "successful_context_previews": 3,
+    "manual_statement_text_edits": 0,
+    "synthetic_AI_knowledge_approvals": 3,
+    "human_operator_seconds": null,
+    "human_clicks": null
+  },
+  "agent_review": {
+    "contract": "unchanged test-matrix-v5 with job-specific naming and criterion hints",
+    "concrete_reference_check": "passed",
+    "primary_criterion_matches": 2,
+    "new_findings": 0,
+    "new_tests_adopted": 0,
+    "general_agent_qualification": false,
+    "earlier_failure_preserved": true
+  },
+  "cleanup": {
+    "passed": true,
+    "owned_processes_gone": 4,
+    "watchdog_gone": true,
+    "isolated_model_port_closed": true,
+    "timed_out": false,
+    "exit_code": 0
+  },
+  "limits": [
+    "Source byte-change only; no policy meaning change tested.",
+    "Both reviewed statements visible in all eight prompts; full documents were not supplied to the model.",
+    "Baseline artifacts are historical after rescan, including an answer using only the unaffected claim because both collections were scoped.",
+    "Fixture knowledge approvals and answer decisions were primary AI, not the owner.",
+    "No new desktop/browser usability or human effort measurement.",
+    "Original scores and 69-case qualification artifacts unchanged and unpooled.",
+    "Production/default routing unchanged; no release or cloud CI.",
+    "Private source-dependent results cannot be reproduced from this summary alone."
+  ]
+}

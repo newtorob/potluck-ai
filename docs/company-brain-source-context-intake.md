@@ -53,3 +53,21 @@ consumed same-company documents and do not qualify new model answers. Private
 sources, databases, raw replies and complete archives remain local. Testing was
 on macOS Chromium and the existing owned Linux agent runtime, not native
 installer or cross-platform certification. No cloud CI or release occurred.
+
+## Prepared-knowledge native workflow follow-up
+
+A subsequent bounded workflow carries prepared statements through actual native
+answers, artifact-bound primary AI review, inconclusive outcomes, exports,
+isolated source invalidation and replacement knowledge preparation. Three known
+questions pass their frozen factual/scope/presentation criteria; one same-question
+refresh also passes with unchanged historical wording and new source bindings.
+The unrelated claim stays approved, while all three old answers/exports become
+unavailable because both collections were in their scope. This tests a labelled
+source byte change, not a change in policy meaning.
+
+The run used consumed documents, five curated source selectors and supplied
+question parts. Both statements reached every native prompt. Knowledge approvals
+and answer reviews were primary AI test fixtures, not new owner acceptance or
+current-policy approval. Human effort was not measured. All prior scores and
+failures remain unchanged. Detailed conditions, measurements and private evidence
+binding are in the [public workflow summary](../bench/results/company-brain-prepared-knowledge-20261112/README.md).
