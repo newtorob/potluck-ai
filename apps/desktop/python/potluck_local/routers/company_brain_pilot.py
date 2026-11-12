@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from potluck_local.services import evidence_lookup, investigation_request_parts, reviewed_knowledge, source_collections
 from potluck_local.services import investigation_readable_presentation as readable
 from potluck_local.services import claim_source_context
+from potluck_local.services import pilot_setup_drafts
 from potluck_local.services.investigations import _privacy, create_investigation
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 from potluck_local.routers.investigations import _error
@@ -50,6 +51,9 @@ class Proposal(Scope):
 
 class ContextPreview(Scope):
     citation_ids: list[StrictStr] = Field(min_length=1, max_length=16)
+
+class SetupDraft(Scope):
+    question: StrictStr = Field(min_length=1, max_length=500)
 
 class Review(Scope):
     reviewer: str = Field(min_length=1, max_length=256)
@@ -186,6 +190,16 @@ async def context_preview(body: ContextPreview) -> dict[str, Any]:
     except (ValueError, PermissionError, LookupError) as exc:
         if str(exc) == claim_source_context.LIMIT_ERROR:
             raise HTTPException(status_code=400, detail=str(exc)) from None
+        raise _pilot_error(exc) from None
+
+
+@router.post('/setup-drafts')
+async def setup_drafts(body: SetupDraft) -> dict[str, Any]:
+    try:
+        await _start()
+        await _ready(body.scope())
+        return await pilot_setup_drafts.source_drafts(body.scope(), body.question)
+    except (ValueError, PermissionError, LookupError) as exc:
         raise _pilot_error(exc) from None
 
 @router.post('/claims')

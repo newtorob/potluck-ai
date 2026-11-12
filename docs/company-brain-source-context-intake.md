@@ -71,3 +71,41 @@ and answer reviews were primary AI test fixtures, not new owner acceptance or
 current-policy approval. Human effort was not measured. All prior scores and
 failures remain unchanged. Detailed conditions, measurements and private evidence
 binding are in the [public workflow summary](../bench/results/company-brain-prepared-knowledge-20261112/README.md).
+
+## Optional setup suggestions
+
+In the reviewed-knowledge pilot, enter the question above the knowledge form and
+choose **Suggest sources and question parts**. This read-only action uses the
+existing scoped word-overlap search; it does not run a model. Up to three matching
+documents are offered. When a document fits the existing sixteen-citation and
+16,000-character preview limits, its complete indexed chunks are prepared with
+the indexed opening. Oversized documents stay on the manual search/review path;
+no partial document is silently substituted. Search limits, omitted terms and
+missing results are shown. Suggestions do not prove relevance or corpus coverage.
+
+Inspect a candidate, then explicitly add its text and citations before the
+existing statement draft. Enter a knowledge key and use the existing proposal
+and approval controls separately. The part suggestion splits only literal question
+sentences. Quoted punctuation, repeated parts, excess sentences and compound
+requests may retain the full question; edit shared conditions and coverage before
+confirming. **Use suggested question parts** replaces the editor contents and
+clears its confirmation. It approves neither knowledge nor an answer.
+
+Question, collection and scan changes invalidate displayed suggestions. Late
+responses cannot restore a different question's suggestions, and the existing
+server proposal route revalidates source revisions. Existing manual search and
+question editing remain available. The ordinary answer path, model, prompts,
+source parser and approval authority are unchanged. Native results for the new
+setup path are recorded separately after the workflow is frozen.
+
+### Measured setup batch
+
+The frozen setup path found the complete required source within three suggestions
+for three new-to-recorded-evaluation documents and used six generated literal
+parts unchanged. All three original answers pass the frozen factual/scope criteria
+under primary AI review. Human effort remains unmeasured and complete-document
+answers remain long. The read-only local-agent packet failed its scalar-input
+contract and was rejected without repair or adoption. See the
+[public setup evidence summary](../bench/results/company-brain-assisted-setup-20261112/README.md)
+for run conditions, checks, retained failures and qualification limits. Older
+scores and default inference behavior remain unchanged.

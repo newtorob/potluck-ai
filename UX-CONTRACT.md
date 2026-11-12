@@ -204,3 +204,22 @@ explicit, immediate and returns focus to the search input. Context citations sta
 inspectable after insertion; server scope/revision validation remains authoritative.
 Saving and approval/supersession keep their existing distinct lifecycle. No tokens,
 locale support, navigation destination or network-routing policy changes.
+
+### Assisted setup drafts
+
+`PilotKnowledge` reuses the shared investigation action/error model and
+`ClaimContextPreview` for optional question-derived source drafts. The question
+appears before knowledge preparation. Suggestions use scoped indexed search,
+prepare at most three complete indexed documents that fit existing limits, and
+show missing/oversized/truncated candidates or omitted query terms. No partial
+source fallback, inference, proposal or approval occurs in the suggestion action.
+Applying a source prepends its literal text and unions its citations with the
+current draft, checks the combined limits, and prevents duplicate application.
+
+Suggested parts are literal question sentences, not verified semantic planning.
+Applying them explicitly replaces the existing editor, enables reviewed parts
+and clears confirmation. Manual editing and explicit confirmation remain required
+before generation. Question/scope/scan changes hide stale suggestions; late
+responses cannot restore them. Setup errors preserve entered statement text and
+clear stale evidence selections. Existing native selectors, Hearth tokens,
+keyboard/source disclosures and local-only routing remain authoritative.

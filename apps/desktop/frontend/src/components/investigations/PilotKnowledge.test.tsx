@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PilotKnowledge } from './PilotKnowledge';
 
@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
   scanPilotCollection: vi.fn(),
   pilotEvidence: vi.fn(),
   pilotContextPreview: vi.fn(),
+  pilotSetupDrafts: vi.fn(),
   pilotClaims: vi.fn(),
   proposePilotClaim: vi.fn(),
   approvePilotClaim: vi.fn(),
@@ -79,6 +80,105 @@ describe('PilotKnowledge', () => {
     });
     api.pilotContextPreview.mockResolvedValue(contextPreview);
   });
+  const setup = {
+    version: 'pilot-setup-drafts-v1',
+    question: 'Who approves release? What is the exception?',
+    question_parts: {
+      parts: ['Who approves release?', 'What is the exception?'],
+      coverage: 'not_verified',
+      limitations: ['Review shared conditions.'],
+    },
+    query_trace: { effective_query: 'release exception', omitted_terms: [] },
+    candidates: [
+      {
+        relative_path: 'policy.md',
+        collection_id: 'c1',
+        document_id: 'doc',
+        revision_id: 'rev1',
+        preview: contextPreview,
+        notice: '',
+      },
+    ],
+    truncated: false,
+    limitations: ['Word overlap does not prove relevance.'],
+  };
+  it('suggests without selecting or approving, applies complete text before current edits and keeps part review explicit', async () => {
+    api.pilotSetupDrafts.mockResolvedValue(setup);
+    const onPartsDraft = vi.fn();
+    render(<PilotKnowledge {...props()} question={setup.question} onPartsDraft={onPartsDraft} />);
+    change('Proposed statement', 'My existing draft.');
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    const candidate = await screen.findByRole('article', { name: 'Suggested document policy.md' });
+    expect(api.pilotEvidence).not.toHaveBeenCalled();
+    expect(api.proposePilotClaim).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+    expect(onPartsDraft).not.toHaveBeenCalled();
+    change('Proposed statement', 'My newer draft.');
+    fireEvent.click(
+      within(candidate).getByRole('button', { name: 'Add context and excerpts to draft' }),
+    );
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue(
+      contextPreview.content + '\n\nMy newer draft.',
+    );
+    expect(
+      within(candidate).getByRole('button', { name: 'Add context and excerpts to draft' }),
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Use suggested question parts' }));
+    expect(onPartsDraft).toHaveBeenCalledWith(setup.question_parts.parts);
+    expect(api.proposePilotClaim).not.toHaveBeenCalled();
+  });
+  it('ignores a late suggestion after a question change and invalidates displayed suggestions on rescan', async () => {
+    let resolve!: (value: typeof setup) => void;
+    api.pilotSetupDrafts.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const view = render(<PilotKnowledge {...props()} question={setup.question} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    view.rerender(<PilotKnowledge {...props()} question="Different question?" />);
+    resolve(setup);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Suggest sources and question parts' }),
+      ).not.toBeDisabled(),
+    );
+    expect(
+      screen.queryByRole('article', { name: 'Suggested document policy.md' }),
+    ).not.toBeInTheDocument();
+    api.pilotSetupDrafts.mockResolvedValue(setup);
+    view.rerender(<PilotKnowledge {...props()} question={setup.question} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    await screen.findByRole('article', { name: 'Suggested document policy.md' });
+    view.rerender(
+      <PilotKnowledge
+        {...props()}
+        question={setup.question}
+        collections={[{ ...props().collections[0]!, last_scan_at: '2026-11-12' }]}
+      />,
+    );
+    expect(
+      screen.queryByRole('article', { name: 'Suggested document policy.md' }),
+    ).not.toBeInTheDocument();
+  });
+  it('shows missing and bounded results and preserves the draft through source errors', async () => {
+    api.pilotSetupDrafts.mockResolvedValue({
+      ...setup,
+      candidates: [],
+      truncated: true,
+      query_trace: { effective_query: 'release', omitted_terms: ['exception'] },
+    });
+    render(<PilotKnowledge {...props()} question={setup.question} />);
+    change('Proposed statement', 'Keep my statement.');
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    await screen.findByText(/No documents matched/);
+    expect(screen.getByText(/Search limits omitted/)).toHaveTextContent('exception');
+    expect(screen.getByText(/Suggestions are limited/)).toBeVisible();
+    api.pilotSetupDrafts.mockRejectedValue(new Error('Scan sources again.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Scan sources again.');
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue('Keep my statement.');
+  });
   it('explicitly previews context, preserves an existing draft and includes every context citation without approval', async () => {
     render(<PilotKnowledge {...props()} />);
     await selectEvidence();
@@ -133,7 +233,10 @@ describe('PilotKnowledge', () => {
     ).not.toBeInTheDocument();
     await prepare();
     view.rerender(
-      <PilotKnowledge {...p} collections={[{ ...p.collections[0]!, last_scan_at: '2026-01-02' }]} />,
+      <PilotKnowledge
+        {...p}
+        collections={[{ ...p.collections[0]!, last_scan_at: '2026-01-02' }]}
+      />,
     );
     expect(
       screen.queryByRole('region', { name: 'Source context preview' }),

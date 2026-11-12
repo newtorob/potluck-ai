@@ -512,9 +512,38 @@ export function InvestigationsView() {
               </p>
             </div>
           )}
+          {pilot && (
+            <section
+              className="rounded-lg border border-border bg-card p-5 space-y-4"
+              aria-label="Prepare a question"
+            >
+              <h2 className="font-serif text-xl">Prepare a question</h2>
+              <label className="block text-sm">
+                {pilot ? 'Question' : 'Issue'}
+                <textarea
+                  className={`${field} resize-none`}
+                  rows={3}
+                  maxLength={pilot ? 500 : 4000}
+                  disabled={busy}
+                  value={issue}
+                  onChange={(e) => {
+                    invalidatePlanContext();
+                    setIssue(e.target.value);
+                  }}
+                />
+              </label>
+            </section>
+          )}
           {pilot && loadedWorkspace && (
             <PilotKnowledge
               key={`${loadedWorkspace}:${[...selected].sort().join(',')}`}
+              question={issue}
+              onPartsDraft={(parts) => {
+                setQuestionParts(parts);
+                setReviewParts(true);
+                setFocusedPassages(false);
+                invalidatePilotAnswers();
+              }}
               workspace={loadedWorkspace}
               selected={selected}
               collections={collections}
@@ -528,20 +557,6 @@ export function InvestigationsView() {
             <h2 className="font-serif text-xl">
               {pilot ? 'Ask reviewed knowledge' : 'New investigation'}
             </h2>
-            <label className="block text-sm">
-              {pilot ? 'Question' : 'Issue'}
-              <textarea
-                className={`${field} resize-none`}
-                rows={3}
-                maxLength={pilot ? 500 : 4000}
-                disabled={busy}
-                value={issue}
-                onChange={(e) => {
-                  invalidatePlanContext();
-                  setIssue(e.target.value);
-                }}
-              />
-            </label>
             {pilot && (
               <>
                 <label className="flex items-start gap-2 text-sm">
@@ -578,6 +593,24 @@ export function InvestigationsView() {
                     }
                   />
                 )}
+              </>
+            )}
+            {!pilot && (
+              <>
+                <label className="block text-sm">
+                  Issue
+                  <textarea
+                    className={`${field} resize-none`}
+                    rows={3}
+                    maxLength={pilot ? 500 : 4000}
+                    disabled={busy}
+                    value={issue}
+                    onChange={(e) => {
+                      invalidatePlanContext();
+                      setIssue(e.target.value);
+                    }}
+                  />
+                </label>
               </>
             )}
             {!pilot && (

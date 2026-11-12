@@ -1,0 +1,117 @@
+{
+  "version": "company-brain-assisted-setup-v204-public-summary-v1",
+  "base_commit": "2afe4b747c20df22b858d891305e88d7bef247cd",
+  "private_archive_manifest_sha256": "bf018bb907d16bac91792c4e787b5702b94ea3e285f7653cf6ac01793ef178fb",
+  "workflow_freeze_sha256": "82df6e2f9b01e3d4df2f1b926fa9ae88e420113ed49d337212627aa50fd2d5d5",
+  "input_freeze_sha256": "6e9275819781a59a34c3d6ce3ab119aa721cc597d9bc08531ea60c58a96c757b",
+  "setup": "Optional deterministic scoped search, complete indexed document previews within existing limits, literal question-sentence drafts. No model call/approval during suggestions.",
+  "source_exposure": "Three related same-company documents absent from recorded Company Brain source names/hashes, selected after implementation freeze. Primary read sources and authored criteria before native inference. Initial source-aware question draft and no-model rehearsal retained. Other sessions/pretraining unseen not claimed.",
+  "results": {
+    "complete_required_source_within_top3": {
+      "passed": 3,
+      "total": 3
+    },
+    "required_source_rank1": {
+      "passed": 2,
+      "total": 3
+    },
+    "original_delivered_factual_scope_presentation": {
+      "passed": 3,
+      "total": 3
+    },
+    "manual_search_queries_or_passage_selection_or_part_rewrites_in_script": 0,
+    "literal_parts_used": 6,
+    "fixture_source_drafts_approved": 9,
+    "native_prompts": "One question-relevant complete approved statement in each of6calls; not multi-document distraction qualification.",
+    "reviewer": "Primary AI source/rubric-aware, unblinded",
+    "business_outcomes": "inconclusive",
+    "owner_acceptance": false
+  },
+  "checks": {
+    "sidecar_summary": "9346 passed, 5 skipped, 1 warning in 786.74s (0:13:06)",
+    "frontend": 553,
+    "CLI": 1355,
+    "landing": 44,
+    "browser": 3,
+    "frontend_build": true,
+    "privacy_lint_and_typechecks": true,
+    "static_UI_findings": 0,
+    "offline_real_route_API_operations": 54,
+    "actual_native_calls_in_rehearsal": 0
+  },
+  "runtime": {
+    "host": "owned Linux",
+    "model": "qwen3.8-27b-iq4-xs",
+    "model_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "engine_commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+    "profile": "qwen3.8-27b-native-non-thinking",
+    "context_tokens": 8192,
+    "threads": 8,
+    "GPU_layers": 10,
+    "prompt_cache_MiB": 0,
+    "seed": 7,
+    "answer_calls": 6,
+    "answer_output_cap_per_call": 256,
+    "CLI_calls": 1,
+    "CLI_output_cap": 700,
+    "generation_retries": 0
+  },
+  "measurements": {
+    "authenticated_in_process_API_operations": 54,
+    "setup_API_seconds": [
+      0.0580987548455596,
+      0.054592535831034184,
+      0.058958539040759206
+    ],
+    "answer_latency_seconds": [
+      48.13315087207593,
+      46.18073258805089,
+      43.796284654177725
+    ],
+    "answer_latency_mean_seconds": 46.03672270476818,
+    "AI_review_gate_wall_seconds": [
+      99.92395440791734
+    ],
+    "load_and_profile_seconds": 27.237575418082997,
+    "scripted_wall_seconds": 326.814393394161,
+    "watchdog_seconds": 334.6996522829868,
+    "CLI_seconds": 57.531,
+    "CLI_input_tokens": 633,
+    "CLI_output_tokens": 279,
+    "unique_source_draft_words": 2064,
+    "original_answer_words": 2152,
+    "human_operator_seconds": null,
+    "human_clicks": null,
+    "duration_accounting": "Nested API ask/inference/answer timing is not additive; gate wall time is not active human/AI review effort."
+  },
+  "agent_review": {
+    "contract": "unchanged test-matrix-v5, explicit naming/criterion hints",
+    "status": "rejected",
+    "reason": "concrete_scalar_input: full-question value contains forbidden whitespace",
+    "primary_review": "Rule reasoning relevant; packet invalid. Raw retained unchanged.",
+    "new_findings": 0,
+    "new_tests_adopted": 0,
+    "output_repair": false,
+    "retry": false,
+    "contract_relaxation": false
+  },
+  "cleanup": {
+    "passed": true,
+    "owned_processes_gone": 4,
+    "watchdog_gone": true,
+    "isolated_model_port_closed": true,
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "limits": [
+    "Source-aware authored questions, two using topics and one naming a dated plan. Three related documents, not unseen-company reliability.",
+    "Literal independent question sentences only; compound/quoted punctuation may require manual editing.",
+    "Every complete candidate was fixture-approved in isolated per-case workspaces; real relevance/approval work and human usability not measured.",
+    "Whole-document answers remain long; source suggestions not exhaustive coverage.",
+    "One initial credential-bearing candidate excluded under frozen no-secret eligibility before native Potluck model exposure; original unchanged and metadata retained.",
+    "No model/parser/gateway/default promotion; older69/V199/V200/V203 results unchanged and unpooled.",
+    "Native originals, source documents, database and full evidence remain private; this summary alone cannot reproduce source-dependent judgments.",
+    "No cloud CI, release or social post."
+  ],
+  "metadata_clarification": "Primary AI read source content during eligibility/criterion authoring. Exclusion before model exposure in retained notes means exclusion from the evaluated native Potluck model/package, not absence of primary AI reading."
+}

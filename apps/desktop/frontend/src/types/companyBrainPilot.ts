@@ -39,3 +39,20 @@ export interface PilotContextPreview {
   }>;
   limitations: string[];
 }
+
+export interface PilotSetupDraft {
+  version: string;
+  question: string;
+  question_parts: { parts: string[]; coverage: 'not_verified'; limitations: string[] };
+  query_trace: { effective_query: string; omitted_terms: string[] };
+  candidates: Array<{
+    relative_path: string;
+    collection_id: string;
+    document_id: string;
+    revision_id: string;
+    preview: PilotContextPreview | null;
+    notice: string;
+  }>;
+  truncated: boolean;
+  limitations: string[];
+}

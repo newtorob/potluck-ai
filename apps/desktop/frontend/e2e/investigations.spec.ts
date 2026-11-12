@@ -1088,3 +1088,145 @@ test('source context failure retains the draft and requires a fresh evidence sel
   ).not.toBeVisible();
   await expect(prepare).toBeDisabled();
 });
+
+test('assisted setup preserves source conditions and explicit question confirmation', async ({
+  page,
+}) => {
+  const controls: Controls = {
+    unavailable: false,
+    empty: false,
+    failCreate: false,
+    reviewedCalls: [],
+  };
+  await setup(page, controls);
+  const question = 'Who approves a restart? What exception applies?';
+  const text =
+    'Document: Incident docs / incident.md\n\nDRAFT 2026-01-01.\n\nRestart only after owner approval, unless the declared incident procedure applies. Log the exception next day.';
+  const setupRequests: unknown[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route('**/company-brain/pilot/setup-drafts', async (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({
+        status: 204,
+        headers: {
+          'access-control-allow-origin': '*',
+          'access-control-allow-methods': '*',
+          'access-control-allow-headers': '*',
+        },
+      });
+    setupRequests.push(route.request().postDataJSON());
+    await gate;
+    return route.fulfill({
+      headers: { 'access-control-allow-origin': '*' },
+      json: {
+        version: 'pilot-setup-drafts-v1',
+        question,
+        question_parts: {
+          parts: ['Who approves a restart?', 'What exception applies?'],
+          coverage: 'not_verified',
+          limitations: ['Review shared conditions.'],
+        },
+        query_trace: { effective_query: question, omitted_terms: [] },
+        candidates: [
+          {
+            relative_path: 'incident.md',
+            collection_id: 'docs',
+            document_id: 'doc',
+            revision_id: 'revision',
+            notice: '',
+            preview: {
+              preview_id: 'full-source',
+              content: text,
+              citation_ids: [sourceId],
+              documents: [
+                {
+                  relative_path: 'incident.md',
+                  collection_name: 'Incident docs',
+                  collection_id: 'docs',
+                  document_id: 'doc',
+                  revision_id: 'revision',
+                  opening: [],
+                  excerpts: [
+                    {
+                      ...source,
+                      collection_id: 'docs',
+                      document_id: 'doc',
+                      chunk_id: 'chunk',
+                      heading: 'Restart',
+                    },
+                  ],
+                },
+              ],
+              limitations: ['Every indexed chunk is included. Nothing is approved.'],
+            },
+          },
+        ],
+        truncated: false,
+        limitations: ['Word overlap does not prove relevance.'],
+      },
+    });
+  });
+  await page.getByRole('checkbox', { name: 'Reviewed knowledge pilot', exact: true }).check();
+  await scope(page);
+  await page.getByRole('textbox', { name: 'Question', exact: true }).fill(question);
+  const statement = page.getByRole('textbox', { name: 'Proposed statement', exact: true });
+  await statement.fill('Keep my existing work.');
+  const suggest = page.getByRole('button', {
+    name: 'Suggest sources and question parts',
+    exact: true,
+  });
+  await suggest.click();
+  await expect(suggest).toBeDisabled();
+  release();
+  const candidate = page.getByRole('article', {
+    name: 'Suggested document incident.md',
+    exact: true,
+  });
+  await expect(candidate).toContainText('Log the exception next day.');
+  await expect(statement).toHaveValue('Keep my existing work.');
+  expect(setupRequests).toEqual([{ workspace: 'workspace', collection_ids: ['docs'], question }]);
+  await page.getByRole('button', { name: 'Use suggested question parts' }).click();
+  await expect(page.getByRole('textbox', { name: 'Part 1', exact: true })).toHaveValue(
+    'Who approves a restart?',
+  );
+  const confirm = page.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+  await expect(confirm).not.toBeChecked();
+  await candidate.scrollIntoViewIfNeeded();
+  await page.getByLabel('Prepared source text', { exact: true }).focus();
+  await page.keyboard.press('Tab');
+  const add = candidate.getByRole('button', { name: 'Add context and excerpts to draft' });
+  await expect(add).toBeFocused();
+  await page.screenshot({ path: `${output}/assisted-setup-desktop.png`, animations: 'disabled' });
+  await page.keyboard.press('Enter');
+  await expect(statement).toHaveValue(text + '\n\nKeep my existing work.');
+  await expect(add).toBeDisabled();
+  await page.setViewportSize({ width: 800, height: 600 });
+  await page.getByRole('button', { name: 'Switch to Common Room (light)' }).click();
+  await candidate.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: `${output}/assisted-setup-narrow-light.png`,
+    animations: 'disabled',
+  });
+  await page.getByLabel('Loaded local model').selectOption('local-model');
+  const ask = page.getByRole('button', { name: 'Ask reviewed knowledge', exact: true });
+  await expect(ask).toBeDisabled();
+  await confirm.check();
+  await page
+    .getByRole('textbox', { name: 'Question', exact: true })
+    .fill(question + ' Please clarify.');
+  await expect(confirm).not.toBeChecked();
+  await expect(candidate).not.toBeVisible();
+  await expect(ask).toBeDisabled();
+  await confirm.check();
+  await ask.click();
+  expect(controls.reviewedCalls?.[0]).toMatchObject({
+    question_parts: ['Who approves a restart?', 'What exception applies?'],
+    question_parts_confirmed: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});

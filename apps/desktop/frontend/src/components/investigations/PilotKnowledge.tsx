@@ -6,11 +6,14 @@ import type {
   PilotEvidence,
   PilotSource,
   PilotContextPreview,
+  PilotSetupDraft,
 } from '@/types/companyBrainPilot';
 import { ClaimContextPreview } from './ClaimContextPreview';
 import { investigationButton as button, investigationField as field } from './controls';
 
 interface Props {
+  question?: string;
+  onPartsDraft?: (parts: string[]) => void;
   workspace: string;
   selected: string[];
   collections: SourceCollection[];
@@ -41,6 +44,8 @@ function SourceText({ source }: { source: PilotSource }) {
 }
 
 export function PilotKnowledge({
+  question,
+  onPartsDraft,
   workspace,
   selected,
   collections,
@@ -64,6 +69,8 @@ export function PilotKnowledge({
   } | null>(null);
   const usedPreview = useRef(false);
   const [contextSources, setContextSources] = useState<PilotSource[]>([]);
+  const [setupDraft, setSetupDraft] = useState<{ key: string; data: PilotSetupDraft } | null>(null);
+  const usedDrafts = useRef(new Set<string>());
   const [claims, setClaims] = useState<PilotClaim[] | null>(null);
   const [proposals, setProposals] = useState<PilotClaim[]>([]);
   const [status, setStatus] = useState<PilotClaim['status']>('proposed');
@@ -98,6 +105,15 @@ export function PilotKnowledge({
   });
   const latestContext = useRef(contextKey);
   latestContext.current = contextKey;
+  const setupKey = JSON.stringify({
+    workspace,
+    selected,
+    question,
+    scans: collections.map((c) => [c.id, c.scan_status, c.last_scan_at]),
+  });
+  const latestSetup = useRef(setupKey);
+  latestSetup.current = setupKey;
+  const suggestions = setupDraft?.key === setupKey ? setupDraft.data : null;
   const preview = contextPreview?.key === contextKey ? contextPreview.data : null;
   const combinedContent = preview
     ? [preview.content, content].filter((s) => s.trim()).join('\n\n')
@@ -133,6 +149,7 @@ export function PilotKnowledge({
         setReviewId('');
         setContextPreview(null);
         setContextSources([]);
+        setSetupDraft(null);
         invalidateAnswers();
       }
     } finally {
@@ -158,6 +175,7 @@ export function PilotKnowledge({
     setReplacement('');
   }
   function changedEvidence() {
+    setSetupDraft(null);
     setContextPreview(null);
     setContextSources([]);
     setEvidence(null);
@@ -180,6 +198,148 @@ export function PilotKnowledge({
           Add documents, inspect their evidence, then decide which statements can inform answers.
         </p>
       </div>
+      {question !== undefined && (
+        <div className="space-y-3 border-t border-border pt-4">
+          <h3 className="text-sm font-medium">Start from your question</h3>
+          <p className="text-xs text-muted-foreground">
+            Suggest matching documents and editable question parts. Review each draft before adding
+            it. Nothing is saved or approved by this action.
+          </p>
+          <button
+            className={button}
+            disabled={disabled || !ready || !question.trim()}
+            onClick={() =>
+              void act(async () => {
+                const key = setupKey;
+                setSetupDraft(null);
+                const data = await localApi.pilotSetupDrafts({
+                  ...scope,
+                  question: question.trim(),
+                });
+                if (alive.current && latestSetup.current === key) {
+                  usedDrafts.current.clear();
+                  setSetupDraft({ key, data });
+                }
+              })
+            }
+          >
+            Suggest sources and question parts
+          </button>
+          {suggestions && (
+            <div className="space-y-4" aria-label="Setup suggestions">
+              <p role="status" className="text-sm">
+                {suggestions.candidates.length} document suggestions. Review the text and question
+                coverage.
+              </p>
+              {suggestions.truncated && (
+                <p className="text-sm">
+                  Suggestions are limited; other matching documents may be missing. Use document
+                  search below to inspect more.
+                </p>
+              )}
+              {suggestions.query_trace.omitted_terms.length > 0 && (
+                <p className="text-sm">
+                  Search limits omitted these question terms:{' '}
+                  {suggestions.query_trace.omitted_terms.join(', ')}. Search them separately below.
+                </p>
+              )}
+              {suggestions.limitations.map((text, i) => (
+                <p key={i} className="text-xs text-muted-foreground">
+                  {text}
+                </p>
+              ))}
+              {!suggestions.candidates.length && (
+                <p className="text-sm">
+                  No documents matched. Try document search below or check the selected collections;
+                  this does not establish that a fact is absent.
+                </p>
+              )}
+              <div className="space-y-2">
+                <h4 className="font-medium">Suggested question parts</h4>
+                <ol className="list-decimal space-y-1 pl-5 text-sm">
+                  {suggestions.question_parts.parts.map((part, i) => (
+                    <li key={i}>{part}</li>
+                  ))}
+                </ol>
+                {suggestions.question_parts.limitations.map((text, i) => (
+                  <p key={i} className="text-xs text-muted-foreground">
+                    {text}
+                  </p>
+                ))}
+                <button
+                  className={button}
+                  disabled={disabled || !onPartsDraft}
+                  onClick={() => {
+                    if (!disabled && latestSetup.current === setupDraft?.key) {
+                      onPartsDraft?.(suggestions.question_parts.parts);
+                      setNotice(
+                        'Question parts added to the editor below. Review and confirm them before answering.',
+                      );
+                    }
+                  }}
+                >
+                  Use suggested question parts
+                </button>
+              </div>
+              {suggestions.candidates.map((candidate) => {
+                const prepared = candidate.preview;
+                const id = `${candidate.collection_id}:${candidate.document_id}:${candidate.revision_id}`;
+                const combined = prepared
+                  ? [prepared.content, content].filter((s) => s.trim()).join('\n\n')
+                  : '';
+                const refs = [...new Set([...citations, ...(prepared?.citation_ids ?? [])])];
+                const error =
+                  combined.length > 16000 || refs.length > 16
+                    ? 'This would exceed the draft limits. Save or shorten the existing draft before adding another document.'
+                    : '';
+                return (
+                  <article
+                    key={id}
+                    className="space-y-2 rounded-md border border-border p-3"
+                    aria-label={`Suggested document ${candidate.relative_path}`}
+                  >
+                    <h4 className="font-medium">{candidate.relative_path}</h4>
+                    {candidate.notice && <p className="text-sm">{candidate.notice}</p>}
+                    {prepared && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Complete indexed document, including its opening and later conditions.
+                          Unindexed content is not included.
+                        </p>
+                        <ClaimContextPreview
+                          preview={prepared}
+                          disabled={disabled || usedDrafts.current.has(id)}
+                          error={error}
+                          onAdd={() => {
+                            if (
+                              disabled ||
+                              error ||
+                              usedDrafts.current.has(id) ||
+                              latestSetup.current !== setupDraft?.key
+                            )
+                              return;
+                            usedDrafts.current.add(id);
+                            setContent(combined);
+                            setCitations(refs);
+                            setContextSources((sources) => [
+                              ...sources,
+                              ...prepared.documents.flatMap((d) => [...d.opening, ...d.excerpts]),
+                            ]);
+                            setContextPreview(null);
+                            setNotice(
+                              'Complete indexed source text added before the existing draft. Review it, enter a knowledge key and save a proposal below.',
+                            );
+                          }}
+                        />
+                      </>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       <div className="min-h-6 text-sm">
         {error && (
           <p role="alert" className="text-destructive">
