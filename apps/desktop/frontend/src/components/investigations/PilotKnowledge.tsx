@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { localApi } from '@/lib/localApi';
 import type { SourceCollection } from '@/types/investigations';
-import type { PilotClaim, PilotEvidence, PilotSource } from '@/types/companyBrainPilot';
+import type {
+  PilotClaim,
+  PilotEvidence,
+  PilotSource,
+  PilotContextPreview,
+} from '@/types/companyBrainPilot';
+import { ClaimContextPreview } from './ClaimContextPreview';
 import { investigationButton as button, investigationField as field } from './controls';
 
 interface Props {
@@ -47,10 +53,17 @@ export function PilotKnowledge({
   const [folder, setFolder] = useState('');
   const [consent, setConsent] = useState(false);
   const [query, setQuery] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
   const [evidence, setEvidence] = useState<PilotEvidence | null>(null);
   const [citations, setCitations] = useState<string[]>([]);
   const [claimKey, setClaimKey] = useState('');
   const [content, setContent] = useState('');
+  const [contextPreview, setContextPreview] = useState<{
+    key: string;
+    data: PilotContextPreview;
+  } | null>(null);
+  const usedPreview = useRef(false);
+  const [contextSources, setContextSources] = useState<PilotSource[]>([]);
   const [claims, setClaims] = useState<PilotClaim[] | null>(null);
   const [proposals, setProposals] = useState<PilotClaim[]>([]);
   const [status, setStatus] = useState<PilotClaim['status']>('proposed');
@@ -75,6 +88,30 @@ export function PilotKnowledge({
   const ready =
     selected.length > 0 &&
     selected.every((id) => collections.some((c) => c.id === id && c.scan_status === 'ready'));
+  const contextKey = JSON.stringify({
+    workspace,
+    selected,
+    query,
+    citations,
+    content,
+    scans: collections.map((c) => [c.id, c.scan_status, c.last_scan_at]),
+  });
+  const latestContext = useRef(contextKey);
+  latestContext.current = contextKey;
+  const preview = contextPreview?.key === contextKey ? contextPreview.data : null;
+  const combinedContent = preview
+    ? [preview.content, content].filter((s) => s.trim()).join('\n\n')
+    : '';
+  const combinedCitations = preview
+    ? [...new Set([...citations, ...preview.citation_ids])]
+    : citations;
+  const previewError =
+    combinedContent.length > 16000
+      ? 'The combined draft exceeds 16,000 characters. Shorten your draft or select fewer excerpts.'
+      : combinedCitations.length > 16
+        ? 'The combined draft exceeds sixteen citations. Select fewer excerpts and prepare context again.'
+        : '';
+  useEffect(() => setContextPreview(null), [contextKey]);
 
   async function act(action: () => Promise<void>) {
     if (inFlight.current || busy) return;
@@ -94,6 +131,8 @@ export function PilotKnowledge({
         setClaims(null);
         setProposals([]);
         setReviewId('');
+        setContextPreview(null);
+        setContextSources([]);
         invalidateAnswers();
       }
     } finally {
@@ -119,6 +158,8 @@ export function PilotKnowledge({
     setReplacement('');
   }
   function changedEvidence() {
+    setContextPreview(null);
+    setContextSources([]);
     setEvidence(null);
     setCitations([]);
     setClaims(null);
@@ -260,6 +301,7 @@ export function PilotKnowledge({
         <label className="block text-sm">
           Search documents
           <input
+            ref={searchInput}
             className={field}
             disabled={disabled || !ready}
             maxLength={1000}
@@ -271,6 +313,22 @@ export function PilotKnowledge({
             }}
           />
         </label>
+        {query && (
+          <button
+            className={button}
+            disabled={disabled}
+            onClick={() => {
+              setQuery('');
+              setEvidence(null);
+              setCitations([]);
+              setContextPreview(null);
+              setContextSources([]);
+              searchInput.current?.focus();
+            }}
+          >
+            Clear document search
+          </button>
+        )}
         <button
           className={button}
           disabled={disabled || !ready || !query.trim()}
@@ -343,6 +401,74 @@ export function PilotKnowledge({
             exceptions. Reuse a knowledge key when proposing a replacement. Saving a proposal does
             not approve it.
           </p>
+          <p className="text-xs text-muted-foreground">
+            Select source excerpts above, then prepare their indexed openings and text for review.
+          </p>
+          <button
+            className={button}
+            disabled={disabled || !ready || !citations.length}
+            onClick={() =>
+              void act(async () => {
+                setContextPreview(null);
+                const key = contextKey;
+                const data = await localApi.pilotContextPreview({
+                  ...scope,
+                  citation_ids: citations,
+                });
+                if (alive.current && latestContext.current === key) {
+                  usedPreview.current = false;
+                  setContextPreview({ key, data });
+                }
+              })
+            }
+          >
+            Prepare source context
+          </button>
+          {preview && (
+            <ClaimContextPreview
+              preview={preview}
+              disabled={disabled}
+              error={previewError}
+              onAdd={() => {
+                if (
+                  disabled ||
+                  previewError ||
+                  usedPreview.current ||
+                  latestContext.current !== contextPreview?.key
+                )
+                  return;
+                usedPreview.current = true;
+                setContextSources(preview.documents.flatMap((d) => [...d.opening, ...d.excerpts]));
+                setContent(combinedContent);
+                setCitations(combinedCitations);
+                setContextPreview(null);
+                setNotice(
+                  'Source context and excerpts added to the draft. Review the statement before saving.',
+                );
+              }}
+            />
+          )}
+          {citations.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+                Draft source citations ({citations.length})
+              </summary>
+              <div className="mt-3 space-y-4">
+                {citations.map((id) => {
+                  const source = [...(evidence?.source_chunks ?? []), ...contextSources].find(
+                    (s) => s.citation_id === id,
+                  );
+                  return source ? (
+                    <SourceText key={id} source={source} />
+                  ) : (
+                    <p key={id} className="break-all text-xs">
+                      {id}
+                    </p>
+                  );
+                })}
+              </div>
+            </details>
+          )}
           <label className="block text-sm">
             Knowledge key
             <input

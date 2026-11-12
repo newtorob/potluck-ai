@@ -182,6 +182,19 @@
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
 
+  /* Other engines inherit the same warm tokens without replacing Chromium's thumb states. */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-color: hsl(var(--border)) transparent;
+      scrollbar-width: thin;
+    }
+  }
+  @media (forced-colors: active) {
+    * {
+      scrollbar-color: auto;
+    }
+  }
+
   /* Reduce motion - global guard for users who want it */
   @media (prefers-reduced-motion: reduce) {
     *,

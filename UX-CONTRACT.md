@@ -188,3 +188,19 @@ the selected statements. Human corrections preserve the immutable original
 presentation and appear without pretending that original selected prose was
 recomputed. Shortening must never be graded as correct using hidden source text
 to rescue missing prerequisites, exceptions or requested facts.
+
+### Source context preparation
+
+The reviewed-knowledge form uses the existing `PilotKnowledge` action/error model,
+shared investigation fields/buttons and `ClaimContextPreview` for the literal
+indexed-source preview. A keyboard-focusable bounded text region owns only its
+own long-text scrolling; the surrounding form keeps its existing scroll owner.
+Prepare is explicit; it never runs inference or writes a proposal. Adding context
+preserves the existing draft and all context references, then closes the preview.
+Draft/search/selection/scan edits invalidate it. Single-flight preparation and a
+consumed-preview guard prevent duplicate actions. Errors preserve draft text,
+clear stale selections and require fresh evidence lookup. Search clearing is
+explicit, immediate and returns focus to the search input. Context citations stay
+inspectable after insertion; server scope/revision validation remains authoritative.
+Saving and approval/supersession keep their existing distinct lifecycle. No tokens,
+locale support, navigation destination or network-routing policy changes.

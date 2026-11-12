@@ -1,4 +1,4 @@
-import type { PilotClaim, PilotEvidence } from '@/types/companyBrainPilot';
+import type { PilotClaim, PilotEvidence, PilotContextPreview } from '@/types/companyBrainPilot';
 import type { Brief, CalculationPreview, CalculationReviewInput, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
@@ -788,6 +788,12 @@ export const localApi = {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/evidence`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<PilotEvidence>);
+  },
+
+  pilotContextPreview(input: InvestigationScope & { citation_ids: string[] }): Promise<PilotContextPreview> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claim-context`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<PilotContextPreview>);
   },
   pilotClaims(input: InvestigationScope & { status: PilotClaim['status'] }): Promise<{ claims: PilotClaim[]; truncated: boolean }> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claims/list`, {

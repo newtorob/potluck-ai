@@ -23,3 +23,19 @@ export interface PilotEvidence {
   missing_evidence: string[];
   scope_status: { requested: number; ready: number };
 }
+
+export interface PilotContextPreview {
+  preview_id: string;
+  content: string;
+  citation_ids: string[];
+  documents: Array<{
+    relative_path: string;
+    collection_name: string;
+    collection_id: string;
+    document_id: string;
+    revision_id: string;
+    opening: PilotSource[];
+    excerpts: PilotSource[];
+  }>;
+  limitations: string[];
+}

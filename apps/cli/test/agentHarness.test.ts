@@ -97,9 +97,13 @@ describe("bounded durable execution", () => {
   it("enforces explicit concurrency, stores every outcome and never repeats completed/failed jobs", async () => {
     plan.limits.concurrency = 2; plan.jobs.push({ ...plan.jobs[0], id: "second" }, { ...plan.jobs[0], id: "third" });
     await prepareHarness(plan, hub); let active = 0, maximum = 0, calls = 0;
+    let release!: () => void;
+    const overlapping = new Promise<void>(resolve => { release = resolve; });
     const execute: NonNullable<RunHarnessOptions["execute"]> = async (_history, _task, options) => {
       active++; maximum = Math.max(maximum, active); calls++;
-      await new Promise(resolve => setTimeout(resolve, 15)); active--;
+      // Keep both slots occupied until overlap is observed, independent of filesystem speed.
+      if (calls === 2) release();
+      await overlapping; active--;
       return options.cwd.includes("/second/") ? { status: "incomplete", reason: "step_limit" } : { status: "finished" };
     };
     const result = await runHarness(hub, plan.id, options(execute));

@@ -128,3 +128,35 @@ full document does not restore a qualification omitted from the text supplied
 to the model. Keep prerequisite and exception paragraphs with their governing
 rule. If the document gives no date, say so during review rather than inventing
 one. Knowledge review still decides whether the excerpt is suitable to admit.
+
+### Prepare source context
+
+After selecting supporting excerpts, choose **Prepare source context**. The local
+pilot reads the document's leading indexed section and the selected excerpts
+from the same workspace, collections and source revisions. Review the literal
+text, then choose **Add context and excerpts to draft**. It prefixes the prepared
+text to your existing draft and adds every supporting context citation. The
+**Draft source citations** disclosure includes the added opening text. Saving a
+proposal and approving knowledge remain separate explicit actions.
+
+Draft, search, selection and scanned-source changes invalidate a preview. Errors
+retain the draft but clear source selections, requiring a fresh lookup. No
+inference, background approval, automatic retry or modification of the original
+files is involved.
+
+This is an indexed opening, not date/status classification or reconstruction of
+the original Markdown layout. The existing parser determines stored headings.
+Leading untitled chunks and the first named indexed section are included;
+conditions or dates elsewhere still require full-source review. Unscanned disk
+edits are outside the indexed snapshot and require a rescan.
+
+`POST /company-brain/pilot/claim-context` takes the normal explicit scope and
+1–16 distinct source citation IDs. It requires all selected collections to be
+ready/recent and every reference to match the current document revision. The
+preview includes at most four opening chunks and 6,000 heading/text characters
+per document, sixteen expanded citations and 16,000 prepared characters. An
+incomplete or oversized opening/excerpt fails the preview rather than returning
+silently shortened context. The desktop also blocks insertion if combining it
+with an existing draft exceeds the proposal limits. Choose fewer/shorter excerpts
+or review the full source manually. Source text remains unapproved data until a
+separate review decision; the original manual proposal route remains available.

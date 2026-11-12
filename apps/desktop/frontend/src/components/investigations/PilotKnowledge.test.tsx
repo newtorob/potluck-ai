@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   registerPilotCollection: vi.fn(),
   scanPilotCollection: vi.fn(),
   pilotEvidence: vi.fn(),
+  pilotContextPreview: vi.fn(),
   pilotClaims: vi.fn(),
   proposePilotClaim: vi.fn(),
   approvePilotClaim: vi.fn(),
@@ -29,6 +30,30 @@ const claim = {
   status: 'proposed',
   sources: [source],
 };
+const contextPreview = {
+  preview_id: 'preview-one',
+  content:
+    'Document: Policies / policy.md\n\nTeam policy\n\nDRAFT. Last updated: 2026-01-01.\n\n' +
+    source.content,
+  citation_ids: ['source:opening:rev1', source.citation_id],
+  documents: [
+    {
+      collection_name: 'Policies',
+      collection_id: 'c1',
+      document_id: 'doc',
+      relative_path: 'policy.md',
+      revision_id: 'rev1',
+      opening: [],
+      excerpts: [source],
+    },
+  ],
+  limitations: ['Indexed snapshot only. Review the full source.'],
+};
+async function selectEvidence() {
+  change('Search documents', 'release');
+  fireEvent.click(screen.getByRole('button', { name: 'Find evidence' }));
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Use policy.md as support' }));
+}
 function props() {
   return {
     workspace: 'w',
@@ -46,6 +71,117 @@ describe('PilotKnowledge', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     api.pilotClaims.mockResolvedValue({ claims: [], truncated: false });
+    api.pilotEvidence.mockResolvedValue({
+      source_chunks: [source],
+      truncated: false,
+      missing_evidence: [],
+      scope_status: { requested: 1, ready: 1 },
+    });
+    api.pilotContextPreview.mockResolvedValue(contextPreview);
+  });
+  it('explicitly previews context, preserves an existing draft and includes every context citation without approval', async () => {
+    render(<PilotKnowledge {...props()} />);
+    await selectEvidence();
+    change('Proposed statement', 'Keep this existing statement.');
+    change('Knowledge key', 'release');
+    expect(api.pilotContextPreview).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare source context' }));
+    await screen.findByRole('region', { name: 'Source context preview' });
+    expect(api.pilotContextPreview).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      citation_ids: [source.citation_id],
+    });
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue(
+      'Keep this existing statement.',
+    );
+    expect(screen.getByLabelText('Prepared source text')).toHaveTextContent(
+      'DRAFT. Last updated: 2026-01-01.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add context and excerpts to draft' }));
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue(
+      contextPreview.content + '\n\nKeep this existing statement.',
+    );
+    expect(
+      screen.queryByRole('region', { name: 'Source context preview' }),
+    ).not.toBeInTheDocument();
+    expect(api.proposePilotClaim).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save proposal' }));
+    await waitFor(() =>
+      expect(api.proposePilotClaim).toHaveBeenCalledWith({
+        workspace: 'w',
+        collection_ids: ['c1'],
+        claim_key: 'release',
+        content: contextPreview.content + '\n\nKeep this existing statement.',
+        citation_ids: [source.citation_id, 'source:opening:rev1'],
+      }),
+    );
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+  });
+  it('invalidates previews on draft, selection, query and scan changes', async () => {
+    const p = props();
+    const view = render(<PilotKnowledge {...p} />);
+    await selectEvidence();
+    const prepare = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Prepare source context' }));
+      await screen.findByRole('region', { name: 'Source context preview' });
+    };
+    await prepare();
+    change('Proposed statement', 'Changed.');
+    expect(
+      screen.queryByRole('region', { name: 'Source context preview' }),
+    ).not.toBeInTheDocument();
+    await prepare();
+    view.rerender(
+      <PilotKnowledge {...p} collections={[{ ...p.collections[0]!, last_scan_at: '2026-01-02' }]} />,
+    );
+    expect(
+      screen.queryByRole('region', { name: 'Source context preview' }),
+    ).not.toBeInTheDocument();
+    await prepare();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use policy.md as support' }));
+    expect(
+      screen.queryByRole('region', { name: 'Source context preview' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use policy.md as support' }));
+    await prepare();
+    change('Search documents', 'Changed query');
+    expect(
+      screen.queryByRole('region', { name: 'Source context preview' }),
+    ).not.toBeInTheDocument();
+  });
+  it('rejects duplicate preview dispatch and retains the draft after a stale-source failure without retry', async () => {
+    let fail!: (e: Error) => void;
+    api.pilotContextPreview.mockReturnValue(
+      new Promise((_, reject) => {
+        fail = reject;
+      }),
+    );
+    render(<PilotKnowledge {...props()} />);
+    await selectEvidence();
+    change('Proposed statement', 'Keep draft.');
+    const button = screen.getByRole('button', { name: 'Prepare source context' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(api.pilotContextPreview).toHaveBeenCalledOnce();
+    expect(button).toBeDisabled();
+    fail(new Error('Source changed. Scan and search again.'));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue('Keep draft.');
+    expect(screen.getByRole('button', { name: 'Save proposal' })).toBeDisabled();
+    expect(api.pilotContextPreview).toHaveBeenCalledOnce();
+  });
+  it('blocks overlong combined drafts instead of trimming context or the existing text', async () => {
+    render(<PilotKnowledge {...props()} />);
+    await selectEvidence();
+    change('Proposed statement', 'x'.repeat(15950));
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare source context' }));
+    await screen.findByRole('region', { name: 'Source context preview' });
+    expect(
+      screen.getByRole('button', { name: 'Add context and excerpts to draft' }),
+    ).toBeDisabled();
+    expect(screen.getByText(/combined draft exceeds 16,000/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Proposed statement')).toHaveValue('x'.repeat(15950));
   });
   it('requires folder consent and keeps scanning separate from registration', async () => {
     const p = props();

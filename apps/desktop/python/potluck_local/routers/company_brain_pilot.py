@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from potluck_local.services import evidence_lookup, investigation_request_parts, reviewed_knowledge, source_collections
 from potluck_local.services import investigation_readable_presentation as readable
+from potluck_local.services import claim_source_context
 from potluck_local.services.investigations import _privacy, create_investigation
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 from potluck_local.routers.investigations import _error
@@ -46,6 +47,9 @@ class Proposal(Scope):
     claim_key: str = Field(min_length=1, max_length=256)
     content: str = Field(min_length=1, max_length=16000)
     citation_ids: list[str] = Field(min_length=1, max_length=16)
+
+class ContextPreview(Scope):
+    citation_ids: list[StrictStr] = Field(min_length=1, max_length=16)
 
 class Review(Scope):
     reviewer: str = Field(min_length=1, max_length=256)
@@ -171,6 +175,17 @@ async def claims(body: Claims) -> dict[str, Any]:
         await _ready(scope)
         return {'claims': selected, 'truncated': len(rows) > 100}
     except (ValueError, PermissionError, LookupError) as exc:
+        raise _pilot_error(exc) from None
+
+
+@router.post('/claim-context')
+async def context_preview(body: ContextPreview) -> dict[str, Any]:
+    try:
+        await _start()
+        return await claim_source_context.preview(body.scope(), body.citation_ids)
+    except (ValueError, PermissionError, LookupError) as exc:
+        if str(exc) == claim_source_context.LIMIT_ERROR:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
         raise _pilot_error(exc) from None
 
 @router.post('/claims')

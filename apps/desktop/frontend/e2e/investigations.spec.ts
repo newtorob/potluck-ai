@@ -161,6 +161,10 @@ const calculationDraft = {
 };
 
 type Controls = {
+  contextCalls?: Array<Record<string, unknown>>;
+  proposalCalls?: Array<Record<string, unknown>>;
+  failContext?: boolean;
+  contextGate?: Promise<void>;
   reviewedCalls?: Array<Record<string, unknown>>;
   failReviewed?: boolean;
   current?: Record<string, unknown>;
@@ -195,6 +199,60 @@ async function setup(page: Page, controls: Controls) {
     if (path === '/models') return fulfill([]);
     if (path === '/health')
       return fulfill({ status: 'ok', model_loaded: true, active_model_id: 'local-model' });
+    const contextSource = {
+      ...source,
+      collection_id: 'docs',
+      document_id: 'doc',
+      chunk_id: 'chunk',
+      heading: 'Restart',
+      content:
+        'Restart only after owner approval, unless the emergency incident procedure applies.',
+    };
+    const openingSource = {
+      ...contextSource,
+      citation_id: 'source:opening:revision',
+      chunk_id: 'opening',
+      heading: 'Incident notes',
+      content: 'DRAFT. Last updated: 2026-01-01.',
+    };
+    if (path === '/company-brain/pilot/evidence')
+      return fulfill({
+        source_chunks: [contextSource],
+        truncated: false,
+        missing_evidence: [],
+        scope_status: { requested: 1, ready: 1 },
+      });
+    if (path === '/company-brain/pilot/claims/list')
+      return fulfill({ claims: [], truncated: false });
+    if (path === '/company-brain/pilot/claim-context') {
+      controls.contextCalls?.push(request.postDataJSON());
+      if (controls.contextGate) await controls.contextGate;
+      if (controls.failContext)
+        return fulfill({ detail: 'Source changed. Scan and search again.' }, 400);
+      return fulfill({
+        preview_id: 'context-preview',
+        content:
+          'Document: Incident docs / incident.md\n\nIncident notes\n\nDRAFT. Last updated: 2026-01-01.\n\nRestart\n\n' +
+          contextSource.content,
+        citation_ids: [openingSource.citation_id, contextSource.citation_id],
+        documents: [
+          {
+            collection_name: 'Incident docs',
+            collection_id: 'docs',
+            document_id: 'doc',
+            revision_id: 'revision',
+            relative_path: 'incident.md',
+            opening: [openingSource],
+            excerpts: [contextSource],
+          },
+        ],
+        limitations: ['Indexed opening only. Review the full source for later conditions.'],
+      });
+    }
+    if (path === '/company-brain/pilot/claims' && request.method() === 'POST') {
+      controls.proposalCalls?.push(request.postDataJSON());
+      return fulfill({ claim_id: 'context-proposal', status: 'proposed' });
+    }
     if (path === '/company-brain/collections')
       return fulfill({
         collections: controls.empty
@@ -857,7 +915,9 @@ test('desktop question parts require current confirmation and preserve edits aft
   await ask.click();
   await expect(page.getByRole('alert')).toContainText('Source changed');
   await expect(confirmation).not.toBeChecked();
-  await expect(page.getByRole('textbox', { name: 'Part 2', exact: true })).toHaveValue('Which deadline is known?');
+  await expect(page.getByRole('textbox', { name: 'Part 2', exact: true })).toHaveValue(
+    'Which deadline is known?',
+  );
   expect(controls.reviewedCalls).toEqual([
     {
       workspace: 'workspace',
@@ -883,4 +943,148 @@ test('desktop question parts require current confirmation and preserve edits aft
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test('source context preview preserves the draft, conditions and citations before an explicit save', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const controls: Controls = {
+    unavailable: false,
+    empty: false,
+    failCreate: false,
+    contextCalls: [],
+    proposalCalls: [],
+    reviewedCalls: [],
+    contextGate: new Promise<void>((resolve) => {
+      release = resolve;
+    }),
+  };
+  await setup(page, controls);
+  await page.getByRole('checkbox', { name: 'Reviewed knowledge pilot', exact: true }).check();
+  await scope(page);
+  const prepare = page.getByRole('button', { name: 'Prepare source context', exact: true });
+  await expect(prepare).toBeDisabled();
+  await page.getByRole('textbox', { name: 'Search documents', exact: true }).fill('restart');
+  await page.getByRole('button', { name: 'Find evidence', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Use incident.md as support', exact: true }).check();
+  const draftField = page.getByRole('textbox', { name: 'Proposed statement', exact: true });
+  await draftField.fill('Keep my existing draft.');
+  await page.getByRole('textbox', { name: 'Knowledge key', exact: true }).fill('restart');
+  await prepare.click();
+  await expect(prepare).toBeDisabled();
+  expect(controls.contextCalls).toEqual([
+    { workspace: 'workspace', collection_ids: ['docs'], citation_ids: [sourceId] },
+  ]);
+  release();
+  const preview = page.getByRole('region', { name: 'Source context preview', exact: true });
+  await expect(preview).toBeVisible();
+  await expect(draftField).toHaveValue('Keep my existing draft.');
+  await expect(preview).toContainText('DRAFT. Last updated: 2026-01-01.');
+  await expect(preview).toContainText('unless the emergency incident procedure applies');
+  await draftField.fill('Keep my edited draft.');
+  await expect(preview).not.toBeVisible();
+  await prepare.click();
+  await expect(preview).toBeVisible();
+  await page.getByLabel('Prepared source text', { exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Add context and excerpts to draft', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Enter');
+  const combined =
+    'Document: Incident docs / incident.md\n\nIncident notes\n\nDRAFT. Last updated: 2026-01-01.\n\nRestart\n\nRestart only after owner approval, unless the emergency incident procedure applies.\n\nKeep my edited draft.';
+  await expect(draftField).toHaveValue(combined);
+  await expect(preview).not.toBeVisible();
+  await expect(page.getByText('Draft source citations (2)', { exact: true })).toBeVisible();
+  expect(controls.proposalCalls).toEqual([]);
+  await page.getByRole('button', { name: 'Save proposal', exact: true }).click();
+  await expect(
+    page.getByText('Proposal saved. Inspect its sources below before approving.'),
+  ).toBeVisible();
+  expect(controls.proposalCalls).toEqual([
+    {
+      workspace: 'workspace',
+      collection_ids: ['docs'],
+      claim_key: 'restart',
+      content: combined,
+      citation_ids: [sourceId, 'source:opening:revision'],
+    },
+  ]);
+  expect(controls.reviewedCalls).toEqual([]);
+  await page.getByRole('checkbox', { name: 'Use incident.md as support', exact: true }).check();
+  await prepare.click();
+  await expect(preview).toBeVisible();
+  await preview.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${output}/source-context-desktop.png`, animations: 'disabled' });
+  await page.setViewportSize({ width: 800, height: 600 });
+  await page.getByRole('button', { name: 'Switch to Common Room (light)' }).click();
+  await preview.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: `${output}/source-context-narrow-light.png`,
+    animations: 'disabled',
+  });
+  const addContext = page.getByRole('button', {
+    name: 'Add context and excerpts to draft',
+    exact: true,
+  });
+  await addContext.scrollIntoViewIfNeeded();
+  await expect(addContext).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'reduce', forcedColors: 'active' });
+  await addContext.focus();
+  await expect(addContext).toBeFocused();
+  expect(
+    await page
+      .getByLabel('Prepared source text')
+      .evaluate((element) => getComputedStyle(element).scrollbarColor),
+  ).toBe('auto');
+  await page.screenshot({
+    path: `${output}/source-context-forced-colors.png`,
+    animations: 'disabled',
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test('source context failure retains the draft and requires a fresh evidence selection', async ({
+  page,
+}) => {
+  const controls: Controls = {
+    unavailable: false,
+    empty: false,
+    failCreate: false,
+    contextCalls: [],
+    failContext: true,
+  };
+  await setup(page, controls);
+  await page.getByRole('checkbox', { name: 'Reviewed knowledge pilot', exact: true }).check();
+  await scope(page);
+  const search = page.getByRole('textbox', { name: 'Search documents', exact: true });
+  await search.fill('restart');
+  await page.getByRole('button', { name: 'Find evidence', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Use incident.md as support', exact: true }).check();
+  const draftField = page.getByRole('textbox', { name: 'Proposed statement', exact: true });
+  await draftField.fill('Retain this draft.');
+  const prepare = page.getByRole('button', { name: 'Prepare source context', exact: true });
+  await prepare.click();
+  await expect(page.getByRole('alert')).toContainText('Source changed');
+  await expect(draftField).toHaveValue('Retain this draft.');
+  await expect(prepare).toBeDisabled();
+  expect(controls.contextCalls).toHaveLength(1);
+  controls.failContext = false;
+  await page.getByRole('button', { name: 'Find evidence', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Use incident.md as support', exact: true }).check();
+  await prepare.click();
+  await expect(
+    page.getByRole('region', { name: 'Source context preview', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Clear document search', exact: true }).click();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('');
+  await expect(draftField).toHaveValue('Retain this draft.');
+  await expect(
+    page.getByRole('region', { name: 'Source context preview', exact: true }),
+  ).not.toBeVisible();
+  await expect(prepare).toBeDisabled();
 });
