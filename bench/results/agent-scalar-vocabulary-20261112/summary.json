@@ -1,0 +1,50 @@
+{
+  "version": "agent-scalar-vocabulary-v206-public-summary-v1",
+  "base_commit": "7e4d03f808dd6222d5ca684009a607cdf349b57d",
+  "private_archive_manifest_sha256": "f2117e7b460eca70c91eb394d0060f8ddf9dbdb938da7b7bcbb6f8f134aa57d0",
+  "private_archive_files": 796,
+  "workflow_freeze_sha256": "dfb341be12bab11ae8fe660359699bc553a76313ff43dc22ad8fffe251942e86",
+  "prior_V205_failure_archive_manifest_sha256": "ad7b215c10d96ef1ffd9f164b1255e5567900bbde0c6d414c6dbcb8b9f092662",
+  "prior_V205": { "HTTP_attempts": 3, "native_generation_calls": 0, "reason": "Unsupported pattern schema keyword; provider guard unchanged", "cleanup_passed": true },
+  "role": { "name": "test-matrix-v6", "output": "potluck-test-matrix-result-v6", "opt_in": true, "generation_constraint": "Caller-declared scalar name/value enums; same host tokens", "V5_unchanged": true, "original_V204_reply_still_rejected": true },
+  "review": {
+    "reviewer": "Primary AI source/rubric-aware and unblinded; also authored synthetic fresh cases",
+    "format_packets": { "passed": 3, "total": 3 },
+    "complete_semantic_criteria": { "passed": 4, "total": 6 },
+    "consumed_criteria": { "passed": 1, "total": 2 },
+    "fresh_synthetic_criteria": { "passed": 3, "total": 4 },
+    "complete_packets": { "passed": 1, "total": 3 },
+    "eligible_proposals": 4,
+    "new_product_tests_implemented_or_executed_from_proposals": 0,
+    "new_findings": 0,
+    "general_agent_qualified": false,
+    "owner_acceptance": false,
+    "decision": "Scoped formatting repair passes; keep opt-in and primary-reviewed. Semantic coverage incomplete."
+  },
+  "checks": { "CLI": 1382, "frontend": 553, "landing": 44, "typechecks": true, "privacy_lint": true, "local_landing_build": true, "backend_source_changed": false, "backend_suite_rerun": false },
+  "execution": {
+    "native_CLI_calls": 3, "answer_calls": 0, "concurrency": 1, "steps_per_job": 1, "generation_retries": 0, "field_repairs": 0,
+    "input_token_cap": 1100, "output_token_cap": 700,
+    "measured_input_tokens": [722, 646, 630], "output_tokens": [256, 287, 255],
+    "CLI_elapsed_seconds": [53.308, 57.715, 51.508],
+    "scripted_wall_seconds": 190.2818724019453, "load_and_profile_seconds": 27.48293070285581,
+    "watchdog_seconds": 198.19512195279822, "watchdog_exit_code": 0, "timed_out": false,
+    "timing_accounting": "Nested, not additive; not human operator time"
+  },
+  "runtime": {
+    "model": "qwen3.8-27b-iq4-xs", "model_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "engine_commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9", "profile": "qwen3.8-27b-native-non-thinking",
+    "context_tokens": 8192, "threads": 8, "GPU_layers": 10, "seed": 7, "temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0, "repeat_penalty": 1,
+    "configured_prompt_cache_MiB": 0, "native_cached_prefix_tokens": [0, 206, 206], "all_cold_calls": false,
+    "ordinary_gateway_or_model_changed": false, "defaults_changed": false
+  },
+  "cleanup": { "passed": true, "owned_processes_gone": 4, "watchdog_gone": true, "model_and_bridge_ports_closed": true, "package_hashes_intact": true },
+  "limits": [
+    "One consumed and two fresh synthetic assignments; same primary authored and graded; no independent holdout or new-company qualification.",
+    "Two incomplete proposals retained unchanged: missing explicit quoted-example/confirmation coverage and one-draft preservation coverage.",
+    "Caller-selected vocabulary does not certify semantic pairing, source entailment or expected answers.",
+    "Frozen brain retained an irrelevant retention-excerpt provenance label; treat as experiment-template defect and name actual inputs in future jobs.",
+    "Initial audit assumed trace/native byte equality; existing turn newline verified separately, native/SSE equal, originals unchanged, failed audit retained.",
+    "Earlier Company Brain scores/failures unchanged and unpooled; no Rob acceptance, human effort, default promotion, cloud CI, release or social post."
+  ]
+}

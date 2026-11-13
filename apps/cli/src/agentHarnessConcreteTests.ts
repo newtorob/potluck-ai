@@ -39,9 +39,39 @@ export function concreteMessages(job: RoleJob, sources: Record<string, string>, 
 }
 
 export function concreteSchema(criteria: Criterion[], units: Unit[]): NonNullable<StreamOptions["responseFormat"]> {
+  return schema(criteria, units, {
+    name: { type: "string", maxLength: 32 }, value: { type: "string", maxLength: 80 },
+  });
+}
+
+export const SCALAR_NAME_PATTERN = "^[a-z][a-z0-9_]*$";
+export const SCALAR_VALUE_PATTERN = "^[!-~]+$";
+
+export interface ScalarVocabulary { names: string[]; values: string[] }
+
+export function validateScalarVocabulary(value: unknown): ScalarVocabulary {
+  const fields = exact(value, ["names", "values"]);
+  check(Array.isArray(fields.names) && fields.names.length > 0 && fields.names.length <= 8
+    && Array.isArray(fields.values) && fields.values.length > 0 && fields.values.length <= 16, "concrete_scalar_vocabulary");
+  const names = fields.names.map(v => text(v, 32)), values = fields.values.map(v => text(v, 80));
+  check(new Set(names).size === names.length && new Set(values).size === values.length
+    && names.every(v => new RegExp(SCALAR_NAME_PATTERN, "u").test(v))
+    && values.every(v => new RegExp(SCALAR_VALUE_PATTERN, "u").test(v)), "concrete_scalar_vocabulary");
+  return { names, values };
+}
+
+export function scalarSchema(job: RoleJob, criteria: Criterion[], units: Unit[]): NonNullable<StreamOptions["responseFormat"]> {
+  const vocabulary = validateScalarVocabulary(job.scalarVocabulary);
+  return schema(criteria, units, {
+    name: { type: "string", enum: vocabulary.names },
+    value: { type: "string", enum: vocabulary.values },
+  });
+}
+
+function schema(criteria: Criterion[], units: Unit[], scalarFields: Record<string, Record<string, unknown>>): NonNullable<StreamOptions["responseFormat"]> {
   const fields = { type: "object", additionalProperties: false, properties: {
     inputs: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false,
-      properties: { name: { type: "string", maxLength: 32 }, value: { type: "string", maxLength: 80 } }, required: ["name", "value"] } },
+      properties: scalarFields, required: ["name", "value"] } },
     question: { type: "string", maxLength: 350 }, expected: { type: "string", maxLength: 600 },
     evidence_ids: { type: "array", maxItems: 3, items: { type: "string", enum: units.map(u => u.id) } },
   }, required: ["inputs", "question", "expected", "evidence_ids"] };
@@ -50,6 +80,25 @@ export function concreteSchema(criteria: Criterion[], units: Unit[]): NonNullabl
     checks: { type: "object", additionalProperties: false, properties: Object.fromEntries(criteria.map(c => [c.id, fields])), required: criteria.map(c => c.id) },
     limitations: { type: "array", maxItems: 2, items: { type: "string", maxLength: 500 } },
   }, required: ["status", "checks", "limitations"] } };
+}
+
+export function scalarMessages(job: RoleJob, sources: Record<string, string>, criteria: Criterion[], units: Unit[]) {
+  const vocabulary = validateScalarVocabulary(job.scalarVocabulary);
+  const messages = concreteMessages(job, sources, criteria, units);
+  messages.history[0].content += "\nChoose input names and values only from scalarVocabulary. They are hypothetical scenario tokens, not source facts. Put full quoted examples in question, never in inputs.value. Question and expected may contain natural language and Unicode. Primary review must verify that the chosen tokens fit the scenario and source rules.";
+  messages.task = JSON.stringify({ ...JSON.parse(messages.task), scalarVocabulary: vocabulary });
+  return messages;
+}
+
+export function scalarResult(value: unknown, job: RoleJob, criteria: Criterion[], units: Unit[]): RoleResult {
+  const vocabulary = validateScalarVocabulary(job.scalarVocabulary);
+  const result = concreteResult(value, job, criteria, units);
+  for (const row of result.concreteChecks ?? []) {
+    for (const input of row.inputs) {
+      check(vocabulary.names.includes(input.name) && vocabulary.values.includes(input.value), "concrete_scalar_vocabulary");
+    }
+  }
+  return result;
 }
 
 export function concreteResult(value: unknown, job: RoleJob, criteria: Criterion[], units: Unit[]): RoleResult {

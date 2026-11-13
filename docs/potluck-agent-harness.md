@@ -524,3 +524,32 @@ prerequisite completeness or test usefulness. Primary review must compare every
 case to its cited rules before using it. No tests execute, no source approval is
 created and no model retries or automatic field repairs are added. Existing
 roles, messages and schemas remain unchanged.
+
+### Opt-in test matrix V6
+
+`test-matrix-v6` pairs with `potluck-test-matrix-result-v6` and requires a small
+per-job `scalarVocabulary`: `{ names: ["request_kind"], values: ["quoted_compound"] }`.
+The caller declares hypothetical scenario tokens, not expected answers or source
+facts. Use at most eight unique identifier-style names and sixteen unique printable
+ASCII values, bounded to 32/80 bytes respectively. Empty, whitespace-bearing,
+non-ASCII or duplicate tokens are rejected before generation. The native schema
+uses supported enums; the host accepts only those same declared tokens and retains
+all existing binding, word/byte, duplicate, unresolved and instruction-echo guards.
+
+Choose tokens that permit useful scenarios, including boundary or exception cases.
+Put the complete quoted or natural-language example in `question`. Prose fields
+retain their existing Unicode and byte-bound behavior. Primary review must check
+that token choices form the claimed scenario and that the expected answer follows
+from its source. Vocabulary membership is not semantic correctness.
+
+V5 messages, schema and validation remain available unchanged. Saved invalid
+packets remain rejected; V6 constrains future generation without repairing replies.
+The role remains opt-in, keeps reference-only receipts and adds no retries,
+authority decisions, ordinary-agent defaults or gateway capability expansion.
+
+The [November 12 bounded evaluation](../bench/results/agent-scalar-vocabulary-20261112/README.md)
+returned three of three format-valid native packets, without retries or field
+repairs. Primary source review found four of six fully covered criteria; the
+remaining proposals omit required checks. This qualifies the narrow formatting
+repair, not general semantic reliability. Keep the role opt-in and review each
+expected answer before use. The original rejected packet remains unchanged.

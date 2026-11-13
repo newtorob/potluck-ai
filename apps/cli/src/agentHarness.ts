@@ -10,6 +10,7 @@ import { DomainRejected, validateDomainPrepared, validateDomainDecoded, type Dom
 import { prepareContext } from "./context.js";
 import type { ChatMessage } from "./gateway.js";
 import { RoleContractError, roleMessages, roleResponseFormat, validateRole, validateRoleResult, validateTestRequirements, type TestRequirement, type RoleJob, type RoleResult, type HarnessRole, type RoleOutputContract } from "./agentHarnessRoles.js";
+import { validateScalarVocabulary, type ScalarVocabulary } from "./agentHarnessConcreteTests.js";
 
 export interface AgentBrain {
   version: "potluck-agent-brain-v1";
@@ -19,6 +20,7 @@ export interface AgentBrain {
 export interface HarnessJob {
   id: string; objective: string; successCriteria: string[];
   role?: HarnessRole; output?: RoleOutputContract; testRequirements?: TestRequirement[];
+  scalarVocabulary?: ScalarVocabulary;
   domain?: "company-brain-coverage-v1";
   files: Array<{ path: string; name: string }>;
 }
@@ -99,7 +101,7 @@ export function validatePlan(value: unknown): HarnessPlan {
   const limits = { concurrency: integer(l.concurrency, 1, 4), maxSteps: integer(l.maxSteps, 1, 8), outputTokens: integer(l.outputTokens, 64, 2048), timeoutMs: integer(l.timeoutMs, 1000, 600_000), totalOutputTokens: integer(l.totalOutputTokens, 64, 262144) };
   requireThat(Array.isArray(p.jobs) && p.jobs.length >= 1 && p.jobs.length <= 64, "Select 1–64 jobs.");
   const jobs = p.jobs.map(value => {
-    const j = object(value); keys(j, ["id", "objective", "successCriteria", "files", ...(roles ? ["role", "output", ...((j.role === "test-matrix-v3" || j.role === "test-matrix-v4") ? ["testRequirements"] : [])] : typed ? ["domain"] : [])]);
+    const j = object(value); keys(j, ["id", "objective", "successCriteria", "files", ...(roles ? ["role", "output", ...((j.role === "test-matrix-v3" || j.role === "test-matrix-v4") ? ["testRequirements"] : []), ...(j.role === "test-matrix-v6" ? ["scalarVocabulary"] : [])] : typed ? ["domain"] : [])]);
     requireThat(Array.isArray(j.files) && j.files.length <= 16, "Select at most 16 files per job.");
     const files = j.files.map(value => { const f = object(value); keys(f, ["path", "name"]);
       const name = text(f.name, 80); requireThat(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name), "Invalid copied file name.");
@@ -112,7 +114,8 @@ export function validatePlan(value: unknown): HarnessPlan {
     const successCriteria = strings(j.successCriteria, 8, 400); requireThat(successCriteria.length, "Each job needs success criteria.");
     const role = roles ? validateRole(j.role,j.output) : undefined;
     const testRequirements = (role?.role === "test-matrix-v3" || role?.role === "test-matrix-v4") ? validateTestRequirements(j.testRequirements,successCriteria,role.output) : undefined;
-    return { id: id(j.id), objective: text(j.objective, 1600), successCriteria, files, ...(role ?? (typed ? { domain: "company-brain-coverage-v1" as const } : {})), ...(testRequirements ? {testRequirements} : {}) };
+    const scalarVocabulary = role?.role === "test-matrix-v6" ? validateScalarVocabulary(j.scalarVocabulary) : undefined;
+    return { id: id(j.id), objective: text(j.objective, 1600), successCriteria, files, ...(role ?? (typed ? { domain: "company-brain-coverage-v1" as const } : {})), ...(testRequirements ? {testRequirements} : {}), ...(scalarVocabulary ? {scalarVocabulary} : {}) };
   });
   requireThat(new Set(jobs.map(j => j.id)).size === jobs.length, "Duplicate job IDs.");
   requireThat(!typed || (limits.concurrency === 1 && limits.maxSteps === 1 && limits.outputTokens === 700 && limits.timeoutMs <= 180_000), "Typed review requires serial one-step jobs, 700 output tokens and at most 180 seconds.");
@@ -419,7 +422,7 @@ export async function runHarness(hubPath: string, batchId: string, options: RunH
         const receipt = { version: 1, batch: batchId, job: job.id, manifestSha256: digest, brainRevision: manifest.brain.revision,
           endpoint, model: manifest.plan.model, modelIdentityVerifiedByHarness: false, scope: "local", readOnly: true, limits,
           startedAt, finishedAt: stamp(), elapsedMs: Date.now() - start, status, reason, outcome, trace, events, needsPrimaryReview: true,
-          ...(job.role ? { role: job.role, outputContract: job.output, outputCheck: roleResult ? (job.role === "test-matrix-v5" ? "passed_concrete_reference_checks_only" : (job.role === "test-matrix-v1" || job.role === "test-matrix-v2" || job.role === "test-matrix-v3" || job.role === "test-matrix-v4") ? "passed_matrix_reference_checks_only" : (job.role === "test-design-v2" || job.role === "test-design-v3") ? "passed_reference_binding_checks_only" : (job.role === "scope-review-v1" || job.role === "scope-review-v2" || job.role === "scope-review-v3") ? "passed_scope_and_coverage_checks_only" : (job.role === "omission-review-v3" || job.role === "omission-review-v4" || job.role === "omission-review-v5") ? "passed_coverage_reference_checks_only" : job.role === "omission-review-v2" ? "passed_candidate_coverage_checks_only" : job.role === "omission-review-v1" ? "passed_unit_binding_checks_only" : "passed_format_and_quotes_only") : "failed_or_incomplete", result: roleResult } : {}),
+          ...(job.role ? { role: job.role, outputContract: job.output, outputCheck: roleResult ? ((job.role === "test-matrix-v5" || job.role === "test-matrix-v6") ? "passed_concrete_reference_checks_only" : (job.role === "test-matrix-v1" || job.role === "test-matrix-v2" || job.role === "test-matrix-v3" || job.role === "test-matrix-v4") ? "passed_matrix_reference_checks_only" : (job.role === "test-design-v2" || job.role === "test-design-v3") ? "passed_reference_binding_checks_only" : (job.role === "scope-review-v1" || job.role === "scope-review-v2" || job.role === "scope-review-v3") ? "passed_scope_and_coverage_checks_only" : (job.role === "omission-review-v3" || job.role === "omission-review-v4" || job.role === "omission-review-v5") ? "passed_coverage_reference_checks_only" : job.role === "omission-review-v2" ? "passed_candidate_coverage_checks_only" : job.role === "omission-review-v1" ? "passed_unit_binding_checks_only" : "passed_format_and_quotes_only") : "failed_or_incomplete", result: roleResult } : {}),
           ...(job.domain ? { domain: job.domain, domainIdentity: manifest.domain![job.id].identity, domainRequestSha256: hash(JSON.stringify(manifest.domain![job.id].request)), domainValidation: "pending", toolsDisabled: true } : {}),
           ...(manifest.plan.version === "potluck-agent-plan-v3" || job.domain ? { responseProtocol: "llama-json-schema-v1", protocolCapabilityVerifiedByHarness: false } : {}) };
         if (job.domain && status === "needs_domain_validation") {

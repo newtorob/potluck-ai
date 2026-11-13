@@ -1,17 +1,18 @@
 /** Versioned, supplied-evidence roles. Format checks never approve model claims. */
 import { createHash } from "node:crypto";
-import { concreteMessages, concreteSchema, concreteResult, ConcreteCaseError, type ConcreteCheck } from "./agentHarnessConcreteTests.js";
+import { concreteMessages, concreteSchema, concreteResult, scalarMessages, scalarSchema, scalarResult, ConcreteCaseError, type ConcreteCheck, type ScalarVocabulary } from "./agentHarnessConcreteTests.js";
 import type { ChatMessage, StreamOptions } from "./gateway.js";
 
-const ROLES = ["context-handoff-v1", "evidence-review-v1", "test-design-v1", "test-design-v2", "test-design-v3", "test-matrix-v1", "test-matrix-v2", "test-matrix-v3", "test-matrix-v4", "test-matrix-v5", "omission-review-v1", "omission-review-v2", "omission-review-v3", "omission-review-v4", "omission-review-v5", "scope-review-v1", "scope-review-v2", "scope-review-v3"] as const;
+const ROLES = ["context-handoff-v1", "evidence-review-v1", "test-design-v1", "test-design-v2", "test-design-v3", "test-matrix-v1", "test-matrix-v2", "test-matrix-v3", "test-matrix-v4", "test-matrix-v5", "test-matrix-v6", "omission-review-v1", "omission-review-v2", "omission-review-v3", "omission-review-v4", "omission-review-v5", "scope-review-v1", "scope-review-v2", "scope-review-v3"] as const;
 export type HarnessRole = typeof ROLES[number];
 export interface RoleOutputContract {
-  version: "potluck-test-matrix-result-v5" | "potluck-test-matrix-result-v4" | "potluck-test-matrix-result-v3" | "potluck-test-matrix-result-v2" | "potluck-test-matrix-result-v1" | "potluck-test-design-result-v3" | "potluck-test-design-result-v2" | "potluck-agent-result-v1" | "potluck-omission-result-v1" | "potluck-omission-result-v2" | "potluck-omission-result-v3" | "potluck-omission-result-v4" | "potluck-omission-result-v5" | "potluck-scope-result-v1" | "potluck-scope-result-v2" | "potluck-scope-result-v3"; maxWords: number; maxFindings: number;
+  version: "potluck-test-matrix-result-v6" | "potluck-test-matrix-result-v5" | "potluck-test-matrix-result-v4" | "potluck-test-matrix-result-v3" | "potluck-test-matrix-result-v2" | "potluck-test-matrix-result-v1" | "potluck-test-design-result-v3" | "potluck-test-design-result-v2" | "potluck-agent-result-v1" | "potluck-omission-result-v1" | "potluck-omission-result-v2" | "potluck-omission-result-v3" | "potluck-omission-result-v4" | "potluck-omission-result-v5" | "potluck-scope-result-v1" | "potluck-scope-result-v2" | "potluck-scope-result-v3"; maxWords: number; maxFindings: number;
 }
 export interface TestRequirement { checkId: string; initialState: string; actions: string[]; expected: string[] }
 export interface RoleJob {
   role: HarnessRole; output: RoleOutputContract;
   objective: string; successCriteria: string[]; testRequirements?: TestRequirement[];
+  scalarVocabulary?: ScalarVocabulary;
 }
 export interface RoleResult {
   status: "complete" | "insufficient";
@@ -40,13 +41,14 @@ function string(value: unknown, max: number): string {
 export function validateRole(role: unknown, output: unknown): Pick<RoleJob, "role" | "output"> {
   check(ROLES.includes(role as HarnessRole), "unknown_role");
   const o = exact(output, ["version", "maxWords", "maxFindings"]);
-  check(o.version === (role === "test-matrix-v5" ? "potluck-test-matrix-result-v5" : role === "test-matrix-v4" ? "potluck-test-matrix-result-v4" : role === "test-matrix-v3" ? "potluck-test-matrix-result-v3" : role === "test-matrix-v2" ? "potluck-test-matrix-result-v2" : role === "test-matrix-v1" ? "potluck-test-matrix-result-v1" : role === "test-design-v3" ? "potluck-test-design-result-v3" : role === "test-design-v2" ? "potluck-test-design-result-v2" : role === "omission-review-v1" ? "potluck-omission-result-v1" : role === "omission-review-v2" ? "potluck-omission-result-v2" : role === "omission-review-v3" ? "potluck-omission-result-v3" : role === "omission-review-v4" ? "potluck-omission-result-v4" : role === "omission-review-v5" ? "potluck-omission-result-v5" : role === "scope-review-v1" ? "potluck-scope-result-v1" : role === "scope-review-v2" ? "potluck-scope-result-v2" : role === "scope-review-v3" ? "potluck-scope-result-v3" : "potluck-agent-result-v1"), "unknown_output_contract");
+  check(o.version === (role === "test-matrix-v6" ? "potluck-test-matrix-result-v6" : role === "test-matrix-v5" ? "potluck-test-matrix-result-v5" : role === "test-matrix-v4" ? "potluck-test-matrix-result-v4" : role === "test-matrix-v3" ? "potluck-test-matrix-result-v3" : role === "test-matrix-v2" ? "potluck-test-matrix-result-v2" : role === "test-matrix-v1" ? "potluck-test-matrix-result-v1" : role === "test-design-v3" ? "potluck-test-design-result-v3" : role === "test-design-v2" ? "potluck-test-design-result-v2" : role === "omission-review-v1" ? "potluck-omission-result-v1" : role === "omission-review-v2" ? "potluck-omission-result-v2" : role === "omission-review-v3" ? "potluck-omission-result-v3" : role === "omission-review-v4" ? "potluck-omission-result-v4" : role === "omission-review-v5" ? "potluck-omission-result-v5" : role === "scope-review-v1" ? "potluck-scope-result-v1" : role === "scope-review-v2" ? "potluck-scope-result-v2" : role === "scope-review-v3" ? "potluck-scope-result-v3" : "potluck-agent-result-v1"), "unknown_output_contract");
   check(Number.isSafeInteger(o.maxWords) && Number(o.maxWords) >= 32 && Number(o.maxWords) <= 350, "output_word_bound");
   check(Number.isSafeInteger(o.maxFindings) && Number(o.maxFindings) >= 1 && Number(o.maxFindings) <= 6, "output_item_bound");
   return { role: role as HarnessRole, output: { version: o.version as RoleOutputContract["version"], maxWords: Number(o.maxWords), maxFindings: Number(o.maxFindings) } };
 }
 
 const INSTRUCTIONS: Record<HarnessRole, string> = {
+  "test-matrix-v6": "Propose scalar question-test cases with generation constraints matching strict validation; primary review verifies every expected answer.",
   "test-matrix-v5": "Propose applied scalar question-test cases; primary review verifies every expected answer.",
   "context-handoff-v1": "Summarize the current direction, unresolved work and constraints. Do not invent progress or approval. Quote the supplied brain or sources for each finding.",
   "evidence-review-v1": "Review only the assigned scope against the supplied evidence. Distinguish missing evidence from a negative answer. Report concrete source-backed omissions or conflicts; a clean control may have no findings. Supplied context is not necessarily content retained in the draft.",
@@ -67,6 +69,7 @@ const INSTRUCTIONS: Record<HarnessRole, string> = {
   "test-design-v1": "Propose bounded tests for the assigned behavior, with an observable expected result and exact supporting source quotes. Do not claim that a proposed test ran or passed.",
 };
 export function roleMessages(job: RoleJob, sources: Record<string, string>): { history: ChatMessage[]; task: string } {
+  if (job.role === "test-matrix-v6") return scalarMessages(job, sources, matrixCriteria(job), matrixUnits(sources));
   if (job.role === "test-matrix-v5") return concreteMessages(job, sources, matrixCriteria(job), matrixUnits(sources));
   if (job.role === "test-matrix-v3" || job.role === "test-matrix-v4") {
     const checks = matrixCriteria(job), requirements = validateTestRequirements(job.testRequirements, job.successCriteria, job.output), units = matrixUnits(sources);
@@ -190,6 +193,7 @@ export function roleMessages(job: RoleJob, sources: Record<string, string>): { h
 
 /** Syntax constraints only. Exact source quotes and word limits are checked later. */
 export function roleResponseFormat(job: RoleJob, sources: Record<string, string>): NonNullable<StreamOptions["responseFormat"]> {
+  if (job.role === "test-matrix-v6") return scalarSchema(job, matrixCriteria(job), matrixUnits(sources));
   if (job.role === "test-matrix-v5") return concreteSchema(matrixCriteria(job), matrixUnits(sources));
   if (job.role === "test-matrix-v2" || job.role === "test-matrix-v3" || job.role === "test-matrix-v4") {
     if (job.role === "test-matrix-v3" || job.role === "test-matrix-v4") validateTestRequirements(job.testRequirements, job.successCriteria, job.output);
@@ -430,8 +434,8 @@ function matrixUnits(sources: Record<string,string>) {
 
 export function validateRoleResult(raw: string, job: RoleJob, sources: Record<string, string>): RoleResult {
   check(Buffer.byteLength(raw) <= 32768, "output_bytes");
-  if (job.role === "test-matrix-v5") {
-    try { return concreteResult(parseUnique(raw), job, matrixCriteria(job), matrixUnits(sources)); }
+  if (job.role === "test-matrix-v5" || job.role === "test-matrix-v6") {
+    try { return (job.role === "test-matrix-v6" ? scalarResult : concreteResult)(parseUnique(raw), job, matrixCriteria(job), matrixUnits(sources)); }
     catch (error) { if (error instanceof ConcreteCaseError) throw new RoleContractError(error.code); throw error; }
   }
   if (job.role === "test-matrix-v1" || job.role === "test-matrix-v2" || job.role === "test-matrix-v3" || job.role === "test-matrix-v4") {
