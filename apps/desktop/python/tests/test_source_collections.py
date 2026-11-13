@@ -50,6 +50,38 @@ def test_collections_scan_and_remove_independently(store, tmp_path):
     asyncio.run(run())
 
 
+def test_opt_in_heading_context_preserves_empty_qualifiers_and_short_section_labels(store, tmp_path):
+    from potluck_local.services import claim_source_context, evidence_lookup, pilot_setup_drafts
+    async def run():
+        folder = document(tmp_path, body='# Proposed policy, not enabled\n\n## Access\nApproval required.\n\n## Exception only after review\nNo customer rows.\n')
+        cid = await sources.register_collection('acme', 'policy', folder)
+        await sources.scan_collection('acme', cid)
+        original = rows(store, 'source_documents')[0]
+        assert all(row['heading'] != 'Proposed policy, not enabled' for row in rows(store, 'source_chunks'))
+        await sources.scan_collection('acme', cid, preserve_heading_context=True)
+        updated = rows(store, 'source_documents')[0]
+        assert updated['revision_id'] != original['revision_id']
+        assert updated['parser_version'] == sources.HEADING_CONTEXT_PARSER_VERSION
+        headings = {row['heading'] for row in rows(store, 'source_chunks')}
+        assert headings == {'Proposed policy, not enabled', 'Access', 'Exception only after review'}
+        assert all(row['content'] for row in rows(store, 'source_chunks'))
+        scope = evidence_lookup.EvidenceScope('acme', (cid,))
+        draft = (await pilot_setup_drafts.source_drafts(scope, 'What access exception applies?'))['candidates'][0]['preview']
+        assert all(value in draft['content'] for value in headings)
+        assert draft['content'].count('Proposed policy, not enabled') == 1
+        assert 'Approval required.' in draft['content'] and 'No customer rows.' in draft['content']
+        from potluck_local.services.investigation_reviewed_claim_selection_v2 import prepare
+        support = {row['citation_id']: row for doc in draft['documents'] for row in doc['opening'] + doc['excerpts']}
+        prepared = prepare('Which planned access exception applies?', [{'kind': 'reviewed_claim',
+            'citation_id': 'claim:fixture', 'content': draft['content'], 'sources': list(support.values())}])
+        assert prepared['claims'][0]['text'] == draft['content']
+        again = await sources.scan_collection('acme', cid, preserve_heading_context=True)
+        assert again.files_updated == again.chunks_inserted == 0
+        await sources.scan_collection('acme', cid)
+        assert rows(store, 'source_documents')[0]['parser_version'] == sources.PARSER_VERSION
+    asyncio.run(run())
+
+
 def test_idempotence_revisions_and_empty_file(store, tmp_path):
     async def run():
         folder = document(tmp_path)

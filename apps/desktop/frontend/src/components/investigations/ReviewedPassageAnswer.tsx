@@ -6,7 +6,7 @@ import type { Brief, ReadableAnswer } from '@/types/investigations';
 
 type Answer = NonNullable<Brief['answers']>[number];
 
-function Markdown({ text }: { text: string }) {
+export function AnswerMarkdown({ text }: { text: string }) {
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground prose-p:my-2 prose-li:my-0.5 prose-pre:overflow-x-auto prose-pre:bg-muted prose-code:before:content-none prose-code:after:content-none">
       <ReactMarkdown
@@ -70,7 +70,7 @@ export function ReviewedPassageAnswer({
   readable?: ReadableAnswer | undefined;
 }) {
   const presentation = answer.passage_presentation;
-  if (!presentation) return <Markdown text={answer.text} />;
+  if (!presentation) return <AnswerMarkdown text={answer.text} />;
   const display =
     presentation.version === 'fixed-part-selection-v32' &&
     readable?.version === 'readable-source-groups-v1' &&
@@ -87,7 +87,9 @@ export function ReviewedPassageAnswer({
     <div className="space-y-3" aria-label="Selected reviewed passages">
       {presentation.lead && <p className="font-medium">{presentation.lead}</p>}
       {presentation.answer && (
-        <Markdown text={display?.markdown ?? (readable ? answer.text : presentation.answer)} />
+        <AnswerMarkdown
+          text={display?.markdown ?? (readable ? answer.text : presentation.answer)}
+        />
       )}
       {display?.source_groups ? (
         <div className="flex flex-wrap gap-3 text-xs" aria-label="Evidence citations">
@@ -111,7 +113,7 @@ export function ReviewedPassageAnswer({
           <summary className="cursor-pointer text-sm font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             Original generated answer
           </summary>
-          <Markdown text={answer.text} />
+          <AnswerMarkdown text={answer.text} />
         </details>
       )}
       <details className="rounded-md border border-border p-3">
@@ -128,17 +130,17 @@ export function ReviewedPassageAnswer({
                     className="rounded-md border border-border px-3 py-2"
                     aria-label="Selected source record"
                   >
-                    <Markdown text={cells[0] || '(Empty cell)'} />
+                    <AnswerMarkdown text={cells[0] || '(Empty cell)'} />
                     <ul className="list-disc pl-5">
                       {cells.slice(1).map((cell, i) => (
                         <li key={i}>
-                          <Markdown text={cell || '(Empty cell)'} />
+                          <AnswerMarkdown text={cell || '(Empty cell)'} />
                         </li>
                       ))}
                     </ul>
                   </div>
                 ) : (
-                  <Markdown text={passage.text} />
+                  <AnswerMarkdown text={passage.text} />
                 )}
                 <div className="text-xs">{sourceLink(passage.citation_id)}</div>
               </div>
@@ -161,7 +163,7 @@ export function ReviewedPassageAnswer({
                 <p className="text-xs font-medium">
                   {String(item.claim_key || 'Reviewed statement')}
                 </p>
-                <Markdown text={String(item.content || '')} />
+                <AnswerMarkdown text={String(item.content || '')} />
                 <div className="text-xs">{sourceLink(String(item.citation_id))}</div>
               </div>
             ))}

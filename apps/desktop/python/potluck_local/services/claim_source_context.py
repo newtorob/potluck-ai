@@ -85,7 +85,8 @@ async def preview(scope: evidence.EvidenceScope, citation_ids: list[str]) -> dic
                     continue
                 seen.add(source['citation_id'])
                 expanded.append(source['citation_id'])
-                blocks.append('\n\n'.join(v for v in (source['heading'], source['content']) if v))
+                values = (source['content'],) if source['heading'] == source['content'] else (source['heading'], source['content'])
+                blocks.append('\n\n'.join(v for v in values if v))
             texts.append('Document: ' + group['collection_name'] + ' / ' + group['relative_path']
                          + '\n\n' + '\n\n'.join(blocks))
         content = '\n\n'.join(texts)

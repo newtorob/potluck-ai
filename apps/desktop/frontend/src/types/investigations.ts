@@ -83,6 +83,7 @@ export interface Investigation {
   status: 'draft' | 'reviewed' | 'invalidated';
   brief: Brief;
   readable_answers?: Record<string, ReadableAnswer>;
+  answer_outlines?: Record<string, ReviewedAnswerOutline>;
   evidence: Array<Record<string, unknown>>;
   retrieval_notices?: string[];
   created_at: string;
@@ -160,4 +161,14 @@ export interface ReadableAnswer {
 export interface InvestigationScope {
   workspace: string;
   collection_ids: string[];
+}
+
+export interface ReviewedAnswerOutline {
+  version: 'reviewed-answer-outline-v1';
+  original_text: string;
+  original_status: NonNullable<Brief['answers']>[number]['status'];
+  original_snippet_ids: string[];
+  source_contents: Record<string, string>;
+  sections: Array<{ title: string; blocks: Array<{ label: string; snippet_ids: string[] }> }>;
+  source_label_snippet_ids: string[];
 }

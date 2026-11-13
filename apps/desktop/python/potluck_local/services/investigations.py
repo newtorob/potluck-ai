@@ -445,7 +445,10 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                                unknown_mode: str | None = None,
                                presentation_mode: str | None = None,
                                evidence_selection: str | None = None,
-                               question_part_plan: dict[str, Any] | None = None) -> dict[str, Any]:
+                               question_part_plan: dict[str, Any] | None = None,
+                               organize_answer: bool = False) -> dict[str, Any]:
+    if type(organize_answer) is not bool or organize_answer and presentation_mode != 'fixed-part-selection-v32':
+        raise ValueError('Automatic organization requires fixed-part selection v32')
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
     if evidence_selection is not None and (evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5')
@@ -1353,6 +1356,15 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         provenance['evidence_selection'] = {
             'version': evidence_selection, 'snapshot_sha256': reviewed_receipt['snapshot_sha256'],
             'limitation': 'Human review is recorded; entailment is not verified.'}
+    if organize_answer:
+        from . import investigation_answer_outlines as outlines
+        provenance['automatic_answer_outlines'] = {}
+        for answer in brief.get('answers', []):
+            provenance['automatic_answer_outlines'][answer['question_id']] = await outlines.produce(
+                issue, answer, evidence, runtime=runtime, model=model_slug, model_sha=sha,
+                profile=generation_profile, seed=seed, deadline=deadline,
+                question_parts=[part['request'] for part in question_part_plan['parts']])
+        provenance['elapsed_ms'] = int((time.monotonic() - started) * 1000)
     original = {'issue': issue, 'evidence': evidence, 'brief': brief, 'provenance': provenance}
     _validate_v10_original(original)
     _validate_v11_original(original)

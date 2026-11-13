@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ReviewedPassageAnswer } from '@/components/investigations/ReviewedPassageAnswer';
+import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
 import { PilotKnowledge } from '@/components/investigations/PilotKnowledge';
 import {
   QuestionPartsEditor,
@@ -991,10 +991,11 @@ export function InvestigationsView() {
                                   : 'Unknown'}
                             </p>
                             {answer.passage_presentation ? (
-                              <ReviewedPassageAnswer
+                              <FocusedSourceAnswer
                                 answer={answer}
                                 evidence={current.evidence}
                                 readable={current.readable_answers?.[answer.question_id]}
+                                outline={current.answer_outlines?.[answer.question_id]}
                                 sourceLink={sourceLink}
                               />
                             ) : (

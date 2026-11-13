@@ -157,20 +157,32 @@ def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
 
 
 def decorate(item: dict[str, Any]) -> dict[str, Any]:
+    from . import investigation_answer_outlines as outlines
     result = {}
     for answer in (item.get('brief') or {}).get('answers', []):
         value = project(answer, item.get('evidence', []))
         if value:
             result[answer['question_id']] = value
-    return {**item, 'readable_answers': result} if result else item
+    organized = outlines.project_item(item)
+    return {**item, **({'readable_answers': result} if result else {}),
+            **({'answer_outlines': organized} if organized else {})}
 
 
 def export(item: dict[str, Any], escape: Callable[[str], str]) -> str | None:
+    from . import investigation_answer_outlines as outlines
     answers = (item.get('brief') or {}).get('answers', [])
     if not answers or (item.get('review') or {}).get('decision') == 'correct':
         return None
     preserve_lines = lambda value: '\n'.join(escape(line) for line in value.splitlines())
-    projections = [project(answer, item.get('evidence', []), escape=preserve_lines) for answer in answers]
+    organized = outlines.project_item(item)
+    projections = []
+    for answer in answers:
+        value = project(answer, item.get('evidence', []), escape=preserve_lines)
+        if value is None and answer['question_id'] in organized:
+            citations = list(dict.fromkeys(row['citation_id'] for row in answer['source_excerpts']))
+            value = {'markdown': '', 'source_groups': [{'evidence_id': str(i), 'citation_id': citation}
+                     for i, citation in enumerate(citations, 1)]}
+        projections.append(value)
     if any(value is None for value in projections):
         return None
     lines = ['# Investigation', '', escape(item['issue']), '',
@@ -178,6 +190,18 @@ def export(item: dict[str, Any], escape: Callable[[str], str]) -> str | None:
              'Investigation: ' + escape(item.get('id', '')), 'Model: ' + escape(item.get('model_slug', '')),
              'Model SHA256: ' + escape(item.get('model_sha', '')), 'Created: ' + escape(item.get('created_at', '')), '']
     for answer, value in zip(answers, projections):
+        outline = organized.get(answer['question_id'])
+        if outline:
+            by_id = {row['snippet_id']: row for row in answer['source_excerpts']}
+            parts = []
+            for section in outline['sections']:
+                parts.append('### ' + escape(section['title']))
+                for block in section['blocks']:
+                    rows = [by_id[sid] for sid in block['snippet_ids']]
+                    parts.append(_records('\n\n'.join(row['quote'].strip() for row in rows),
+                                          [s for e in item['evidence'] for s in e.get('sources', [])], preserve_lines))
+                    parts.append('Citations: ' + ', '.join(escape(c) for c in dict.fromkeys(row['citation_id'] for row in rows)))
+            value = {**value, 'markdown': '\n\n'.join(parts)}
         lines += ['## Answer · ' + escape(answer['status']), value['markdown'], '', '### Citations']
         for group in value['source_groups']:
             lines.append('- Evidence ' + group['evidence_id'] + ': ' + escape(group['citation_id']))

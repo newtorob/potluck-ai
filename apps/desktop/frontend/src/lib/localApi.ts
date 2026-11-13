@@ -779,9 +779,9 @@ export const localApi = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<{ collection_id: string }>);
   },
-  scanPilotCollection(id: string, input: { workspace: string; scan_confirmed: true }): Promise<{ files_scanned: number; chunks_inserted: number }> {
+  scanPilotCollection(id: string, input: { workspace: string; scan_confirmed: true; preserve_heading_context?: boolean }): Promise<{ files_scanned: number; chunks_inserted: number }> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/collections/${encodeURIComponent(id)}/scan`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, preserve_heading_context: input.preserve_heading_context ?? true }),
     }, 120_000).then(handleResponse<{ files_scanned: number; chunks_inserted: number }>);
   },
   pilotEvidence(input: InvestigationScope & { query: string }): Promise<PilotEvidence> {
@@ -827,9 +827,9 @@ export const localApi = {
     }, 360_000).then(handleResponse<Investigation>);
   },
 
-  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true }): Promise<Investigation> {
+  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true; organize_answer?: boolean }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/ask-reviewed`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, organize_answer: input.organize_answer ?? true }),
     }, 360_000).then(handleResponse<Investigation>);
   },
 

@@ -69,13 +69,15 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def chunk_markdown(text: str) -> list[_Chunk]:
+def chunk_markdown(text: str, *, preserve_headings: bool = False) -> list[_Chunk]:
     """Split markdown into heading-bounded chunks.
 
     A chunk starts at a `#`-prefixed heading line and runs until the next
     heading. Files with no headings become a single chunk with heading=''.
     Oversize chunks are split further on blank-line paragraph boundaries.
     Tiny trailing chunks are merged into the previous chunk.
+    With preserve_headings, retain heading-only sections and do not merge across
+    different headings: a title may carry a draft state, condition or exception.
     """
     lines = text.splitlines()
     raw_sections: list[tuple[str, list[str]]] = []
@@ -123,8 +125,11 @@ def chunk_markdown(text: str) -> list[_Chunk]:
         base_anchor = _slugify(heading) if heading else "intro"
         for idx, piece in enumerate(pieces):
             piece = piece.strip()
-            if not piece:
+            if not piece and not (preserve_headings and heading):
                 continue
+            if not piece:
+                # Keep heading-only support nonempty for the reviewed-evidence contract.
+                piece = heading
             anchor = base_anchor if len(pieces) == 1 else f"{base_anchor}-{idx + 1}"
             # Disambiguate repeated headings within the same file
             count = seen_anchors.get(anchor, 0)
@@ -138,7 +143,8 @@ def chunk_markdown(text: str) -> list[_Chunk]:
     # one-line nodes.
     merged: list[_Chunk] = []
     for c in chunks:
-        if merged and len(c.body) < _MIN_CHUNK_CHARS:
+        if (merged and len(c.body) < _MIN_CHUNK_CHARS
+                and (not preserve_headings or c.heading == merged[-1].heading)):
             prev = merged[-1]
             prev.body = f"{prev.body}\n\n{c.body}".strip()
         else:

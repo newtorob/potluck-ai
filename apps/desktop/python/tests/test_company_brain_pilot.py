@@ -210,7 +210,8 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
         }
 
 
-def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch):
+@pytest.mark.parametrize('organize', [False, True])
+def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize):
     import json
     from copy import deepcopy
     import test_investigation_fixed_part_answers_service as shared
@@ -220,10 +221,18 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
     class Runtime(shared.FixedRuntime):
         async def chat(self, messages, **kwargs):
             self.calls.append(deepcopy((messages, kwargs)))
-            return {'choices': [{'message': {'content': wire('supported', ['C1:rule'])},
+            value = json.loads(wire('supported', ['C1:rule', 'C1:exception'] if organize else ['C1:rule']))
+            if organize:
+                value['parts']['P2'] = deepcopy(value['parts']['P1'])
+            raw = (json.dumps({'groups': {key: ('P2' if i == 1 else 'P1') for i,key in enumerate(json.loads(messages[1]['content'])['ROWS'])}})
+                   if messages[0]['content'].startswith('Organize cited passages') else json.dumps(value))
+            return {'choices': [{'message': {'content': raw},
                                  'finish_reason': 'stop'}]}
 
     async def run():
+        if organize:
+            import test_investigation_reviewed_claim_selection_v16_service as source_fixture
+            monkeypatch.setattr(source_fixture, 'BODY', source_fixture.BODY.replace('\n', '\n\n'))
         path, scope, *_ = await shared.setup(tmp_path, monkeypatch)
         monkeypatch.setattr(pilot, '_privacy', lambda: None)
         runtime = Runtime()
@@ -232,10 +241,12 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
             workspace=scope.workspace, collection_ids=list(scope.collection_ids),
             question=shared.QUESTION, model_slug='model', pilot_confirmed=True,
             question_parts=['What is required for access?', 'What exact expiry is stated?'],
-            question_parts_confirmed=True)
+            question_parts_confirmed=True, organize_answer=organize)
         item = await pilot.ask_reviewed(body)
-        assert len(runtime.calls) == 2
-        assert all(options['max_tokens'] == 256 for _, options in runtime.calls)
+        assert len(runtime.calls) == 2 + int(organize), (item['brief']['answers'][0].get('status'), item['brief']['answers'][0].get('passage_presentation', {}).get('version'), item['provenance'].get('automatic_answer_outlines'))
+        assert bool(item.get('answer_outlines')) is organize, item['provenance'].get('automatic_answer_outlines')
+        assert all(options['max_tokens'] == 256 for _, options in runtime.calls[:2])
+        if organize: assert runtime.calls[-1][1]['max_tokens'] == 768
         assert item['provenance']['presentation_mode'] == 'fixed-part-selection-v32'
         assert item['provenance']['question_part_plan']['origin'] == 'reviewer_supplied'
         assert (await inv.get_investigation(scope, item['id']))['brief'] == item['brief']
@@ -244,13 +255,17 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
         assert reviewed['brief'] == item['brief']
         exported = await shared.routes.export(item['id'], scope.workspace, list(scope.collection_ids))
         assert 'Transport check' in exported['markdown']
+        if organize:
+            assert '### What is required for access?' in exported['markdown']
+            reopened = await shared.routes.get(item['id'], scope.workspace, list(scope.collection_ids))
+            assert reopened['answer_outlines'] == item['answer_outlines']
         with sqlite3.connect(path) as db:
             db.execute("UPDATE source_collections SET scan_status='pending'")
         with pytest.raises(HTTPException):
             await pilot.ask_reviewed(body)
         with pytest.raises((ValueError, LookupError)):
             await inv.get_investigation(scope, item['id'])
-        assert len(runtime.calls) == 2
+        assert len(runtime.calls) == 2 + int(organize), (item['brief']['answers'][0].get('status'), item['brief']['answers'][0].get('passage_presentation', {}).get('version'), item['provenance'].get('automatic_answer_outlines'))
         with sqlite3.connect(path) as db:
             assert db.execute('SELECT COUNT(*) FROM investigations').fetchone()[0] == 1
             contract = json.loads(db.execute('SELECT question_part_contract FROM investigations').fetchone()[0])

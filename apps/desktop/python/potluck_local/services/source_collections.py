@@ -30,6 +30,7 @@ from potluck_local.services.investigations import invalidate
 from potluck_local.services.vault_ingestion import chunk_markdown
 
 PARSER_VERSION = 'markdown-evidence-v1'
+HEADING_CONTEXT_PARSER_VERSION = 'markdown-evidence-v3-heading-context'
 MAX_FILE_BYTES = 2 * 1024 * 1024
 DEFAULT_EXCLUDES = ('.git/**', '.obsidian/**', 'archive/**', '**/archive/**')
 
@@ -151,9 +152,13 @@ class CollectionScan:
     chunks_inserted: int = 0
 
 
-async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
+async def scan_collection(workspace: str, collection_id: str, *,
+                          preserve_heading_context: bool = False) -> CollectionScan:
     """Replace one collection atomically; failed scans keep the last complete snapshot."""
     result = CollectionScan(collection_id)
+    if type(preserve_heading_context) is not bool:
+        raise ValueError('Invalid heading context option')
+    parser_version = HEADING_CONTEXT_PARSER_VERSION if preserve_heading_context else PARSER_VERSION
     try:
         async with aiosqlite.connect(get_memory_db_path(), timeout=30) as db:
             await db.execute('PRAGMA foreign_keys=ON')
@@ -178,12 +183,12 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                 seen.add(relative)
                 result.files_scanned += 1
                 sha = hashlib.sha256(text.encode()).hexdigest()
-                if known.get(relative) == (sha, PARSER_VERSION):
+                if known.get(relative) == (sha, parser_version):
                     continue
                 document_id = str(uuid.uuid5(uuid.UUID(collection_id), relative))
                 safe_text = redact_credentials(text)
                 revision_id = str(uuid.uuid5(
-                    uuid.UUID(document_id), PARSER_VERSION + ':'
+                    uuid.UUID(document_id), parser_version + ':'
                     + hashlib.sha256(safe_text.encode()).hexdigest(),
                 ))
                 await invalidate(db, 'collection_id=?', (collection_id,))
@@ -199,9 +204,9 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                     'content_sha=excluded.content_sha, revision_id=excluded.revision_id, '
                     'parser_version=excluded.parser_version, updated_at=excluded.updated_at',
                     (document_id, collection_id, relative, sha, revision_id,
-                     PARSER_VERSION, _now()),
+                     parser_version, _now()),
                 )
-                chunks = chunk_markdown(safe_text)
+                chunks = chunk_markdown(safe_text, preserve_headings=preserve_heading_context)
                 for ordinal, chunk in enumerate(chunks):
                     chunk_id = str(uuid.uuid5(uuid.UUID(revision_id), str(ordinal)))
                     await db.execute(
