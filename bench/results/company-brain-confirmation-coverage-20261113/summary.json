@@ -1,0 +1,44 @@
+{
+  "version": "company-brain-confirmation-coverage-v207-public-v1",
+  "base_commit": "9cc5864f65fee92020e118f2a853845ac809d239",
+  "private_archive_manifest_sha256": "273c19bec3be922678b22b2d8d8221f04a5cc7b5d97f3645ec596c458ff06994",
+  "private_archive_files": 816,
+  "workflow_freeze_sha256": "013475b148df1e5f3e4d810d0a471da6091c7bb7fffd7d633d10b8e857a22149",
+  "product_regression_batch": { "passed": true, "new_primary_authored_parameterized_cases": 4, "generation_is_test_double": true, "production_implementation_changed": false, "new_answer_quality_score": null, "owner_acceptance": false },
+  "checks": { "Python_passed": 9348, "Python_skipped": 5, "Python_warnings": 1, "Python_seconds": 690.64, "frontend": 555, "CLI": 1382, "landing": 44, "types": true, "privacy_lint": true, "initial_CLI_coordination_refusal_retained": true, "serial_CLI_rerun_passed_without_guard_or_timeout_changes": true },
+  "local_agent": {
+    "role": "unchanged test-matrix-v6",
+    "change": "Separately keyed source obligations; brain provenance names actual synthetic files",
+    "qualified": false,
+    "format_packets": { "passed": 4, "total": 4 },
+    "fully_acceptable_applied_checks": { "passed": 8, "total": 11 },
+    "decomposed_consumed_coverage_groups": { "passed": 4, "total": 6, "direct_comparison_to_V206_combined_cases": false },
+    "fresh_synthetic_obligations": { "passed": 2, "total": 3 },
+    "complete_packets": { "passed": 1, "total": 4 },
+    "eligible_supplemental_proposals": 8,
+    "new_product_tests_adopted_from_agent": 0,
+    "new_findings": 0,
+    "reviewer": "Primary AI, source/rubric-aware, unblinded; primary also authored controls",
+    "failures": ["Category token substitutes for concrete quoted example", "Dispatch case substitutes for required one-draft assertion", "Fresh quote/one-item result present, but action input does not match preparation question"],
+    "prior_scores_unchanged_and_unpooled": true
+  },
+  "runtime": {
+    "model": "qwen3.8-27b-iq4-xs", "model_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "engine_commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9", "profile": "qwen3.8-27b-native-non-thinking",
+    "configured_context": 8192, "configured_threads": 8, "configured_GPU_layers": 10, "seed": 7,
+    "temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0, "repeat_penalty": 1,
+    "configured_cache_MiB": 0, "native_cached_prefix_tokens": [0, 289, 289, 289],
+    "native_CLI_calls": 4, "answer_calls": 0, "concurrency": 1, "generation_retries": 0, "output_repairs": 0,
+    "input_tokens": [805, 713, 724, 786], "output_tokens": [381, 284, 352, 269], "input_cap": 1100, "output_cap": 700,
+    "CLI_seconds": [89.6, 64.232, 79.534, 62.218], "scripted_wall_seconds": 323.3059246269986, "load_profile_seconds": 27.4331386720296, "watchdog_seconds": 331.36296284594573,
+    "timings_are_nested_not_additive_or_human_effort": true, "watchdog_exit_code": 0, "timed_out": false
+  },
+  "cleanup": { "independently_verified": true, "owned_processes_gone": 4, "watchdog_gone": true, "model_and_bridge_ports_closed": true, "package_hashes_intact": true },
+  "limits": [
+    "App tests use explicit generation doubles; native work only assesses supplemental agent proposals, not new Company Brain answers.",
+    "Pre-inference max-three-criteria refusal preserved; packet narrowed without widening role/provider guards.",
+    "Fresh variants planned before exact source authoring after workflow freeze; primary authors/reviews unblinded, not an independent holdout.",
+    "No old raw outputs, rubrics or scores rewritten; no helper/default promotion or owner acceptance.",
+    "No paid/cloud inference, model downloads, CI, production runtime changes, release or social post."
+  ]
+}

@@ -160,3 +160,13 @@ silently shortened context. The desktop also blocks insertion if combining it
 with an existing draft exceeds the proposal limits. Choose fewer/shorter excerpts
 or review the full source manually. Source text remains unapproved data until a
 separate review decision; the original manual proposal route remains available.
+
+### Confirmation regression coverage
+
+The [November 13 guard tests](../bench/results/company-brain-confirmation-coverage-20261113/README.md)
+exercise quoted Unicode and compound requests through actual setup/reviewed-ask
+routes and the desktop view. Suggested parts preserve one whole request; setup
+does not approve knowledge or ask the model. An unconfirmed ask is rejected.
+Applying or reapplying suggested parts, and editing confirmed parts, requires new
+review before dispatch. These are executable regression tests with generation
+doubled explicitly; they establish no new answer-quality or operator-effort score.

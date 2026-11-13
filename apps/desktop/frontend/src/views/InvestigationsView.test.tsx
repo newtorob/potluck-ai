@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   createInvestigation: vi.fn(),
   askPilot: vi.fn(),
   askReviewedPilot: vi.fn(),
+  pilotSetupDrafts: vi.fn(),
   planInvestigation: vi.fn(),
   reviewInvestigation: vi.fn(),
   previewCalculationReview: vi.fn(),
@@ -827,6 +828,59 @@ describe('Confirmed desktop question parts', () => {
     expect(screen.getByLabelText('Part 1')).toBeDisabled();
     resolve(item);
     await waitFor(() => expect(screen.getByLabelText('Part 1')).not.toBeDisabled());
+  });
+  it.each([
+    'For "Café open? Who approves?", who reviews the draft?',
+    'If A and B apply, can we release and who approves?',
+  ])('keeps suggested %s whole and requires new review on apply, reapply and edit', async (question) => {
+    const ask = await setupParts();
+    api.pilotSetupDrafts.mockResolvedValue({
+      version: 'pilot-setup-drafts-v1',
+      question,
+      question_parts: {
+        version: 'pilot-setup-drafts-v1', question, parts: [question],
+        coverage: 'not_verified', origin: 'literal_question_sentences', limitations: [],
+      },
+      query_trace: { omitted_terms: [] }, candidates: [], matching_documents_seen: 0,
+      truncated: false, limitations: [],
+    });
+    fireEvent.change(screen.getByLabelText('Question'), { target: { value: question } });
+    const confirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+    fireEvent.click(confirm);
+    expect(confirm).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+    const apply = await screen.findByRole('button', { name: 'Use suggested question parts' });
+    await waitFor(() => expect(apply).toBeEnabled());
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.askPilot).not.toHaveBeenCalled();
+    fireEvent.click(apply);
+    expect(screen.getByLabelText('Part 1')).toHaveValue(question);
+    expect(screen.queryByLabelText('Part 2')).not.toBeInTheDocument();
+    expect(confirm).not.toBeChecked();
+    expect(ask).toBeDisabled();
+    fireEvent.click(ask);
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+
+    fireEvent.click(confirm);
+    expect(ask).toBeEnabled();
+    fireEvent.click(apply);
+    expect(confirm).not.toBeChecked();
+    expect(ask).toBeDisabled();
+    fireEvent.click(confirm);
+    const edited = `${question} Include the stated expiry.`;
+    fireEvent.change(screen.getByLabelText('Part 1'), { target: { value: edited } });
+    expect(confirm).not.toBeChecked();
+    expect(ask).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+
+    fireEvent.click(confirm);
+    fireEvent.click(ask);
+    await waitFor(() => expect(api.askReviewedPilot).toHaveBeenCalledTimes(1));
+    expect(api.askReviewedPilot).toHaveBeenCalledWith({
+      workspace: 'w', collection_ids: ['c1'], question, model_slug: 'local-model',
+      pilot_confirmed: true, question_parts: [edited], question_parts_confirmed: true,
+    });
+    expect(api.askPilot).not.toHaveBeenCalled();
   });
   it('clears confirmation after question, model, source or workspace changes', async () => {
     const ask = await setupParts();

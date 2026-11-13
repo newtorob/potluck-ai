@@ -529,6 +529,8 @@ roles, messages and schemas remain unchanged.
 
 `test-matrix-v6` pairs with `potluck-test-matrix-result-v6` and requires a small
 per-job `scalarVocabulary`: `{ names: ["request_kind"], values: ["quoted_compound"] }`.
+Matrix jobs accept one to three criteria, even when `maxFindings` allows more.
+Validate the complete job before freezing an inference batch.
 The caller declares hypothetical scenario tokens, not expected answers or source
 facts. Use at most eight unique identifier-style names and sixteen unique printable
 ASCII values, bounded to 32/80 bytes respectively. Empty, whitespace-bearing,
@@ -553,3 +555,10 @@ repairs. Primary source review found four of six fully covered criteria; the
 remaining proposals omit required checks. This qualifies the narrow formatting
 repair, not general semantic reliability. Keep the role opt-in and review each
 expected answer before use. The original rejected packet remains unchanged.
+
+The [November 13 follow-up](../bench/results/company-brain-confirmation-coverage-20261113/README.md)
+keeps V6 unchanged and splits one-draft and confirmation obligations into separate
+criteria. It remains unqualified: four format-valid packets contain eight of eleven
+fully acceptable applied checks under primary source review. A criterion key does
+not ensure the model tests that behavior. Keep critical expectations in reviewed
+executable app tests; local-agent proposals remain supplemental and need review.

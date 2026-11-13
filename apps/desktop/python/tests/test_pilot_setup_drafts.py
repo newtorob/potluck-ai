@@ -48,6 +48,50 @@ def test_literal_parts_preserve_request_and_never_split_conditions_or_quoted_pun
             drafts.question_parts(q)
 
 
+@pytest.mark.parametrize('question', [
+    'For "Café open? Who approves?", who reviews the draft?',
+    'If A and B apply, can we release and who approves?',
+])
+def test_suggested_literal_request_remains_one_unconfirmed_part_until_explicit_ask(
+        client, tmp_path, monkeypatch, question):
+    from potluck_local.routers import company_brain_pilot as pilot
+    from potluck_local.services import investigation_request_parts
+
+    calls = []
+
+    async def capture(*args, **kwargs):
+        calls.append((args, kwargs))
+        return {'id': 'reviewed-test'}
+
+    monkeypatch.setattr(pilot, 'create_investigation', capture)
+    cid, _ = register(client, tmp_path, {'policy.md': '# Review\n\nApproval requires review.'})
+    result = suggest(client, cid, question=question)
+    assert result.status_code == 200
+    parts = result.json()['question_parts']
+    assert parts['question'] == question
+    assert parts['parts'] == [question]
+    assert parts['coverage'] == 'not_verified'
+    assert calls == []
+    with sqlite3.connect(tmp_path / 'db') as db:
+        assert db.execute('select count(*) from reviewed_claims').fetchone()[0] == 0
+        assert db.execute('select count(*) from investigations').fetchone()[0] == 0
+
+    body = {'workspace': 'w', 'collection_ids': [cid], 'question': question,
+            'model_slug': 'model', 'pilot_confirmed': True,
+            'question_parts': parts['parts'], 'question_parts_confirmed': False}
+    path = '/company-brain/pilot/ask-reviewed'
+    assert client.post(path, json=body).status_code == 400
+    assert calls == []
+    assert client.post(path, json={**body, 'question_parts_confirmed': True}).json() == {
+        'id': 'reviewed-test'}
+    assert len(calls) == 1
+    args, options = calls[0]
+    assert args[1:3] == (question, question)
+    assert options['reviewed_operations'] == [{'request': question, 'operation': 'answer'}]
+    assert options['question_part_plan'] == investigation_request_parts.prepare(
+        question, [question], origin='reviewer_supplied')
+
+
 def test_suggestions_include_later_nonmatching_exception_and_make_no_authority_writes(client, tmp_path):
     cid, _ = register(client, tmp_path, {'release.md': '# Release\n\nDRAFT 2026-01-01.\n\n## Rule\n\nRelease requires owner approval.\n\n## Boundary\n\nExcept during a declared incident, record the decision next day.'})
     result = suggest(client, cid)
