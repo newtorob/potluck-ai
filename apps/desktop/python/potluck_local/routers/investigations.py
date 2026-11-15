@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import json
 from typing import Any, Literal
 
 import aiosqlite
@@ -137,9 +138,17 @@ async def collections(workspace: str) -> dict[str, Any]:
             raise ValueError
         async with aiosqlite.connect(get_memory_db_path()) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute('SELECT id,name,scan_status,last_scan_at FROM source_collections '
-                                      'WHERE workspace=? ORDER BY name LIMIT 100', (workspace,))
-            return {'collections': [dict(row) for row in await cursor.fetchall()]}
+            cursor = await db.execute(
+                'SELECT c.id,c.name,c.scan_status,c.last_scan_at,r.report '
+                'FROM source_collections c LEFT JOIN source_scan_reports r ON r.collection_id=c.id '
+                'WHERE c.workspace=? ORDER BY c.name LIMIT 100', (workspace,))
+            collections = []
+            for row in await cursor.fetchall():
+                item = dict(row)
+                report = item.pop('report')
+                item['last_scan_report'] = json.loads(report) if report else None
+                collections.append(item)
+            return {'collections': collections}
     except (ValueError, PermissionError, LookupError) as exc:
         raise _error(exc) from None
 

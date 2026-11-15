@@ -1,8 +1,23 @@
+export interface CollectionScanReport {
+  collection_id: string;
+  files_scanned: number;
+  chunks_inserted: number;
+  files_added: number;
+  files_updated: number;
+  files_removed: number;
+  files_unchanged: number;
+  invalidated_answers: number;
+  revoked_claims: number;
+  scanned_at: string;
+  changes: Array<{ relative_path: string; change: 'added' | 'updated' | 'removed' | 'reindexed' }>;
+  changes_truncated: boolean;
+}
 export interface SourceCollection {
   id: string;
   name: string;
   scan_status: string;
   last_scan_at: string | null;
+  last_scan_report?: CollectionScanReport | null;
 }
 export interface BriefItem {
   text: string;

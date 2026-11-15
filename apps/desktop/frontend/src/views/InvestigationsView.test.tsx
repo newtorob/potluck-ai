@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvestigationsView } from './InvestigationsView';
+import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceStore';
 
 const api = vi.hoisted(() => ({
   sourceCollections: vi.fn(),
+  fetchModels: vi.fn().mockResolvedValue(undefined),
   investigations: vi.fn(),
   createInvestigation: vi.fn(),
   askPilot: vi.fn(),
@@ -15,17 +17,23 @@ const api = vi.hoisted(() => ({
   recordInvestigationOutcome: vi.fn(),
 }));
 vi.mock('@/lib/localApi', () => ({ localApi: api }));
+vi.mock('@/lib/sidecarPersist', () => ({ persistUiPref: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/stores/modelStore', () => ({
   useModelStore: (selector: (state: unknown) => unknown) =>
     selector({
       activeModelSlug: 'local-model',
-      fetchModels: async () => undefined,
+      fetchModels: api.fetchModels,
     }),
 }));
+
+beforeEach(() => {
+  useCompanyBrainWorkspaceStore.setState({ saved: null, revision: 0 });
+});
 
 describe('InvestigationsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useCompanyBrainWorkspaceStore.setState({ saved: null, revision: 0 });
   });
   it.each([
     ['difference', 'Amount to subtract', 'Amount to subtract from', '20 (N2) − 10 (N1)'],
@@ -832,56 +840,71 @@ describe('Confirmed desktop question parts', () => {
   it.each([
     'For "Café open? Who approves?", who reviews the draft?',
     'If A and B apply, can we release and who approves?',
-  ])('keeps suggested %s whole and requires new review on apply, reapply and edit', async (question) => {
-    const ask = await setupParts();
-    api.pilotSetupDrafts.mockResolvedValue({
-      version: 'pilot-setup-drafts-v1',
-      question,
-      question_parts: {
-        version: 'pilot-setup-drafts-v1', question, parts: [question],
-        coverage: 'not_verified', origin: 'literal_question_sentences', limitations: [],
-      },
-      query_trace: { omitted_terms: [] }, candidates: [], matching_documents_seen: 0,
-      truncated: false, limitations: [],
-    });
-    fireEvent.change(screen.getByLabelText('Question'), { target: { value: question } });
-    const confirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
-    fireEvent.click(confirm);
-    expect(confirm).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
-    const apply = await screen.findByRole('button', { name: 'Use suggested question parts' });
-    await waitFor(() => expect(apply).toBeEnabled());
-    expect(api.askReviewedPilot).not.toHaveBeenCalled();
-    expect(api.askPilot).not.toHaveBeenCalled();
-    fireEvent.click(apply);
-    expect(screen.getByLabelText('Part 1')).toHaveValue(question);
-    expect(screen.queryByLabelText('Part 2')).not.toBeInTheDocument();
-    expect(confirm).not.toBeChecked();
-    expect(ask).toBeDisabled();
-    fireEvent.click(ask);
-    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  ])(
+    'keeps suggested %s whole and requires new review on apply, reapply and edit',
+    async (question) => {
+      const ask = await setupParts();
+      api.pilotSetupDrafts.mockResolvedValue({
+        version: 'pilot-setup-drafts-v1',
+        question,
+        question_parts: {
+          version: 'pilot-setup-drafts-v1',
+          question,
+          parts: [question],
+          coverage: 'not_verified',
+          origin: 'literal_question_sentences',
+          limitations: [],
+        },
+        query_trace: { omitted_terms: [] },
+        candidates: [],
+        matching_documents_seen: 0,
+        truncated: false,
+        limitations: [],
+      });
+      fireEvent.change(screen.getByLabelText('Question'), { target: { value: question } });
+      const confirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+      fireEvent.click(confirm);
+      expect(confirm).toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: 'Suggest sources and question parts' }));
+      const apply = await screen.findByRole('button', { name: 'Use suggested question parts' });
+      await waitFor(() => expect(apply).toBeEnabled());
+      expect(api.askReviewedPilot).not.toHaveBeenCalled();
+      expect(api.askPilot).not.toHaveBeenCalled();
+      fireEvent.click(apply);
+      expect(screen.getByLabelText('Part 1')).toHaveValue(question);
+      expect(screen.queryByLabelText('Part 2')).not.toBeInTheDocument();
+      expect(confirm).not.toBeChecked();
+      expect(ask).toBeDisabled();
+      fireEvent.click(ask);
+      expect(api.askReviewedPilot).not.toHaveBeenCalled();
 
-    fireEvent.click(confirm);
-    expect(ask).toBeEnabled();
-    fireEvent.click(apply);
-    expect(confirm).not.toBeChecked();
-    expect(ask).toBeDisabled();
-    fireEvent.click(confirm);
-    const edited = `${question} Include the stated expiry.`;
-    fireEvent.change(screen.getByLabelText('Part 1'), { target: { value: edited } });
-    expect(confirm).not.toBeChecked();
-    expect(ask).toBeDisabled();
-    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+      fireEvent.click(confirm);
+      expect(ask).toBeEnabled();
+      fireEvent.click(apply);
+      expect(confirm).not.toBeChecked();
+      expect(ask).toBeDisabled();
+      fireEvent.click(confirm);
+      const edited = `${question} Include the stated expiry.`;
+      fireEvent.change(screen.getByLabelText('Part 1'), { target: { value: edited } });
+      expect(confirm).not.toBeChecked();
+      expect(ask).toBeDisabled();
+      expect(api.askReviewedPilot).not.toHaveBeenCalled();
 
-    fireEvent.click(confirm);
-    fireEvent.click(ask);
-    await waitFor(() => expect(api.askReviewedPilot).toHaveBeenCalledTimes(1));
-    expect(api.askReviewedPilot).toHaveBeenCalledWith({
-      workspace: 'w', collection_ids: ['c1'], question, model_slug: 'local-model',
-      pilot_confirmed: true, question_parts: [edited], question_parts_confirmed: true,
-    });
-    expect(api.askPilot).not.toHaveBeenCalled();
-  });
+      fireEvent.click(confirm);
+      fireEvent.click(ask);
+      await waitFor(() => expect(api.askReviewedPilot).toHaveBeenCalledTimes(1));
+      expect(api.askReviewedPilot).toHaveBeenCalledWith({
+        workspace: 'w',
+        collection_ids: ['c1'],
+        question,
+        model_slug: 'local-model',
+        pilot_confirmed: true,
+        question_parts: [edited],
+        question_parts_confirmed: true,
+      });
+      expect(api.askPilot).not.toHaveBeenCalled();
+    },
+  );
   it('clears confirmation after question, model, source or workspace changes', async () => {
     const ask = await setupParts();
     const confirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
@@ -915,4 +938,120 @@ describe('Confirmed desktop question parts', () => {
     ).not.toBeChecked();
     expect(api.askReviewedPilot).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('Saved Company Brain workspace', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useCompanyBrainWorkspaceStore.setState({ saved: null, revision: 0 });
+  });
+  it('reopens saved scope without approving sources, asking, or switching an unavailable model', async () => {
+    useCompanyBrainWorkspaceStore.setState({
+      saved: {
+        version: 1,
+        workspace: 'saved-work',
+        collectionIds: ['c1', 'removed'],
+        modelSlug: 'missing-model',
+      },
+      revision: 0,
+    });
+    api.sourceCollections.mockResolvedValue({
+      collections: [
+        { id: 'c1', name: 'Saved policies', scan_status: 'failed', last_scan_at: null },
+      ],
+    });
+    render(<InvestigationsView />);
+    expect(await screen.findByText(/Some saved collections are unavailable/)).toBeVisible();
+    expect(screen.getByLabelText('Workspace')).toHaveValue('saved-work');
+    expect(screen.getByRole('checkbox', { name: /Saved policies/ })).toBeChecked();
+    expect(screen.getByLabelText('Loaded local model')).toHaveValue('missing-model');
+    expect(screen.getByRole('option', { name: 'missing-model (not loaded)' })).toBeInTheDocument();
+    expect(screen.getByText(/Your saved model is not loaded/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Create investigation' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.createInvestigation).not.toHaveBeenCalled();
+  });
+
+  it('preserves new edits when durable hydration arrives after entry, and saves choices across remount', async () => {
+    useCompanyBrainWorkspaceStore.setState({ saved: null, revision: 0 });
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Policies', scan_status: 'ready', last_scan_at: null }],
+    });
+    const view = render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'new-work' } });
+    useCompanyBrainWorkspaceStore
+      .getState()
+      .hydrateFromSidecar(
+        JSON.stringify({ version: 1, workspace: 'old-work', collectionIds: [], modelSlug: '' }),
+        0,
+      );
+    expect(screen.getByLabelText('Workspace')).toHaveValue('new-work');
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Policies/ }));
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    await waitFor(() =>
+      expect(useCompanyBrainWorkspaceStore.getState().saved).toEqual({
+        version: 1,
+        workspace: 'new-work',
+        collectionIds: ['c1'],
+        modelSlug: 'local-model',
+      }),
+    );
+    view.unmount();
+    render(<InvestigationsView />);
+    expect(
+      await screen.findByText(/Workspace reopened. Saved source choices were checked/),
+    ).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: /Policies/ })).toBeChecked();
+    expect(screen.getByLabelText('Loaded local model')).toHaveValue('local-model');
+  });
+});
+
+it('does not replace an in-use restored workspace when delayed settings arrive', async () => {
+  vi.clearAllMocks();
+  const cached = {
+    version: 1 as const,
+    workspace: 'cached',
+    collectionIds: ['c1'],
+    modelSlug: 'local-model',
+  };
+  useCompanyBrainWorkspaceStore.setState({ saved: cached, revision: 0 });
+  api.sourceCollections.mockResolvedValue({
+    collections: [{ id: 'c1', name: 'Policies', scan_status: 'ready', last_scan_at: null }],
+  });
+  render(<InvestigationsView />);
+  await screen.findByText(/Workspace reopened. Saved source choices were checked/);
+  fireEvent.pointerDown(screen.getByLabelText('Issue'));
+  fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Keep my question' } });
+  useCompanyBrainWorkspaceStore
+    .getState()
+    .hydrateFromSidecar(JSON.stringify({ ...cached, workspace: 'older-sidecar-workspace' }), 0);
+  expect(useCompanyBrainWorkspaceStore.getState().saved).toEqual(cached);
+  expect(screen.getByLabelText('Workspace')).toHaveValue('cached');
+  expect(screen.getByLabelText('Issue')).toHaveValue('Keep my question');
+  expect(api.sourceCollections).toHaveBeenCalledTimes(1);
+});
+
+it('finishes an in-flight restore when the reader interacts with its loading view', async () => {
+  let finish!: (data: {
+    collections: Array<{ id: string; name: string; scan_status: string; last_scan_at: null }>;
+  }) => void;
+  useCompanyBrainWorkspaceStore.setState({
+    saved: { version: 1, workspace: 'cached', collectionIds: ['c1'], modelSlug: 'local-model' },
+    revision: 0,
+  });
+  api.sourceCollections.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  render(<InvestigationsView />);
+  fireEvent.pointerDown(screen.getByRole('heading', { name: 'Investigations' }));
+  finish({
+    collections: [{ id: 'c1', name: 'Restored policy', scan_status: 'ready', last_scan_at: null }],
+  });
+  expect(await screen.findByRole('checkbox', { name: /Restored policy/ })).toBeChecked();
+  expect(screen.getByLabelText('Workspace')).toHaveValue('cached');
 });

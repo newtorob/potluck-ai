@@ -40,6 +40,7 @@ Component paths below are relative to `apps/desktop/frontend/src/`.
 
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 | --- | --- | --- | --- | --- |
+| Scrollbar | `apps/desktop/frontend/src/styles/globals.css` | Existing global Hearth scrollbar rules and forced-colors fallback | Native viewport and view-owned overflow; no hidden scrollbars | Workspace browser overflow, narrow layout and keyboard checks |
 | Select/Listbox | Native loaded-model selectors in `PilotKnowledge` and `InvestigationsView` | Loaded sidecar model IDs and explicit selection | Native OS popup; no custom geometry or autocomplete | Pilot component tests and investigations browser checks |
 | Form | `components/auth/MagicLinkForm.tsx` | `hooks/useAuth.ts` and passwordless confirmation flow | Entry form without input autofocus; dedicated sign-in form with autofocus | AuthGate and localUse tests; browser error/keyboard checks |
 | Account entry | `components/auth/AuthGate.tsx`, `SignInWall.tsx` | Explicit local choice or confirmed/cached account | Account lookup, local entry, signed-in and cached offline access | `components/auth/AuthGate.test.tsx` |
@@ -229,3 +230,24 @@ keyboard/source disclosures and local-only routing remain authoritative.
 `FocusedSourceAnswer` is an opt-in display owner for a primary-reviewed outline of a saved answer. It binds the original text, status, snippet IDs and exact approved source content; displays exact cited excerpts by topic; accounts for every selected snippet; and keeps original output/full evidence in a closed, keyboard-accessible disclosure. Structural source labels may move below only when matched to actual source headings without conditional language, a document label, or an exact label already visible. A changed, incomplete or malformed outline falls back to `ReviewedPassageAnswer`. It never changes approval, generation, model defaults, saved answers or evaluation scores. Outline review remains responsible for topic relevance; this renderer does not infer a correct outline from arbitrary source text.
 
 The general investigation view also consumes validated `answer_outlines` returned by the API through this same owner, with the existing passage renderer as fallback. The optional automatic producer is stored with the original answer; it groups every nonblank selected excerpt without paraphrasing and moves only blank excerpts below. A source paragraph covering several confirmed questions appears once under their exact combined question headings. Source-adjacent conditional paragraphs remain attached; context cannot substitute for a directly relevant prerequisite or exception. Organization failure leaves the complete cited answer available. It performs no inference on read/export, cannot grant approval and cannot override a corrected answer. After fresh-document factual and grouping qualification, the reviewed desktop helpers explicitly request organization and heading-preserving scans by default. Raw API defaults remain false; explicit caller opt-outs are preserved. Existing source, pilot and question-part confirmations remain mandatory.
+
+### Reopening a Company Brain workspace
+
+The Company Brain workspace store saves only the last workspace name, selected
+collection IDs and chosen model slug, in the local cache and durable sidecar UI
+preferences. Folder registrations remain in the source database. It never stores
+folder consent, question confirmation, source approval, questions or answer content.
+Reopening checks collection IDs against the scoped local API, keeps missing IDs out
+of the active scope, and displays an unavailable saved model without switching or
+loading one. No inference or approval runs during restoration. Once the user starts
+interacting, delayed settings hydration cannot replace that session's workspace.
+Local preference writes are ordered; an unavailable cache does not crash the view.
+
+A scan atomically saves a bounded last-successful change report with the source
+snapshot. It lists added, updated, reindexed and removed document paths, complete
+counts, revoked approved statements and cleared answers. Failed scans retain the
+previous report, visibly labeled as the last successful scan. Counts refer to this
+collection and workspace. The existing conservative rule still clears all saved
+answers whose scope includes a changed collection; unchanged document approvals
+survive. Reopening never revives invalidated content or restores approval. Ask again
+after explicitly reviewing new source statements and question parts.

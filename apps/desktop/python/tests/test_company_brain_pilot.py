@@ -271,3 +271,26 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
             contract = json.loads(db.execute('SELECT question_part_contract FROM investigations').fetchone()[0])
         assert contract['version'] == 'fixed-part-selection-v32'
     asyncio.run(run())
+
+
+def test_http_collection_reports_are_scoped_and_survive_restart(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from potluck_local.app import create_app
+    from potluck_local.services import investigations
+    monkeypatch.setenv('POTLUCK_SIDECAR_TOKEN', 'report-secret')
+    monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / 'db'))
+    monkeypatch.setenv('POTLUCK_DATA_DIR', str(tmp_path / 'data'))
+    monkeypatch.setattr(investigations, 'get_settings', lambda: SimpleNamespace(privacy=SimpleNamespace(memory_enabled=True), memory=SimpleNamespace(enabled=True)))
+    folder = tmp_path / 'docs'; folder.mkdir()
+    (folder / 'one.md').write_text('# Policy\n\nReview first.')
+    headers = {'Authorization': 'Bearer report-secret'}
+    client = TestClient(create_app(), client=('127.0.0.1', 50000))
+    cid = client.post('/company-brain/pilot/collections', json={'workspace': 'w', 'name': 'docs', 'folder': str(folder), 'scan_confirmed': True}, headers=headers).json()['collection_id']
+    report = client.post(f'/company-brain/pilot/collections/{cid}/scan', json={'workspace': 'w', 'scan_confirmed': True}, headers=headers).json()
+    reopened = TestClient(create_app(), client=('127.0.0.1', 50001))
+    data = reopened.get('/company-brain/collections', params={'workspace': 'w'}, headers=headers).json()['collections']
+    assert data[0]['last_scan_report'] == report
+    assert 'root_path' not in data[0] and 'report' not in data[0]
+    assert reopened.get('/company-brain/collections', params={'workspace': 'other'}, headers=headers).json()['collections'] == []
+    assert reopened.get('/company-brain/collections', params={'workspace': 'w'}).status_code == 401

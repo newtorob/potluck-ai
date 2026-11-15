@@ -14,6 +14,10 @@ SOURCE_SCHEMA = (
         last_error TEXT,
         UNIQUE(workspace, name)
     )""",
+    """CREATE TABLE IF NOT EXISTS source_scan_reports (
+        collection_id TEXT PRIMARY KEY REFERENCES source_collections(id) ON DELETE CASCADE,
+        report TEXT NOT NULL
+    )""",
     """CREATE TABLE IF NOT EXISTS source_documents (
         id TEXT PRIMARY KEY,
         collection_id TEXT NOT NULL REFERENCES source_collections(id) ON DELETE CASCADE,

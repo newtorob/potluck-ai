@@ -12,6 +12,7 @@ import {
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { localApi } from '@/lib/localApi';
 import { useModelStore } from '@/stores/modelStore';
+import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceStore';
 import type {
   Brief,
   CalculationPreview,
@@ -51,6 +52,10 @@ const operationLabels: Record<OperationType, string> = {
 export function InvestigationsView() {
   const activeModel = useModelStore((s) => s.activeModelSlug);
   const fetchModels = useModelStore((s) => s.fetchModels);
+  const savedWorkspace = useCompanyBrainWorkspaceStore((s) => s.saved);
+  const workspaceEdited = useRef(false);
+  const workspaceRequest = useRef(0);
+  const [restoring, setRestoring] = useState(false);
   const [workspace, setWorkspace] = useState('');
   const [loadedWorkspace, setLoadedWorkspace] = useState('');
   const [collections, setCollections] = useState<SourceCollection[]>([]);
@@ -123,13 +128,69 @@ export function InvestigationsView() {
   const [claimKey, setClaimKey] = useState('');
   const [claimContent, setClaimContent] = useState('');
   const [claimCitations, setClaimCitations] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const busy = working || restoring;
   const inFlight = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [citationsOpen, setCitationsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scope = { workspace: loadedWorkspace, collection_ids: selected };
+  function protectWorkspaceChoice() {
+    if (workspaceEdited.current) return;
+    workspaceEdited.current = true;
+    useCompanyBrainWorkspaceStore.setState((state) => ({ revision: state.revision + 1 }));
+  }
+  function rememberWorkspace(name: string, ids: string[], slug = model) {
+    useCompanyBrainWorkspaceStore.getState().saveWorkspace({
+      version: 1,
+      workspace: name,
+      collectionIds: ids,
+      modelSlug: slug,
+    });
+  }
+  useEffect(() => {
+    if (!savedWorkspace || workspaceEdited.current) return;
+    const request = ++workspaceRequest.current;
+    setLoadedWorkspace('');
+    setSelected([]);
+    setCollections([]);
+    setCurrent(null);
+    setItems([]);
+    setWorkspace(savedWorkspace.workspace);
+    setModel(savedWorkspace.modelSlug);
+    setRestoring(true);
+    setError('');
+    void localApi
+      .sourceCollections(savedWorkspace.workspace)
+      .then(async (data) => {
+        if (request !== workspaceRequest.current) return;
+        const ids = savedWorkspace.collectionIds.filter((id) =>
+          data.collections.some((c) => c.id === id),
+        );
+        setCollections(data.collections);
+        setLoadedWorkspace(savedWorkspace.workspace);
+        setSelected(ids);
+        setNotice(
+          ids.length === savedWorkspace.collectionIds.length
+            ? 'Workspace reopened. Saved source choices were checked; review question parts before asking.'
+            : 'Workspace reopened. Some saved collections are unavailable; check your source selection.',
+        );
+        await fetchModels();
+      })
+      .catch(() => {
+        if (request === workspaceRequest.current)
+          setError(
+            'Could not reopen this workspace. Check that the local runtime is running, then load collections to retry.',
+          );
+      })
+      .finally(() => {
+        if (request === workspaceRequest.current) setRestoring(false);
+      });
+    return () => {
+      workspaceRequest.current++;
+    };
+  }, [savedWorkspace, fetchModels]);
   const questions = questionsInput
     .split('\n')
     .map((q) => q.trim())
@@ -244,6 +305,7 @@ export function InvestigationsView() {
       setError('Enter a workspace.');
       return;
     }
+    protectWorkspaceChoice();
     invalidatePlanContext();
     invalidateCalculationPreview();
     setCalculationRows([]);
@@ -256,6 +318,7 @@ export function InvestigationsView() {
       const data = await localApi.sourceCollections(name);
       setCollections(data.collections);
       setLoadedWorkspace(name);
+      rememberWorkspace(name, []);
       await fetchModels();
     });
   }
@@ -377,7 +440,13 @@ export function InvestigationsView() {
     ) ?? []),
   ]);
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col" aria-busy={busy}>
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-col"
+      aria-busy={busy}
+      onPointerDownCapture={protectWorkspaceChoice}
+      onKeyDownCapture={protectWorkspaceChoice}
+      onInputCapture={protectWorkspaceChoice}
+    >
       <ViewHeader
         title="Investigations"
         eyebrow="Company Brain"
@@ -435,13 +504,14 @@ export function InvestigationsView() {
                   disabled={busy}
                   value={workspace}
                   onChange={(e) => {
+                    protectWorkspaceChoice();
                     invalidatePlanContext();
                     setWorkspace(e.target.value);
                   }}
                 />
               </label>
               <button className={button} disabled={busy} onClick={() => void loadWorkspace()}>
-                Load collections
+                {restoring ? 'Reopening workspace…' : 'Load collections'}
               </button>
             </div>
             {loadedWorkspace && (
@@ -465,12 +535,13 @@ export function InvestigationsView() {
                           type="checkbox"
                           checked={selected.includes(c.id)}
                           onChange={(e) => {
+                            protectWorkspaceChoice();
                             invalidatePlanContext();
-                            setSelected(
-                              e.target.checked
-                                ? [...selected, c.id]
-                                : selected.filter((id) => id !== c.id),
-                            );
+                            const ids = e.target.checked
+                              ? [...selected, c.id]
+                              : selected.filter((id) => id !== c.id);
+                            setSelected(ids);
+                            rememberWorkspace(loadedWorkspace, ids);
                             invalidateCalculationPreview();
                             setCalculationRows([]);
                             setCurrent(null);
@@ -829,14 +900,26 @@ export function InvestigationsView() {
                 disabled={busy}
                 value={model}
                 onChange={(e) => {
+                  protectWorkspaceChoice();
                   invalidatePlanContext();
                   setModel(e.target.value);
+                  if (loadedWorkspace === workspace.trim())
+                    rememberWorkspace(loadedWorkspace, selected, e.target.value);
                 }}
               >
                 <option value="">Choose the loaded model</option>
+                {model && model !== activeModel && (
+                  <option value={model}>{model} (not loaded)</option>
+                )}
                 {activeModel && <option value={activeModel}>{activeModel}</option>}
               </select>
             </label>
+            {model && model !== activeModel && (
+              <p className="text-sm text-muted-foreground">
+                Your saved model is not loaded. Load it in Models or choose the currently loaded
+                model here. Potluck will not switch automatically.
+              </p>
+            )}
             {!activeModel && (
               <p className="text-sm text-muted-foreground">
                 Load a model in Models, then reload collections to refresh its status.

@@ -14,7 +14,7 @@ import json
 import os
 import stat
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from collections.abc import Iterator
 from datetime import datetime, timezone
 from fnmatch import fnmatchcase
@@ -150,6 +150,25 @@ class CollectionScan:
     files_updated: int = 0
     files_removed: int = 0
     chunks_inserted: int = 0
+    files_unchanged: int = 0
+    invalidated_answers: int = 0
+    revoked_claims: int = 0
+    scanned_at: str = ''
+    changes: list[dict[str, str]] = field(default_factory=list)
+    changes_truncated: bool = False
+
+
+async def _current_counts(db: aiosqlite.Connection, workspace: str,
+                          collection_id: str) -> tuple[int, int]:
+    answers = await db.execute(
+        "SELECT COUNT(*) FROM investigations WHERE workspace=? AND status!='invalidated' "
+        'AND EXISTS (SELECT 1 FROM json_each(scope) WHERE value=?)',
+        (workspace, collection_id))
+    claims = await db.execute(
+        "SELECT COUNT(*) FROM reviewed_claims WHERE workspace=? AND status='approved' "
+        'AND id IN (SELECT claim_id FROM reviewed_claim_sources WHERE collection_id=?)',
+        (workspace, collection_id))
+    return (await answers.fetchone())[0], (await claims.fetchone())[0]
 
 
 async def scan_collection(workspace: str, collection_id: str, *,
@@ -170,6 +189,16 @@ async def scan_collection(workspace: str, collection_id: str, *,
             collection = await cursor.fetchone()
             if not collection:
                 raise LookupError('Collection not found in this workspace')
+            from potluck_local.services.investigations import ensure_schema
+            await ensure_schema(db)
+            before_answers, before_claims = await _current_counts(db, workspace, collection_id)
+
+            def changed(relative: str, change: str) -> None:
+                if len(result.changes) < 100:
+                    result.changes.append({'relative_path': redact_credentials(relative),
+                                           'change': change})
+                else:
+                    result.changes_truncated = True
             cursor = await db.execute(
                 'SELECT relative_path, content_sha, parser_version FROM source_documents '
                 'WHERE collection_id=?', (collection_id,),
@@ -184,7 +213,10 @@ async def scan_collection(workspace: str, collection_id: str, *,
                 result.files_scanned += 1
                 sha = hashlib.sha256(text.encode()).hexdigest()
                 if known.get(relative) == (sha, parser_version):
+                    result.files_unchanged += 1
                     continue
+                changed(relative, 'added' if relative not in known else
+                        'reindexed' if known[relative][0] == sha else 'updated')
                 document_id = str(uuid.uuid5(uuid.UUID(collection_id), relative))
                 safe_text = redact_credentials(text)
                 revision_id = str(uuid.uuid5(
@@ -219,7 +251,8 @@ async def scan_collection(workspace: str, collection_id: str, *,
                     result.files_updated += 1
                 else:
                     result.files_added += 1
-            for relative in known.keys() - seen:
+            for relative in sorted(known.keys() - seen):
+                changed(relative, 'removed')
                 cur = await db.execute('SELECT id FROM source_documents WHERE collection_id=? AND relative_path=?', (collection_id, relative))
                 removed = await cur.fetchone()
                 if removed:
@@ -234,11 +267,19 @@ async def scan_collection(workspace: str, collection_id: str, *,
                     (collection_id, relative),
                 )
                 result.files_removed += 1
+            after_answers, after_claims = await _current_counts(db, workspace, collection_id)
+            result.invalidated_answers = before_answers - after_answers
+            result.revoked_claims = before_claims - after_claims
+            result.scanned_at = _now()
             await db.execute(
                 "UPDATE source_collections SET last_scan_at=?, "
                 "scan_status='ready', last_error=NULL "
-                'WHERE id=?', (_now(), collection_id),
+                'WHERE id=?', (result.scanned_at, collection_id),
             )
+            await db.execute(
+                'INSERT INTO source_scan_reports(collection_id,report) VALUES (?,?) '
+                'ON CONFLICT(collection_id) DO UPDATE SET report=excluded.report',
+                (collection_id, json.dumps(asdict(result))))
             await db.commit()
     except (OSError, ValueError):
         async with aiosqlite.connect(get_memory_db_path(), timeout=30) as db:

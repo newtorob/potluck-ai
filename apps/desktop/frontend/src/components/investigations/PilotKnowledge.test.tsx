@@ -438,3 +438,43 @@ describe('PilotKnowledge', () => {
     expect(p.setBusy).not.toHaveBeenCalledWith(false);
   });
 });
+
+it('shows the retained source-change receipt and required review without approving or asking', () => {
+  vi.clearAllMocks();
+  const input = props();
+  const report = {
+    collection_id: 'c1',
+    files_scanned: 2,
+    files_added: 0,
+    files_updated: 1,
+    files_removed: 1,
+    chunks_inserted: 3,
+    files_unchanged: 1,
+    invalidated_answers: 2,
+    revoked_claims: 1,
+    scanned_at: '2026-11-15T20:00:00Z',
+    changes: [
+      { relative_path: 'policy.md', change: 'updated' as const },
+      { relative_path: 'removed.md', change: 'removed' as const },
+    ],
+    changes_truncated: false,
+  };
+  render(
+    <PilotKnowledge
+      {...input}
+      collections={[{ ...input.collections[0]!, last_scan_report: report }]}
+    />,
+  );
+  expect(screen.getByText('updated: policy.md')).toBeVisible();
+  expect(screen.getByText('removed: removed.md')).toBeVisible();
+  expect(
+    screen.getByText(
+      /Approved statements revoked: 1. Saved answers using this collection cleared: 2/,
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/Unchanged approved statements can be used for another question/),
+  ).toBeVisible();
+  expect(api.approvePilotClaim).not.toHaveBeenCalled();
+  expect(api.scanPilotCollection).not.toHaveBeenCalled();
+});

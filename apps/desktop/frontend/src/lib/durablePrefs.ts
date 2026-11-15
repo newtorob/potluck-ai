@@ -28,6 +28,10 @@ import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { setContributionReceiptsEnabled } from '@/lib/appPrefs';
+import {
+  COMPANY_BRAIN_WORKSPACE_KEY,
+  useCompanyBrainWorkspaceStore,
+} from '@/stores/companyBrainWorkspaceStore';
 
 /**
  * Fetch durable settings from the sidecar and apply them to the live stores.
@@ -36,6 +40,7 @@ import { setContributionReceiptsEnabled } from '@/lib/appPrefs';
  */
 export async function hydrateDurablePrefs(): Promise<void> {
   const localUseRevision = useUiPrefsStore.getState().localUseRevision;
+  const workspaceRevision = useCompanyBrainWorkspaceStore.getState().revision;
   let settings;
   try {
     settings = await localApi.getSettings();
@@ -57,6 +62,9 @@ export async function hydrateDurablePrefs(): Promise<void> {
 
   // UI preferences (settings.ui is a generic string→string dict the frontend owns).
   const ui = settings.ui;
+  useCompanyBrainWorkspaceStore
+    .getState()
+    .hydrateFromSidecar(ui[COMPANY_BRAIN_WORKSPACE_KEY], workspaceRevision);
 
   // theme
   const theme = ui[PREF.theme];
@@ -86,12 +94,11 @@ export async function hydrateDurablePrefs(): Promise<void> {
 
   // routing_scope - Zustand chatStore handles live state + localStorage.
   const scope = ui[PREF.routingScope];
-  if (!localChoiceChanged && !useUiPrefsStore.getState().localUseEnabled && (
-    scope === 'local' ||
-    scope === 'household' ||
-    scope === 'circle' ||
-    scope === 'cooperative'
-  )) {
+  if (
+    !localChoiceChanged &&
+    !useUiPrefsStore.getState().localUseEnabled &&
+    (scope === 'local' || scope === 'household' || scope === 'circle' || scope === 'cooperative')
+  ) {
     useChatStore.getState().setRoutingScope(scope);
   }
 

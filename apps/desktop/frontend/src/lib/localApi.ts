@@ -1,5 +1,5 @@
 import type { PilotClaim, PilotEvidence, PilotContextPreview, PilotSetupDraft } from '@/types/companyBrainPilot';
-import type { Brief, CalculationPreview, CalculationReviewInput, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
+import type { Brief, CalculationPreview, CalculationReviewInput, CollectionScanReport, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
  *
@@ -779,10 +779,10 @@ export const localApi = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<{ collection_id: string }>);
   },
-  scanPilotCollection(id: string, input: { workspace: string; scan_confirmed: true; preserve_heading_context?: boolean }): Promise<{ files_scanned: number; chunks_inserted: number }> {
+  scanPilotCollection(id: string, input: { workspace: string; scan_confirmed: true; preserve_heading_context?: boolean }): Promise<CollectionScanReport> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/collections/${encodeURIComponent(id)}/scan`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, preserve_heading_context: input.preserve_heading_context ?? true }),
-    }, 120_000).then(handleResponse<{ files_scanned: number; chunks_inserted: number }>);
+    }, 120_000).then(handleResponse<CollectionScanReport>);
   },
   pilotEvidence(input: InvestigationScope & { query: string }): Promise<PilotEvidence> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/evidence`, {

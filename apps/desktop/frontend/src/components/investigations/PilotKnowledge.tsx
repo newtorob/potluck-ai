@@ -416,37 +416,83 @@ export function PilotKnowledge({
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Scan documents</h3>
           <p className="text-xs text-muted-foreground">
-            Rescanning changed documents invalidates their reviewed knowledge and dependent answers.
-            Review the new evidence before approving it again.
+            Scan to check for changes. Unchanged documents keep their approved statements. A changed
+            document revokes its statements and clears saved answers using this collection. Review
+            the new evidence before asking again.
           </p>
           {collections.map((c) => (
-            <div
-              key={c.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
-            >
-              <span className="text-sm">
-                {c.name} <span className="text-muted-foreground">· {c.scan_status}</span>
-              </span>
-              <button
-                className={`${button} min-w-24`}
-                disabled={disabled}
-                onClick={() =>
-                  void act(async () => {
-                    changedEvidence();
-                    const result = await localApi.scanPilotCollection(c.id, {
-                      workspace,
-                      scan_confirmed: true,
-                    });
-                    await refreshCollections();
-                    if (alive.current)
-                      setNotice(
-                        `${c.name}: scanned ${result.files_scanned} files and indexed ${result.chunks_inserted} excerpts.`,
-                      );
-                  })
-                }
-              >
-                Scan {c.name}
-              </button>
+            <div key={c.id} className="space-y-3 rounded-md border border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm">
+                  {c.name} <span className="text-muted-foreground">· {c.scan_status}</span>
+                </span>
+                <button
+                  className={`${button} min-w-24`}
+                  disabled={disabled}
+                  onClick={() =>
+                    void act(async () => {
+                      changedEvidence();
+                      const result = await localApi.scanPilotCollection(c.id, {
+                        workspace,
+                        scan_confirmed: true,
+                      });
+                      await refreshCollections();
+                      if (alive.current)
+                        setNotice(
+                          `${c.name}: scanned ${result.files_scanned} files and indexed ${result.chunks_inserted} excerpts.`,
+                        );
+                    })
+                  }
+                >
+                  Scan {c.name}
+                </button>
+              </div>
+              {c.last_scan_report && (
+                <details open={c.last_scan_report.changes.length > 0}>
+                  <summary className="cursor-pointer text-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+                    Last successful scan: {c.last_scan_report.files_added} added,{' '}
+                    {c.last_scan_report.files_updated} updated or reindexed,{' '}
+                    {c.last_scan_report.files_removed} removed, {c.last_scan_report.files_unchanged}{' '}
+                    unchanged
+                  </summary>
+                  <div className="mt-2 space-y-2 text-sm">
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(c.last_scan_report.scanned_at).toLocaleString()}. This is an indexed
+                      snapshot; scan again to check current files.
+                    </p>
+                    {c.last_scan_report.changes.length > 0 ? (
+                      <>
+                        <ul className="space-y-1">
+                          {c.last_scan_report.changes.map((change, index) => (
+                            <li key={index} className="break-words">
+                              {change.change}: {change.relative_path}
+                            </li>
+                          ))}
+                        </ul>
+                        {c.last_scan_report.changes_truncated && (
+                          <p>Showing the first 100 changed paths. Counts cover the full scan.</p>
+                        )}
+                        <p>
+                          Approved statements revoked: {c.last_scan_report.revoked_claims}. Saved
+                          answers using this collection cleared:{' '}
+                          {c.last_scan_report.invalidated_answers}.
+                        </p>
+                        <p className="text-muted-foreground">
+                          Use Find source evidence below to inspect added or updated documents, then
+                          propose and approve their new statements. Removed documents cannot support
+                          new answers. Unchanged approved statements can be used for another
+                          question.
+                        </p>
+                      </>
+                    ) : (
+                      <p>
+                        No document changes. Existing approvals were kept; freshness checks still
+                        apply to each question.
+                      </p>
+                    )}
+                  </div>
+                </details>
+              )}
             </div>
           ))}
         </div>

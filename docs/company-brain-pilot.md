@@ -170,3 +170,29 @@ does not approve knowledge or ask the model. An unconfirmed ask is rejected.
 Applying or reapplying suggested parts, and editing confirmed parts, requires new
 review before dispatch. These are executable regression tests with generation
 doubled explicitly; they establish no new answer-quality or operator-effort score.
+
+## Return to a workspace and review changes
+
+Potluck remembers the last workspace, source selection and model choice locally
+and in the sidecar settings. Reopening rechecks the selected collections. A saved
+model that is no longer loaded stays marked unavailable; load it or choose the
+current model explicitly. Questions, confirmations and source approvals are not
+preferences and are never recreated by reopening.
+
+Use **Scan documents** to check registered folders. Each collection keeps its last
+successful scan report across restarts, with document paths and change counts.
+An unchanged scan preserves approved knowledge. A changed or removed document
+revokes its source-bound statements. The current conservative invalidation also
+clears every saved answer whose scope includes that collection. Reindexed files
+(for example after an explicit parser change) follow the same review lifecycle.
+Use **Find source evidence** to inspect the new revision, propose its statements
+and explicitly approve them before asking again. An unchanged document's current
+approved statements can inform another question without another approval.
+
+The report is an indexed snapshot, not a background file watcher. Freshness and
+current source/review checks remain enforced by the sidecar on every operation.
+
+Scan reports retain up to 100 redacted relative paths per collection, together
+with counts for the complete scan. Removing the collection deletes its report.
+The report contains no source document or answer text. It records the last
+successful scan only; it is not an approval queue or a full revision history.

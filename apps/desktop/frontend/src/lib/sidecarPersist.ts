@@ -21,12 +21,16 @@ const LOCAL_SIDECAR_BASE =
  * Persist a single UI preference key to the sidecar's durable config.
  * PATCH is deep-merged on the server so writing one key never drops another.
  */
-export function persistUiPref(key: string, value: string): void {
-  void fetch(`${LOCAL_SIDECAR_BASE}/settings`, {
+export function persistUiPref(key: string, value: string): Promise<void> {
+  return fetch(`${LOCAL_SIDECAR_BASE}/settings`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ui: { [key]: value } }),
-  }).catch((err: unknown) => {
-    console.warn('[durablePrefs] sidecar sync failed:', err);
-  });
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error('Preference sync failed');
+    })
+    .catch((err: unknown) => {
+      console.warn('[durablePrefs] sidecar sync failed:', err);
+    });
 }
