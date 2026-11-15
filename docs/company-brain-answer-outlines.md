@@ -18,3 +18,9 @@ A compact draft and binding digest are stored in original provenance. Reading, r
 The pilot scan also accepts an opt-in `preserve_heading_context` flag. This uses a separately versioned evidence parser that retains heading-only sections and avoids merging short bodies across different headings. A heading can carry a draft/proposed state or an exception prerequisite; it must reach the reviewed source draft before organization can preserve it. Explicit rescans with this parser change the document revision and invalidate older bound claims and answers through the normal review lifecycle. The raw API and personal vault retain their existing parser defaults. The qualified reviewed desktop scan explicitly requests heading preservation by default, with a caller opt-out. No sources are silently rescanned or approved.
 
 The Markdown owner is shared with the existing evidence renderer, so raw HTML, unsafe links and external image loading keep the same restrictions. The component does not write to the API, rerun inference, approve an answer or record usefulness.
+
+Metadata-only passages made of flat Markdown frontmatter fields are rendered as
+literal text instead of Markdown headings. The full original string, including
+state, dates, conditions and delimiters, remains visible and unchanged; the
+renderer does not parse those fields into company authority. This display change
+does not modify the saved answer, source, review, citation or export contracts.

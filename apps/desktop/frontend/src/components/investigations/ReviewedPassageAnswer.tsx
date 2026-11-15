@@ -6,11 +6,67 @@ import type { Brief, ReadableAnswer } from '@/types/investigations';
 
 type Answer = NonNullable<Brief['answers']>[number];
 
+function isDocumentMetadata(text: string): boolean {
+  const lines = text.trim().split(/\r?\n/);
+  return (
+    lines.length > 2 &&
+    lines[0] === '---' &&
+    lines.at(-1) === '---' &&
+    lines.slice(1, -1).every((line) => /^[A-Za-z_][\w-]*:.*$/.test(line))
+  );
+}
+
+type MarkdownNode = {
+  type: string;
+  depth?: number;
+  children?: MarkdownNode[];
+  position?: { start: { offset?: number }; end: { offset?: number } };
+  value?: string;
+};
+
+function literalMetadata() {
+  return (tree: unknown, file: { value: unknown }) => {
+    const source = String(file.value);
+    function visit(parent: MarkdownNode) {
+      const children = parent.children;
+      if (!children) return;
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        const next = children[i + 1];
+        const start = node?.position?.start.offset;
+        const end = next?.position?.end.offset;
+        if (
+          node?.type === 'thematicBreak' &&
+          next?.type === 'heading' &&
+          next.depth === 2 &&
+          typeof start === 'number' &&
+          typeof end === 'number'
+        ) {
+          const text = source.slice(start, end);
+          if (isDocumentMetadata(text)) children.splice(i, 2, { type: 'code', value: text });
+        }
+        if (children[i]) visit(children[i]!);
+      }
+    }
+    visit(tree as MarkdownNode);
+  };
+}
+
 export function AnswerMarkdown({ text }: { text: string }) {
+  // Literal source metadata must not become a Markdown setext heading.
+  if (isDocumentMetadata(text))
+    return (
+      <pre
+        aria-label="Document metadata"
+        className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground"
+      >
+        {text}
+      </pre>
+    );
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground prose-p:my-2 prose-li:my-0.5 prose-pre:overflow-x-auto prose-pre:bg-muted prose-code:before:content-none prose-code:after:content-none">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, literalMetadata]}
         skipHtml
         components={{
           a: SafeExternalLink,

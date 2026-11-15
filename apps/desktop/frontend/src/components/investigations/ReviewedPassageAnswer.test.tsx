@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ReviewedPassageAnswer } from '@/components/investigations/ReviewedPassageAnswer';
+import {
+  ReviewedPassageAnswer,
+  AnswerMarkdown,
+} from '@/components/investigations/ReviewedPassageAnswer';
 import type { Brief } from '@/types/investigations';
 
 type Answer = NonNullable<Brief['answers']>[number];
@@ -156,4 +159,46 @@ describe('Readable fixed-part answer', () => {
     expect(screen.queryByText('Original generated answer')).not.toBeInTheDocument();
     expect(screen.getAllByText('Corrected condition: always require approval.')[0]).toBeVisible();
   });
+});
+
+it('keeps source metadata literal instead of turning it into a setext heading', () => {
+  const text =
+    '\n---\r\nid: OLT-12\r\nstatus: open\r\nverified: false\r\ncondition: only if both stacks share the account limit\r\n---\n';
+  const { container } = render(<AnswerMarkdown text={text} />);
+  expect(screen.getByLabelText('Document metadata').textContent).toBe(text);
+  expect(container.querySelector('h2')).toBeNull();
+});
+
+it('retains ordinary source rules and Markdown headings outside a metadata-only block', () => {
+  render(
+    <AnswerMarkdown
+      text={
+        '## Before sending\n\nKeep the ledger guard unless the owner approves an exception.\n\n---'
+      }
+    />,
+  );
+  expect(screen.getByRole('heading', { name: 'Before sending' })).toBeVisible();
+  expect(
+    screen.getByText('Keep the ledger guard unless the owner approves an exception.'),
+  ).toBeVisible();
+});
+
+it('keeps embedded metadata literal with source rules and citations around it', () => {
+  const metadata = '---\nid: OLT-12\nstatus: open\nverified: false\n---';
+  const { container } = render(
+    <AnswerMarkdown
+      text={`Document: email task\n\n${metadata}\n\n## Fix\n\nShare only if both stacks share the account limit.\n\n[Source](https://example.com/evidence)`}
+    />,
+  );
+  expect(container.querySelector('pre')?.textContent?.trim()).toBe(metadata);
+  expect(screen.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Fix']);
+  expect(screen.getByText('Share only if both stacks share the account limit.')).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Source' })).toHaveAttribute('href', 'https://example.com/evidence');
+});
+
+it('leaves metadata examples inside existing code fences as literal code', () => {
+  const metadata = '---\nstatus: open\n---';
+  const { container } = render(<AnswerMarkdown text={`\`\`\`text\n${metadata}\n\`\`\``} />);
+  expect(container.querySelectorAll('pre')).toHaveLength(1);
+  expect(container.querySelector('pre')?.textContent?.trim()).toBe(metadata);
 });
