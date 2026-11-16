@@ -790,7 +790,7 @@ export const localApi = {
     }).then(handleResponse<PilotEvidence>);
   },
 
-  pilotSetupDrafts(input: InvestigationScope & { question: string }): Promise<PilotSetupDraft> {
+  pilotSetupDrafts(input: InvestigationScope & { question: string; suggestion_version?: 'legacy' | 'document-topics-v1' | 'document-topics-v2' | 'document-topics-v3' | 'document-topics-v4' }): Promise<PilotSetupDraft> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/setup-drafts`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<PilotSetupDraft>);

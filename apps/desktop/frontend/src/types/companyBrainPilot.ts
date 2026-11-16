@@ -52,6 +52,11 @@ export interface PilotSetupDraft {
     revision_id: string;
     preview: PilotContextPreview | null;
     notice: string;
+    match?: {
+      version: 'document-topics-v1' | 'document-topics-v2' | 'document-topics-v3' | 'document-topics-v4';
+      title_terms: string[];
+      text_terms: string[];
+    };
   }>;
   truncated: boolean;
   limitations: string[];

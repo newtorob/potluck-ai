@@ -226,3 +226,21 @@ these drafts and confirmations are not written to durable preferences.
 **Full supplied evidence** includes the reviewed statements supplied to the answer,
 including statements the response did not cite. Citation links open this same
 expandable evidence drawer. The full evidence and original answer remain available.
+
+## Source suggestions
+
+The guided view requests the versioned `document-topics-v4` suggestion method.
+It ranks normalized topic words in document names, headings and indexed text;
+shared frontmatter and Related wiki-link footers do not add ranking weight.
+Each suggested document shows its matching words. These are inspectable lexical
+matches, not verified relevance, approval or confidence scores.
+
+Review is bounded to 200 documents, sixteen chunks and 16,000 ranking characters
+per document, with at most three suggestions. The UI reports incomplete suggestions;
+missing matches cannot establish corpus-wide absence. Refine the question or use
+Advanced investigations for other documents. Complete previews still use every
+indexed chunk within the existing complete-source caps, including all metadata,
+conditions, exceptions and citations. A rank never grants approval or restricts
+answers to suggested documents: answers use all current approved statements in
+the selected folders. The API's omitted-version default and Advanced source setup
+retain the legacy suggestion method; answer retrieval and model settings are unchanged.

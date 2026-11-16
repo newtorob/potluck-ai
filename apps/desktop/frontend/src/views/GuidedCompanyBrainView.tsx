@@ -71,6 +71,8 @@ export function GuidedCompanyBrainView({
   const [parts, setParts] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState('');
   const [drafts, setDrafts] = useState<PilotSourceDraft[]>([]);
+  const [suggestionNotes, setSuggestionNotes] = useState<string[]>([]);
+  const [suggestionIncomplete, setSuggestionIncomplete] = useState(false);
   const [approved, setApproved] = useState<PilotClaim[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [prepared, setPrepared] = useState(false);
@@ -130,6 +132,8 @@ export function GuidedCompanyBrainView({
   function clearDraft() {
     setConfirmation('');
     setDrafts([]);
+    setSuggestionNotes([]);
+    setSuggestionIncomplete(false);
     setPrepared(false);
     setContinueReviewed(false);
     setParts([]);
@@ -272,12 +276,24 @@ export function GuidedCompanyBrainView({
     clearDraft();
     await run('Finding source drafts…', async (ticket) => {
       const [draft, knowledge] = await Promise.all([
-        localApi.pilotSetupDrafts({ ...scope, question: question.trim() }),
+        localApi.pilotSetupDrafts({
+          ...scope,
+          question: question.trim(),
+          suggestion_version: 'document-topics-v4',
+        }),
         claims(),
       ]);
       if (!current(ticket)) return;
       applyClaims(knowledge);
       setDrafts(draft.candidates);
+      const omitted = draft.query_trace?.omitted_terms ?? [];
+      setSuggestionNotes([
+        ...draft.limitations,
+        ...(omitted.length
+          ? [`Some question words were not used for ranking: ${omitted.join(', ')}.`]
+          : []),
+      ]);
+      setSuggestionIncomplete(draft.truncated || omitted.length > 0);
       setParts(draft.question_parts.parts);
       setPrepared(true);
       setNotice('Review the suggested documents below. No source was saved or approved.');
@@ -366,6 +382,8 @@ export function GuidedCompanyBrainView({
     setConfirmation('');
     setAnswer(null);
     setContinueReviewed(false);
+    setSuggestionNotes([]);
+    setSuggestionIncomplete(false);
     await run('Opening changed source…', async (ticket) => {
       const [draft, knowledge] = await Promise.all([
         localApi.pilotSourceDraft({ ...scope, collection_id: collectionId, relative_path: path }),
@@ -729,9 +747,27 @@ export function GuidedCompanyBrainView({
             </p>
             {prepared && !drafts.length && (
               <p className="text-sm">
-                No matching document drafts. You can continue with current reviewed knowledge, or
-                add another folder.
+                No strong word matches for new source drafts. Try a specific topic or document name,
+                continue with current reviewed knowledge, or use Advanced investigations.
               </p>
+            )}
+            {suggestionIncomplete && (
+              <p role="status" className="text-sm text-muted-foreground">
+                More matching documents or indexed text may be available. Refine the question or
+                review sources in Advanced investigations.
+              </p>
+            )}
+            {!!suggestionNotes.length && (
+              <details>
+                <summary className="cursor-pointer text-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+                  How documents were suggested
+                </summary>
+                {suggestionNotes.map((note, i) => (
+                  <p key={i} className="mt-2 text-xs text-muted-foreground">
+                    {note}
+                  </p>
+                ))}
+              </details>
             )}
             {drafts.map((draft, index) => {
               const reviewed = approved.some((c) => sameSource(c, draft));
@@ -751,6 +787,15 @@ export function GuidedCompanyBrainView({
                   aria-label={`Source ${draft.relative_path}`}
                 >
                   <h3 className="break-words font-medium">{draft.relative_path}</h3>
+                  {draft.match && (
+                    <p className="text-xs text-muted-foreground">
+                      Normalized word matches:{' '}
+                      {draft.match.title_terms.length > 0 &&
+                        `title/headings: ${draft.match.title_terms.join(', ')}. `}
+                      {draft.match.text_terms.length > 0 &&
+                        `indexed text: ${draft.match.text_terms.join(', ')}.`}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {reviewed
                       ? 'Current reviewed document. No new approval is needed.'

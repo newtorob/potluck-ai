@@ -174,9 +174,66 @@ beforeEach(() => {
   api.scanPilotCollection.mockResolvedValue(report);
 });
 describe('guided Company Brain', () => {
+  it('makes omitted query words visible even when document search is otherwise complete', async () => {
+    api.pilotSetupDrafts.mockResolvedValueOnce({
+      version: 'pilot-setup-drafts-v2',
+      question: 'Who approves?',
+      query_trace: { effective_query: 'approval', omitted_terms: ['billing'] },
+      question_parts: { parts: ['Who approves?'], coverage: 'not_verified', limitations: [] },
+      candidates: [draft],
+      truncated: false,
+      limitations: [],
+    });
+    mount();
+    await question();
+    expect(await screen.findByText(/More matching documents or indexed text/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('How documents were suggested'));
+    expect(
+      screen.getByText(/Some question words were not used for ranking: billing/),
+    ).toBeInTheDocument();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('shows bounded word-match explanations without authorizing an answer and clears them on question changes', async () => {
+    api.pilotSetupDrafts.mockResolvedValueOnce({
+      version: 'pilot-setup-drafts-v2',
+      question: 'Who approves?',
+      question_parts: { parts: ['Who approves?'], coverage: 'not_verified', limitations: [] },
+      candidates: [
+        {
+          ...draft,
+          match: {
+            version: 'document-topics-v4',
+            title_terms: ['approval'],
+            text_terms: ['owner'],
+          },
+        },
+      ],
+      truncated: true,
+      limitations: ['Word matches are not approval.'],
+    });
+    mount();
+    await question();
+    expect(await screen.findByText(/Normalized word matches/)).toHaveTextContent('approval');
+    expect(screen.getByText(/More matching documents or indexed text/)).toBeInTheDocument();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Your question' }), {
+      target: { value: 'Other question?' },
+    });
+    expect(screen.queryByText(/Normalized word matches/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/More matching documents or indexed text/)).not.toBeInTheDocument();
+    expect(screen.queryByText('How documents were suggested')).not.toBeInTheDocument();
+  });
   it('requires explicit source approval and question confirmation, then makes exactly one answer request', async () => {
     mount();
     await question();
+    expect(api.pilotSetupDrafts).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      question: 'Who approves?',
+      suggestion_version: 'document-topics-v4',
+    });
     expect(api.proposePilotClaim).not.toHaveBeenCalled();
     expect(api.approvePilotClaim).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Approve document for answers' }));

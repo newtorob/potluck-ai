@@ -55,6 +55,7 @@ class ContextPreview(Scope):
 
 class SetupDraft(Scope):
     question: StrictStr = Field(min_length=1, max_length=500)
+    suggestion_version: Literal['legacy', 'document-topics-v1', 'document-topics-v2', 'document-topics-v3', 'document-topics-v4'] = 'legacy'
 
 class SourceDraft(Scope):
     collection_id: StrictStr = Field(min_length=1, max_length=128)
@@ -205,7 +206,8 @@ async def setup_drafts(body: SetupDraft) -> dict[str, Any]:
     try:
         await _start()
         await _ready(body.scope())
-        return await pilot_setup_drafts.source_drafts(body.scope(), body.question)
+        return await pilot_setup_drafts.source_drafts(
+            body.scope(), body.question, suggestion_version=body.suggestion_version)
     except (ValueError, PermissionError, LookupError) as exc:
         raise _pilot_error(exc) from None
 

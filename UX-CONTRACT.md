@@ -301,3 +301,11 @@ question but resets guided confirmations. No question text is added to UI settin
 The answer drawer is named **Full supplied evidence** because its contents may
 include reviewed statements that were supplied but not cited in the response.
 Changing this label does not filter or remove any evidence or original answer.
+
+Guided source setup explicitly requests `document-topics-v4`; other callers retain
+the legacy default. Suggestion cards show normalized matching words rather than
+confidence scores. Ranking can omit common metadata/wiki-link words without
+altering any complete source preview. Incomplete/bounded results are visible and
+never establish absence. Source ranking creates no authority and does not narrow
+the all-approved selected-folder answer scope. Existing details, status and source
+card owners provide explanations; scope changes/errors clear those explanations.

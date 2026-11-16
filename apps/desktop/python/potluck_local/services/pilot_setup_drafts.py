@@ -27,7 +27,12 @@ def question_parts(question: str) -> dict[str, Any]:
             'limitations': ['Only explicit question sentences are separated. Review compound requests and shared conditions before confirming.']}
 
 
-async def source_drafts(scope: evidence.EvidenceScope, question: str) -> dict[str, Any]:
+async def source_drafts(scope: evidence.EvidenceScope, question: str, *,
+                        suggestion_version: str = 'legacy') -> dict[str, Any]:
+    if suggestion_version in ('document-topics-v1', 'document-topics-v2', 'document-topics-v3', 'document-topics-v4'):
+        return await _topic_drafts(scope, question, suggestion_version)
+    if suggestion_version != 'legacy':
+        raise ValueError('Unsupported source suggestion version')
     parts = question_parts(question)
     query, trace = bounded_query(question)
     result = await evidence.lookup_evidence(scope, query, max_results=100, retrieval_version='v2')
@@ -139,3 +144,37 @@ async def document_draft(
         if len(ready) != len(scope.collection_ids) or await cur.fetchone() is None:
             raise ValueError('Source citation unavailable')
     return draft
+
+
+async def _topic_drafts(scope: evidence.EvidenceScope, question: str, version: str) -> dict[str, Any]:
+    from . import source_suggestions
+    parts = question_parts(question)
+    query, trace = bounded_query(question)
+    ranked = await source_suggestions.rank(scope, query, version=version)
+    drafts = []
+    for match in ranked['documents'][:MAX_DOCUMENTS]:
+        draft = await document_draft(scope, match['collection_id'], match['relative_path'])
+        if draft['revision_id'] != match['revision_id'] or draft['document_id'] != match['document_id']:
+            raise ValueError('Source citation unavailable')
+        draft['match'] = match['match']
+        drafts.append(draft)
+    await source_suggestions.validate_current(scope, drafts, ranked['collection_scans'])
+    return {'version': 'pilot-setup-drafts-v2', 'question': question, 'question_parts': parts,
+            'query_trace': {**trace, 'topic_terms': ranked['topic_terms'],
+                            'ignored_generic_terms': ranked['ignored_terms']},
+            'candidates': drafts, 'matching_documents_seen': len(ranked['documents']),
+            'documents_considered': ranked['documents_considered'],
+            'truncated': ranked['incomplete'] or len(ranked['documents']) > MAX_DOCUMENTS,
+            'limitations': [
+                'Ranked by normalized topic-word matches, not verified relevance or source approval.',
+                'Frontmatter and Related wiki-link footers do not influence ranking; complete previews retain them.',
+                'Missing suggestions do not establish absence. Review other sources in Advanced investigations.',
+                *(['Extra suggestions need a strong match or additional topic words; a weak partial match may produce no suggestion.']
+                  if version != 'document-topics-v1' else []),
+                *(['Extra cards cover an additional question clause or closely match the leading document; other relevant sources may still be missed.']
+                  if version in ('document-topics-v3', 'document-topics-v4') else []),
+                *(['Standalone JS/TS names match JavaScript/TypeScript; aliased wiki links contribute their visible labels, not hidden targets.']
+                  if version == 'document-topics-v4' else []),
+                *(['Suggestion search was bounded; some documents or indexed text were not considered.']
+                  if ranked['incomplete'] else []),
+            ]}
