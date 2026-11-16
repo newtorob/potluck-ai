@@ -796,6 +796,12 @@ export const localApi = {
     }).then(handleResponse<PilotSetupDraft>);
   },
 
+  pilotSourceDraft(input: InvestigationScope & { collection_id: string; relative_path: string }): Promise<PilotSetupDraft['candidates'][number]> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/source-draft`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<PilotSetupDraft['candidates'][number]>);
+  },
+
   pilotContextPreview(input: InvestigationScope & { citation_ids: string[] }): Promise<PilotContextPreview> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/claim-context`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),

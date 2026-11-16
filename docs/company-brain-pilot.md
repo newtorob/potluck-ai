@@ -196,3 +196,29 @@ Scan reports retain up to 100 redacted relative paths per collection, together
 with counts for the complete scan. Removing the collection deletes its report.
 The report contains no source document or answer text. It records the last
 successful scan only; it is not an approval queue or a full revision history.
+
+## Guided desktop return visits
+
+Open **Company Brain** in the sidebar. Your last workspace and selected folders
+reopen. On a first visit, choose **Open workspace**, choose a folder, explicitly
+allow reading it, and add/scan it. The supported loaded local model is shown under
+**Workspace and folders**; this page never downloads or loads a model.
+
+Enter a question and choose **Review sources for this question**. Inspect complete
+source drafts before clicking **Approve document for answers**. Exact current
+approvals need no second approval. Suggestions do not narrow the answer scope:
+answers use current approved knowledge in all selected folders. Continue with
+that knowledge, review the question parts, confirm them and choose **Get answer**.
+
+**Recent questions** reopen saved answers without inference. **Document changes**
+shows the last successful scan and offers **Review [document]** for current added
+or updated paths, without replacing your question. Removed documents cannot be
+reapproved from that entry. Oversized or ambiguous replacements lead to **Advanced
+investigations**, where the existing correction, supersession and outcome tools
+remain available. A source or answer that is no longer current must be reviewed
+again; it is never revived from the browser cache.
+
+Opening **Advanced investigations** from an answer hands that record to the
+existing review tools under its exact saved folder scope. Returning preserves
+the question in this app session and requires fresh source/question confirmation;
+these drafts and confirmations are not written to durable preferences.

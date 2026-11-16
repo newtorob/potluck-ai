@@ -41,7 +41,7 @@ Component paths below are relative to `apps/desktop/frontend/src/`.
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 | --- | --- | --- | --- | --- |
 | Scrollbar | `apps/desktop/frontend/src/styles/globals.css` | Existing global Hearth scrollbar rules and forced-colors fallback | Native viewport and view-owned overflow; no hidden scrollbars | Workspace browser overflow, narrow layout and keyboard checks |
-| Select/Listbox | Native loaded-model selectors in `PilotKnowledge` and `InvestigationsView` | Loaded sidecar model IDs and explicit selection | Native OS popup; no custom geometry or autocomplete | Pilot component tests and investigations browser checks |
+| Select/Listbox | Native loaded-model selectors in `PilotKnowledge`, `InvestigationsView` and `GuidedCompanyBrainView` | Loaded sidecar model IDs and explicit selection | Native OS popup; no custom geometry or autocomplete | Pilot component tests and investigations browser checks |
 | Form | `components/auth/MagicLinkForm.tsx` | `hooks/useAuth.ts` and passwordless confirmation flow | Entry form without input autofocus; dedicated sign-in form with autofocus | AuthGate and localUse tests; browser error/keyboard checks |
 | Account entry | `components/auth/AuthGate.tsx`, `SignInWall.tsx` | Explicit local choice or confirmed/cached account | Account lookup, local entry, signed-in and cached offline access | `components/auth/AuthGate.test.tsx` |
 | Account-backed feature | `components/auth/AccountRequired.tsx` | `stores/authStore.ts` | Full feature or in-shell sign-in prompt | `lib/localUse.test.tsx` |
@@ -251,3 +251,49 @@ collection and workspace. The existing conservative rule still clears all saved
 answers whose scope includes a changed collection; unchanged document approvals
 survive. Reopening never revives invalidated content or restores approval. Ask again
 after explicitly reviewing new source statements and question parts.
+
+## Guided Company Brain desktop
+
+`CompanyBrainView` owns the existing `/investigations` route. The default guided
+view presents source review → explicit question-part confirmation → a cited draft.
+`?mode=advanced` retains the existing investigation/review/correction/outcome tools.
+The sidebar names this workflow Company Brain. No model runs merely by navigating
+here, restoring a workspace or opening a recent answer.
+
+`GuidedCompanyBrainView` reuses the durable workspace store, Hearth controls,
+QuestionPartsEditor, safe AnswerMarkdown and FocusedSourceAnswer. It restores only
+workspace/source/model choices, validates the folder IDs, and never restores folder
+consent, source approval or question confirmation from preferences. The currently
+loaded model can be inherited; unavailable saved models do not switch or load.
+The native directory picker is the existing IPC owner and does not grant scan
+consent. Folder consent resets on path or workspace changes.
+
+Source suggestions are review aids, not an answer-scope restriction: answers may
+use all current approved statements in the selected folders. Existing exact
+content/citation approvals are reused. A unique single-document prior statement
+requires an explicit replacement action under its existing key. Multiple or
+multi-document statements require Advanced review rather than an inferred
+replacement. Unknown write outcomes never trigger automatic retries; the next
+review reloads current approved/proposed records before another authority write.
+Incomplete knowledge inventories block the guided authority path.
+
+The direct `source-draft` endpoint reads an exact current indexed document under
+explicit workspace/selected-collection scope. It enforces privacy, freshness,
+revision checks and existing complete-preview caps; it never reads arbitrary
+paths, generates answers, approves sources or truncates a document. Changed-path
+review leaves the user's question unchanged. Scans and authority changes clear
+answers/confirmation and fence late recent-list reads. Recent questions belong to
+the exact folder set; opening one revalidates source bindings and performs no
+inference. Stale/unavailable records clear the displayed artifact with a named
+scan/review recovery path. Raw original answers and cited sources remain expandable.
+
+Async operations disable controls and reject duplicate dispatch before React
+commits busy state. Context edits invalidate question confirmation; server
+validation remains final. New stages receive focus after rendering. The content
+panel owns scrolling and narrow layouts keep source text and actions reachable.
+This remains a local-owner workflow, not authenticated multi-user company roles.
+
+Guided-to-Advanced navigation carries an ephemeral question and optional saved
+record ID. The advanced view reopens that record only after restoring and
+revalidating its exact scope; it performs no inference. Returning preserves the
+question but resets guided confirmations. No question text is added to UI settings.

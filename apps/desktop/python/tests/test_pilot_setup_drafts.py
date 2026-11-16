@@ -149,3 +149,78 @@ def test_source_revision_is_revalidated_by_existing_proposal_route(client, tmp_p
     assert client.post(f'/company-brain/pilot/collections/{cid}/scan', json={'workspace': 'w', 'scan_confirmed': True}).status_code == 200
     rejected = client.post('/company-brain/pilot/claims', json={'workspace': 'w', 'collection_ids': [cid], 'claim_key': 'release', 'content': preview['content'], 'citation_ids': preview['citation_ids']})
     assert rejected.status_code == 400
+
+
+def test_direct_document_draft_is_scoped_complete_and_read_only(client, tmp_path):
+    cid, folder = register(client, tmp_path, {'release.md': '# Draft 2026-01-01\n\nApproval required.\n\n## Exception\n\nOnly during an incident, record next day.'})
+    other, _ = register(client, tmp_path, {'release.md': '# Other workspace\n\nDifferent rule.'}, name='other', workspace='other')
+    path = '/company-brain/pilot/source-draft'
+    body = {'workspace': 'w', 'collection_ids': [cid], 'collection_id': cid, 'relative_path': 'release.md'}
+    response = client.post(path, json=body)
+    assert response.status_code == 200
+    draft = response.json()
+    assert draft['collection_id'] == cid and draft['relative_path'] == 'release.md'
+    assert draft['document_id'] and draft['revision_id'] and draft['notice'] == ''
+    preview = draft['preview']
+    assert 'Draft 2026-01-01' in preview['content']
+    assert 'Only during an incident, record next day.' in preview['content']
+    assert preview['documents'][0]['revision_id'] == draft['revision_id']
+    with sqlite3.connect(tmp_path / 'db') as db:
+        assert len(preview['citation_ids']) == db.execute('select count(*) from source_chunks where document_id=?', (draft['document_id'],)).fetchone()[0]
+        assert db.execute('select count(*) from reviewed_claims').fetchone()[0] == 0
+        assert db.execute('select count(*) from investigations').fetchone()[0] == 0
+    assert client.post(path, json={**body, 'collection_id': other}).status_code == 400
+    assert client.post(path, json={**body, 'workspace': 'other'}).status_code == 400
+    assert client.post(path, json={**body, 'relative_path': '../release.md'}).status_code == 400
+    assert client.post(path, json={**body, 'relative_path': 'missing.md'}).status_code == 400
+    assert client.post(path, json={**body, 'relative_path': 1}).status_code == 422
+    (folder / 'release.md').unlink()
+    assert client.post(f'/company-brain/pilot/collections/{cid}/scan', json={'workspace': 'w', 'scan_confirmed': True}).status_code == 200
+    assert client.post(path, json=body).status_code == 400
+
+
+def test_direct_document_draft_rejects_any_stale_scope_and_never_truncates(client, tmp_path):
+    cid, _ = register(client, tmp_path, {'large.md': '# Release\n\n' + '\n\n'.join('Rule ' + str(i) + 'x' * 1000 for i in range(20))})
+    other, _ = register(client, tmp_path, {'small.md': '# Small\n\nText.'}, name='second')
+    path = '/company-brain/pilot/source-draft'
+    body = {'workspace': 'w', 'collection_ids': [cid, other], 'collection_id': cid, 'relative_path': 'large.md'}
+    result = client.post(path, json=body)
+    assert result.status_code == 200
+    assert result.json()['preview'] is None and 'exceeds' in result.json()['notice']
+    with sqlite3.connect(tmp_path / 'db') as db:
+        db.execute("update source_collections set last_scan_at='2000-01-01T00:00:00+00:00' where id=?", (other,))
+    assert client.post(path, json=body).status_code == 400
+
+
+def test_direct_document_draft_requires_auth_and_privacy(client, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from potluck_local.app import create_app
+    from potluck_local.routers import company_brain_pilot as pilot
+    from potluck_local.services import investigations
+
+    cid, _ = register(client, tmp_path, {'release.md': '# Release\n\nRule.'})
+    body = {'workspace': 'w', 'collection_ids': [cid], 'collection_id': cid, 'relative_path': 'release.md'}
+    path = '/company-brain/pilot/source-draft'
+    unauthenticated = TestClient(create_app(), client=('127.0.0.1', 50001))
+    assert unauthenticated.post(path, json=body).status_code == 401
+    monkeypatch.setattr(pilot, '_privacy', investigations._privacy)
+    monkeypatch.setattr(investigations, 'get_settings', lambda: SimpleNamespace(
+        privacy=SimpleNamespace(memory_enabled=False), memory=SimpleNamespace(enabled=True)))
+    assert client.post(path, json=body).status_code == 403
+
+
+def test_direct_document_draft_rejects_revision_changed_after_preview(client, tmp_path, monkeypatch):
+    from potluck_local.services import claim_source_context, source_collections
+
+    cid, folder = register(client, tmp_path, {'release.md': '# Release\n\nOriginal rule.'})
+    original_preview = claim_source_context.preview
+
+    async def preview_then_rescan(scope, citations):
+        result = await original_preview(scope, citations)
+        (folder / 'release.md').write_text('# Release\n\nChanged rule.')
+        await source_collections.scan_collection('w', cid)
+        return result
+
+    monkeypatch.setattr(claim_source_context, 'preview', preview_then_rescan)
+    body = {'workspace': 'w', 'collection_ids': [cid], 'collection_id': cid, 'relative_path': 'release.md'}
+    assert client.post('/company-brain/pilot/source-draft', json=body).status_code == 400

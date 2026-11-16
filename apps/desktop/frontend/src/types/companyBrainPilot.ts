@@ -56,3 +56,4 @@ export interface PilotSetupDraft {
   truncated: boolean;
   limitations: string[];
 }
+export type PilotSourceDraft = PilotSetupDraft['candidates'][number];

@@ -56,6 +56,10 @@ class ContextPreview(Scope):
 class SetupDraft(Scope):
     question: StrictStr = Field(min_length=1, max_length=500)
 
+class SourceDraft(Scope):
+    collection_id: StrictStr = Field(min_length=1, max_length=128)
+    relative_path: StrictStr = Field(min_length=1, max_length=4096)
+
 class Review(Scope):
     reviewer: str = Field(min_length=1, max_length=256)
     reason: str = Field(min_length=1, max_length=4000)
@@ -202,6 +206,14 @@ async def setup_drafts(body: SetupDraft) -> dict[str, Any]:
         await _start()
         await _ready(body.scope())
         return await pilot_setup_drafts.source_drafts(body.scope(), body.question)
+    except (ValueError, PermissionError, LookupError) as exc:
+        raise _pilot_error(exc) from None
+
+@router.post('/source-draft')
+async def source_draft(body: SourceDraft) -> dict[str, Any]:
+    try:
+        await _start()
+        return await pilot_setup_drafts.document_draft(body.scope(), body.collection_id, body.relative_path)
     except (ValueError, PermissionError, LookupError) as exc:
         raise _pilot_error(exc) from None
 

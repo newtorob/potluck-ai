@@ -65,3 +65,18 @@ it('retains explicit caller opt-outs for both optional capabilities', async () =
   expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body)).organize_answer).toBe(false);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+it('requests a direct current source draft with the explicit workspace and selected-folder scope only', async () => {
+  const input = {
+    workspace: 'w',
+    collection_ids: ['one', 'two'],
+    collection_id: 'two',
+    relative_path: 'Policies/release.md',
+  };
+  await localApi.pilotSourceDraft(input);
+  const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+  expect(url).toBe('http://127.0.0.1:8321/company-brain/pilot/source-draft');
+  expect(JSON.parse(String(init.body))).toEqual(input);
+  expect(init.method).toBe('POST');
+  expect(fetchMock).toHaveBeenCalledOnce();
+});

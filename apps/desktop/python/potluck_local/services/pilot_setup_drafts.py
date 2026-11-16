@@ -84,3 +84,58 @@ async def source_drafts(scope: evidence.EvidenceScope, question: str) -> dict[st
                 'Review dates, draft status, conditions and exceptions before saving or approving.',
                 *result['missing_evidence'],
             ]}
+
+
+async def document_draft(
+        scope: evidence.EvidenceScope, collection_id: str, relative_path: str
+) -> dict[str, Any]:
+    """Prepare one current indexed document without making an authority decision."""
+    if collection_id not in scope.collection_ids:
+        raise ValueError('Source citation unavailable')
+    async with aiosqlite.connect(get_memory_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute('BEGIN')
+        ready, _ = await evidence._ready(db, scope)
+        if len(ready) != len(scope.collection_ids):
+            raise ValueError('All selected collections must be ready and recent')
+        cur = await db.execute(
+            'SELECT d.id, d.revision_id FROM source_documents d '
+            'JOIN source_collections c ON d.collection_id=c.id '
+            'WHERE c.workspace=? AND c.id=? AND d.relative_path=?',
+            (scope.workspace, collection_id, relative_path))
+        doc = await cur.fetchone()
+        if doc is None:
+            raise ValueError('Source citation unavailable')
+        cur = await db.execute(
+            'SELECT id, length(content) size FROM source_chunks WHERE document_id=? '
+            'ORDER BY ordinal LIMIT ?', (doc['id'], claim_source_context.MAX_CITATIONS + 1))
+        rows = await cur.fetchall()
+        if not rows:
+            raise ValueError('Source citation unavailable')
+        draft = {'relative_path': relative_path, 'collection_id': collection_id,
+                 'document_id': doc['id'], 'revision_id': doc['revision_id'],
+                 'preview': None, 'notice': ''}
+        oversized = (len(rows) > claim_source_context.MAX_CITATIONS
+                     or sum(row['size'] for row in rows) > claim_source_context.MAX_CONTENT_CHARS)
+        citations = [f"source:{row['id']}:{doc['revision_id']}" for row in rows] if not oversized else []
+    if citations:
+        try:
+            draft['preview'] = await claim_source_context.preview(scope, citations)
+        except ValueError as exc:
+            if str(exc) != claim_source_context.LIMIT_ERROR:
+                raise
+            oversized = True
+    if oversized:
+        draft['notice'] = 'This document exceeds the complete-draft limit. Search and review its excerpts manually.'
+    # Revalidate even when no preview was possible.
+    async with aiosqlite.connect(get_memory_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute('BEGIN')
+        ready, _ = await evidence._ready(db, scope)
+        cur = await db.execute(
+            'SELECT 1 FROM source_documents d JOIN source_collections c ON d.collection_id=c.id '
+            'WHERE c.workspace=? AND c.id=? AND d.relative_path=? AND d.id=? AND d.revision_id=?',
+            (scope.workspace, collection_id, relative_path, doc['id'], doc['revision_id']))
+        if len(ready) != len(scope.collection_ids) or await cur.fetchone() is None:
+            raise ValueError('Source citation unavailable')
+    return draft

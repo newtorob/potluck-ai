@@ -49,7 +49,11 @@ const operationLabels: Record<OperationType, string> = {
   percentage: 'Percentage (part of total)',
 };
 
-export function InvestigationsView() {
+export function InvestigationsView({
+  initialQuestion = '',
+  initialInvestigationId,
+}: { initialQuestion?: string; initialInvestigationId?: string | undefined } = {}) {
+  const initialOpened = useRef('');
   const activeModel = useModelStore((s) => s.activeModelSlug);
   const fetchModels = useModelStore((s) => s.fetchModels);
   const savedWorkspace = useCompanyBrainWorkspaceStore((s) => s.saved);
@@ -60,7 +64,7 @@ export function InvestigationsView() {
   const [loadedWorkspace, setLoadedWorkspace] = useState('');
   const [collections, setCollections] = useState<SourceCollection[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [issue, setIssue] = useState('');
+  const [issue, setIssue] = useState(initialQuestion);
   const [query, setQuery] = useState('');
   const [answerEach, setAnswerEach] = useState(false);
   const [pilot, setPilot] = useState(false);
@@ -364,6 +368,20 @@ export function InvestigationsView() {
   async function selectItem(id: string) {
     await run(async () => show(await localApi.investigation(id, scope)));
   }
+  useEffect(() => {
+    if (
+      !initialInvestigationId ||
+      !ready ||
+      busy ||
+      initialOpened.current === initialInvestigationId
+    )
+      return;
+    initialOpened.current = initialInvestigationId;
+    void run(async () => {
+      show(await localApi.investigation(initialInvestigationId, scope));
+      requestAnimationFrame(() => document.getElementById('investigation-current')?.focus());
+    });
+  }, [initialInvestigationId, ready, busy]);
   function changeText(key: (typeof sections)[number][0], index: number, value: string) {
     setCorrected(
       (old) =>
@@ -1037,7 +1055,11 @@ export function InvestigationsView() {
             )}
           </section>
           {current && (
-            <section className="rounded-lg border border-border bg-card p-5 space-y-5">
+            <section
+              id="investigation-current"
+              tabIndex={-1}
+              className="rounded-lg border border-border bg-card p-5 space-y-5"
+            >
               <div>
                 <h2 className="font-serif text-xl">{current.issue}</h2>
                 <p className="text-xs text-muted-foreground">

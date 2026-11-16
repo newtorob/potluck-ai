@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
   sourceCollections: vi.fn(),
   fetchModels: vi.fn().mockResolvedValue(undefined),
   investigations: vi.fn(),
+  investigation: vi.fn(),
   createInvestigation: vi.fn(),
   askPilot: vi.fn(),
   askReviewedPilot: vi.fn(),
@@ -1054,4 +1055,35 @@ it('finishes an in-flight restore when the reader interacts with its loading vie
   });
   expect(await screen.findByRole('checkbox', { name: /Restored policy/ })).toBeChecked();
   expect(screen.getByLabelText('Workspace')).toHaveValue('cached');
+});
+
+it('opens the explicitly handed-off saved record after restoring its exact folder scope', async () => {
+  useCompanyBrainWorkspaceStore.setState({
+    saved: { version: 1, workspace: 'w', collectionIds: ['c1'], modelSlug: 'local-model' },
+    revision: 0,
+  });
+  api.sourceCollections.mockResolvedValue({
+    collections: [{ id: 'c1', name: 'Docs', scan_status: 'ready', last_scan_at: null }],
+  });
+  api.investigation.mockResolvedValue({
+    id: 'handoff',
+    issue: 'Saved guided answer',
+    status: 'draft',
+    model_slug: 'local-model',
+    created_at: 'today',
+    review: null,
+    outcome: null,
+    evidence: [],
+    brief: { facts: [], prior_fixes: [], hypotheses: [], recommended_checks: [] },
+  });
+  render(
+    <InvestigationsView initialQuestion="Original question" initialInvestigationId="handoff" />,
+  );
+  await screen.findByRole('heading', { name: 'Saved guided answer' });
+  expect(api.investigation).toHaveBeenCalledWith('handoff', {
+    workspace: 'w',
+    collection_ids: ['c1'],
+  });
+  expect(api.investigation).toHaveBeenCalledTimes(1);
+  expect(api.createInvestigation).not.toHaveBeenCalled();
 });
