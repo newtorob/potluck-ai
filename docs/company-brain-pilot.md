@@ -222,3 +222,7 @@ Opening **Advanced investigations** from an answer hands that record to the
 existing review tools under its exact saved folder scope. Returning preserves
 the question in this app session and requires fresh source/question confirmation;
 these drafts and confirmations are not written to durable preferences.
+
+**Full supplied evidence** includes the reviewed statements supplied to the answer,
+including statements the response did not cite. Citation links open this same
+expandable evidence drawer. The full evidence and original answer remain available.

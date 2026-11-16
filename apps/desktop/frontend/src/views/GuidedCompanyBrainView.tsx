@@ -940,8 +940,11 @@ export function GuidedCompanyBrainView({
               ))}
               <details id="guided-answer-sources" className="rounded-md border border-border p-3">
                 <summary className="cursor-pointer font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
-                  Full cited sources
+                  Full supplied evidence
                 </summary>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Reviewed statements supplied to the answer. Some may not be cited in the response.
+                </p>
                 {answer.evidence.map((e, i) => (
                   <div key={i} className="mt-3 space-y-2">
                     <p className="break-all text-xs text-muted-foreground">

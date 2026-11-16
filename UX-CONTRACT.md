@@ -297,3 +297,7 @@ Guided-to-Advanced navigation carries an ephemeral question and optional saved
 record ID. The advanced view reopens that record only after restoring and
 revalidating its exact scope; it performs no inference. Returning preserves the
 question but resets guided confirmations. No question text is added to UI settings.
+
+The answer drawer is named **Full supplied evidence** because its contents may
+include reviewed statements that were supplied but not cited in the response.
+Changing this label does not filter or remove any evidence or original answer.
