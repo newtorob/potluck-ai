@@ -208,10 +208,15 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
             'question_part_plan': investigation_request_parts.prepare(
                 body['question'], body['question_parts'], origin='reviewer_supplied'),
         }
+        assert client.post(path, json={**body, 'reviewed_evidence_version': 'v6'}, headers=headers).status_code == 200
+        assert calls[-1][1]['evidence_selection'] == 'reviewed-collection-v6'
+        assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7'}, headers=headers).status_code == 422
+
 
 
 @pytest.mark.parametrize('organize', [False, True])
-def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize):
+@pytest.mark.parametrize('evidence_version', ['v5', 'v6'])
+def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize, evidence_version):
     import json
     from copy import deepcopy
     import test_investigation_fixed_part_answers_service as shared
@@ -241,8 +246,10 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
             workspace=scope.workspace, collection_ids=list(scope.collection_ids),
             question=shared.QUESTION, model_slug='model', pilot_confirmed=True,
             question_parts=['What is required for access?', 'What exact expiry is stated?'],
-            question_parts_confirmed=True, organize_answer=organize)
+            question_parts_confirmed=True, organize_answer=organize,
+            reviewed_evidence_version=evidence_version)
         item = await pilot.ask_reviewed(body)
+        assert item['provenance']['evidence_selection']['version'] == f'reviewed-collection-{evidence_version}'
         assert len(runtime.calls) == 2 + int(organize), (item['brief']['answers'][0].get('status'), item['brief']['answers'][0].get('passage_presentation', {}).get('version'), item['provenance'].get('automatic_answer_outlines'))
         assert bool(item.get('answer_outlines')) is organize, item['provenance'].get('automatic_answer_outlines')
         assert all(options['max_tokens'] == 256 for _, options in runtime.calls[:2])

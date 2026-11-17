@@ -6,12 +6,15 @@ vi.mock('./GuidedCompanyBrainView', () => ({
   GuidedCompanyBrainView: ({
     onAdvanced,
     initialQuestion,
+    reviewedEvidenceVersion,
   }: {
     onAdvanced: (q: string, id: string) => void;
     initialQuestion: string;
+    reviewedEvidenceVersion: 'v5' | 'v6';
   }) => (
     <div>
       <p>Guided question: {initialQuestion}</p>
+      <p>Evidence version: {reviewedEvidenceVersion}</p>
       <button onClick={() => onAdvanced('Keep my question', 'saved-answer')}>
         Open review tools
       </button>
@@ -37,8 +40,17 @@ it('hands a saved record to advanced review and keeps the question on return wit
       <CompanyBrainView />
     </MemoryRouter>,
   );
+  expect(screen.getByText('Evidence version: v6')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Open review tools' }));
   expect(screen.getByText('Advanced record: saved-answer · Keep my question')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Back to Company Brain' }));
   expect(screen.getByText('Guided question: Keep my question')).toBeVisible();
+});
+it('keeps the legacy evidence version available through an explicit caller override', () => {
+  render(
+    <MemoryRouter>
+      <CompanyBrainView reviewedEvidenceVersion="v5" />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('Evidence version: v5')).toBeVisible();
 });

@@ -153,13 +153,18 @@ def _assignment_options(topics: list[str], rows: list[dict], packets: list[list[
     sets = _topic_sets(topics)
     before = sum(1 << i for i, title in enumerate(topics[1:])
                  if re.search(r'(?i)\b(before|prerequisites?)\b', title))
+    implementation_before = sum(1 << i for i, title in enumerate(topics[1:])
+        if re.search(r'(?i)\b(?:before\s+(?:building|adding|implementing|creating|developing|deploying|constructing|installation|implementation)|prerequisites?)\b', title))
     completion_asked = any(re.search(r'(?i)\b(done|complete|completed|completion|test|verify|success|finish)\b', title)
                            for title in topics[1:])
-    restrictions = {}; stage = None
+    restrictions = {}; stage = None; explicit_after = False
     for index, row in enumerate(rows):
         text = row['quote'].strip()
         if re.match(r'(?i)^\*\*Fix\.\*\*', text):
             stage = 'implementation'
+            explicit_after = bool(re.search(r'(?i)\bafter\b', text))
+        elif stage == 'implementation' and re.match(r'(?i)^after\b', text):
+            explicit_after = True
         if re.search(r'(?i)\bBefore building:\s*$', text):
             stage = 'before'
         done = bool(re.match(r'(?i)^\*\*Done when\.\*\*', text))
@@ -169,8 +174,11 @@ def _assignment_options(topics: list[str], rows: list[dict], packets: list[list[
             and not re.search(r'(?i)\b(before|after|prerequisites?|until|first|must|required?|check|confirm)\b', text))
         if before and done and not completion_asked:
             restrictions[index] = ['context']
-        elif before and (done or later_step):
+        elif before and done:
             restrictions[index] = [key for key, mask in sets.items() if not mask & before]
+        elif later_step and (implementation_before or (explicit_after and before)):
+            restricted = before if explicit_after else implementation_before
+            restrictions[index] = [key for key, mask in sets.items() if not mask & restricted]
     return {f'r{index}': [key for key in sets if all(key in restrictions.get(i, sets) for i in packet)]
             for index, packet in enumerate(packets)}
 

@@ -120,6 +120,11 @@ export interface Investigation {
     model_sha256?: string;
     template_version?: string;
     retrieval_version?: string;
+    reviewed_selection?: {
+      version: 'whole-claim-snippet-budget-v1';
+      selected_claims: number;
+      omitted_claims: number;
+    };
     elapsed_ms?: number;
     extraction_notices?: Array<{
       snippet_id: string;

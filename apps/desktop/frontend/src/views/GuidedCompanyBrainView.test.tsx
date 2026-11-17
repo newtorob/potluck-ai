@@ -119,10 +119,13 @@ const result = {
 };
 let approved: PilotClaim[] = [];
 let proposed: PilotClaim[] = [];
-function mount() {
+function mount(reviewedEvidenceVersion: 'v5' | 'v6' = 'v5') {
   return render(
     <MemoryRouter>
-      <GuidedCompanyBrainView onAdvanced={vi.fn()} />
+      <GuidedCompanyBrainView
+        onAdvanced={vi.fn()}
+        reviewedEvidenceVersion={reviewedEvidenceVersion}
+      />
     </MemoryRouter>,
   );
 }
@@ -176,6 +179,42 @@ beforeEach(() => {
   api.scanPilotCollection.mockResolvedValue(report);
 });
 describe('guided Company Brain', () => {
+  it('opts into whole-statement packing only when explicitly selected', async () => {
+    approved = [claim];
+    mount('v6');
+    await question();
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
+    await screen.findByRole('region', { name: 'Your answer' });
+    expect(api.askReviewedPilot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewed_evidence_version: 'v6',
+        question_parts_confirmed: true,
+      }),
+    );
+  });
+  it('shows omitted matching statements above a reopened answer without rerunning it', async () => {
+    const savedAnswer = {
+      ...result,
+      provenance: {
+        reviewed_selection: {
+          version: 'whole-claim-snippet-budget-v1',
+          selected_claims: 2,
+          omitted_claims: 1,
+        },
+      },
+    };
+    api.investigations.mockResolvedValue({ investigations: [savedAnswer] });
+    api.investigation.mockResolvedValue(savedAnswer);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Who approves? · draft' }));
+    await screen.findByRole('region', { name: 'Your answer' });
+    expect(screen.getByText(/2 reviewed statements were supplied/)).toHaveTextContent(
+      '1 other matching statement was left out to stay within the evidence limit',
+    );
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+  });
   it('keeps literal evidence and citations intact and exposes structured values on reopen without inference', async () => {
     const text = 'Approval required unless incident response applies.';
     const savedAnswer = {

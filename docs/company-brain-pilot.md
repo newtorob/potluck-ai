@@ -265,3 +265,27 @@ Opening setup or expanding paths does not scan, approve, infer or change scope.
 The full supplied-evidence drawer preserves string values verbatim. Other JSON
 values remain inspectable as JSON rather than displaying object coercion labels;
 this changes no source bindings, answer generation or authority.
+
+## Bounded reviewed evidence
+
+The guided desktop requests `reviewed_evidence_version: v6` after its narrow
+qualification. The HTTP API still defaults to v5; an explicit v5 caller override
+and Advanced investigations retain the older path. V6 reuses v5 ranking and
+character limits and budgets actual deduplicated paragraph snippets at whole
+reviewed-statement boundaries. Selected statements, their supporting text,
+conditions and citations remain complete. Lower-ranked statements may be omitted;
+counts are visible above the answer and exact selection/omission traces stay in
+provenance. The 100-snippet ceiling is unchanged. An oversized highest-ranked
+statement still fails closed. Bounded selection cannot prove whole-company absence.
+
+The statement inventory, including omitted records and their source bindings, is
+rechecked before the answer is saved. Opening, exporting and organizing answers
+never reruns inference or approves policy. Generic before-event questions do not
+automatically become before-building questions when organizing numbered source
+steps; explicit implementation, after-boundary, completion and conditional rules
+remain guarded. Source statements still require factual and relevance review.
+
+Review-effort pilots record approvals/reuse, manual part edits, source text
+presented, API wait and native generation time separately. Assistant wall spans
+include tool and inspection delays; they are not active human minutes. These
+measurements do not establish customer usefulness or time saved.

@@ -64,7 +64,7 @@ export function AnswerMarkdown({ text }: { text: string }) {
       </pre>
     );
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground prose-p:my-2 prose-li:my-0.5 prose-pre:overflow-x-auto prose-pre:bg-muted prose-code:before:content-none prose-code:after:content-none">
+    <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground prose-p:my-2 prose-li:my-0.5 prose-pre:overflow-x-auto prose-pre:bg-muted prose-pre:text-foreground prose-code:before:content-none prose-code:after:content-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, literalMetadata]}
         skipHtml

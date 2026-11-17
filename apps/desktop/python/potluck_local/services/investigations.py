@@ -451,7 +451,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         raise ValueError('Automatic organization requires fixed-part selection v32')
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
-    if evidence_selection is not None and (evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5')
+    if evidence_selection is not None and (evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6')
                                            or template_version != 'investigation-v21'):
         raise ValueError('Unsupported evidence selection')
     if prompt_encoding is not None and (prompt_encoding != investigation_prompt_encoding.COMPACT
@@ -473,7 +473,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     if presentation_mode in ('fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32') and question_part_plan is None:
         raise ValueError('Fixed-part selection requires an explicit question-part plan')
     claim_selection_mode = presentation_mode in ('reviewed-claim-selection-v1', 'reviewed-claim-selection-v2', 'reviewed-claim-selection-v3', 'reviewed-claim-selection-v4', 'reviewed-claim-selection-v5', 'reviewed-claim-selection-v6', 'reviewed-claim-selection-v7', 'reviewed-claim-selection-v8', 'reviewed-claim-selection-v9', 'reviewed-claim-selection-v10', 'reviewed-claim-selection-v11', 'reviewed-claim-selection-v12', 'reviewed-claim-selection-v13', 'reviewed-claim-selection-v14', 'reviewed-claim-selection-v15', 'reviewed-claim-selection-v16', 'fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32')
-    if claim_selection_mode and (template_version != 'investigation-v21' or evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5')
+    if claim_selection_mode and (template_version != 'investigation-v21' or evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6')
                                  or reviewed_operations is None or formula_mode is not None):
         raise ValueError('Unsupported reviewed claim selection options')
     if presentation_mode in ('reviewed-claim-selection-v7', 'reviewed-claim-selection-v8', 'reviewed-claim-selection-v9', 'reviewed-claim-selection-v10', 'reviewed-claim-selection-v11', 'reviewed-claim-selection-v12', 'reviewed-claim-selection-v13', 'reviewed-claim-selection-v14', 'reviewed-claim-selection-v15', 'reviewed-claim-selection-v16', 'fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32') and reliability_mode != input_budget.VERSION:
@@ -539,7 +539,9 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     reviewed_receipt = None
     if evidence_selection is not None:
         from . import investigation_reviewed_evidence as reviewed_evidence
-        if evidence_selection == 'reviewed-collection-v5':
+        if evidence_selection == 'reviewed-collection-v6':
+            from . import investigation_reviewed_collection_v6 as reviewed_selector
+        elif evidence_selection == 'reviewed-collection-v5':
             from . import investigation_reviewed_collection_v5 as reviewed_selector
         elif evidence_selection == 'reviewed-collection-v4':
             from . import investigation_reviewed_collection_v4 as reviewed_selector
@@ -1208,7 +1210,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         prompt_cache.request_is_local.reset(cache_token)
     _privacy()
     retrieval_notices = list(result['missing_evidence'])
-    if evidence_selection in ('reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5'):
+    if evidence_selection in ('reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6'):
         omitted = result['retrieval_trace']['omitted_count']
         retrieval_notices.append(
             f'Bounded selection of current reviewed claims; {omitted} matching claim{"" if omitted == 1 else "s"} omitted. '
@@ -1248,6 +1250,12 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     if template_version in ('investigation-v11', 'investigation-v12', 'investigation-v13', 'investigation-v14', 'investigation-v15', 'investigation-v16', 'investigation-v17', 'investigation-v18', 'investigation-v19', 'investigation-v20', 'investigation-v21'):
         provenance.update({'retrieval_version': result['retrieval_version'], 'retrieval_trace': result['retrieval_trace'],
                            'snippet_trace': snippet_trace, 'answer_coverage': coverage_trace})
+    if evidence_selection == 'reviewed-collection-v6':
+        provenance['reviewed_selection'] = {
+            'version': 'whole-claim-snippet-budget-v1',
+            'selected_claims': len(result['reviewed_claims']),
+            'omitted_claims': result['retrieval_trace']['omitted_count'],
+        }
     if template_version in ('investigation-v12', 'investigation-v13', 'investigation-v14', 'investigation-v15'):
         provenance.update({'answer_part_plan': answer_parts, 'answer_part_plan_origin': 'planned_unreviewed' if answer_parts else None,
                            'answer_part_planner_version': ('evidence-units-v2' if template_version == 'investigation-v15' else 'request-spans-fallback-v1' if template_version in ('investigation-v13', 'investigation-v14') else 'request-spans-v1') if answer_parts else None,

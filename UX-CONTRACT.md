@@ -327,3 +327,20 @@ closed; counts and authority consequences remain outside the bounded path scroll
 Failed scans distinguish their prior successful report. Removed paths cannot be
 reviewed, bounded-result notices remain outside disclosures, and existing direct
 changed-document review keeps the question. No table selection or new UI primitive.
+
+### Whole-statement evidence limits
+
+The guided Company Brain owner passes the qualified v6 evidence option; the raw
+API default and Advanced remain v5. A visible notice distinguishes statements
+supplied to generation from statements actually cited, and reports matching
+statements omitted to stay within limits. It does not imply complete coverage.
+Counts are server provenance, not inferred from suggestion cards. Existing
+source/citation approvals, current-scope revalidation and explicit question
+confirmation remain authoritative. Changing the caller version clears confirmation.
+The native disclosures and complete evidence/original answer remain available.
+
+Automatic grouping respects an explicit source stage and the question's event.
+A generic before-event question cannot alone exclude every numbered Fix step.
+Implementation-before questions, explicit After boundaries, completion stages
+and conditional packets retain their existing guards. Source facts and old saved
+views are unchanged; organization is not independent correctness verification.

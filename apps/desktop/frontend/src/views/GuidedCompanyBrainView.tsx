@@ -59,9 +59,11 @@ function failure(error: unknown): string {
 export function GuidedCompanyBrainView({
   onAdvanced,
   initialQuestion = '',
+  reviewedEvidenceVersion = 'v5',
 }: {
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
+  reviewedEvidenceVersion?: 'v5' | 'v6';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);
@@ -131,6 +133,7 @@ export function GuidedCompanyBrainView({
     parts,
     model,
     activeModel,
+    reviewedEvidenceVersion,
     collections.map((c) => [c.id, c.scan_status, c.last_scan_at]),
     approved.map((c) => [c.id, c.sources.map((s) => [s.citation_id, s.revision_id])]),
   ]);
@@ -225,6 +228,10 @@ export function GuidedCompanyBrainView({
   useEffect(() => {
     setConfirmation('');
   }, [health.hasChecked, health.sidecarUp, health.modelLoaded, health.activeModelId]);
+  useEffect(() => {
+    setConfirmation('');
+    setAnswer(null);
+  }, [reviewedEvidenceVersion]);
   useEffect(() => {
     if (!saved || touched.current) return;
     const ticket = ++epoch.current;
@@ -441,6 +448,7 @@ export function GuidedCompanyBrainView({
         pilot_confirmed: true,
         question_parts: parts.map((p) => p.trim()),
         question_parts_confirmed: true,
+        ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
       });
       if (!current(ticket)) return;
       setAnswer(result);
@@ -1091,6 +1099,21 @@ export function GuidedCompanyBrainView({
               aria-label="Your answer"
             >
               <h2 className="font-serif text-xl">3. Read the answer</h2>
+              {!!answer.provenance?.reviewed_selection?.omitted_claims && (
+                <p role="status" className="rounded-md border border-border p-3 text-sm">
+                  {answer.provenance.reviewed_selection.selected_claims} reviewed statement
+                  {answer.provenance.reviewed_selection.selected_claims === 1
+                    ? ' was'
+                    : 's were'}{' '}
+                  supplied to this answer. {answer.provenance.reviewed_selection.omitted_claims}{' '}
+                  other matching statement
+                  {answer.provenance.reviewed_selection.omitted_claims === 1
+                    ? ' was'
+                    : 's were'}{' '}
+                  left out to stay within the evidence limit. It may not cover every relevant
+                  source.
+                </p>
+              )}
               <p className="text-sm font-medium">{answer.issue}</p>
               <p className="text-xs text-muted-foreground">
                 Draft for review. A supported status is a model claim, not verified correctness.

@@ -833,7 +833,7 @@ export const localApi = {
     }, 360_000).then(handleResponse<Investigation>);
   },
 
-  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true; organize_answer?: boolean }): Promise<Investigation> {
+  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true; organize_answer?: boolean; reviewed_evidence_version?: 'v5' | 'v6' }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/ask-reviewed`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, organize_answer: input.organize_answer ?? true }),
     }, 360_000).then(handleResponse<Investigation>);

@@ -294,3 +294,37 @@ def test_saved_stage_guard_rejects_temporally_inverted_assignment():
     result = view.compile_shared(QUESTION, answer, evidence, {'titles':topics,'groups':[1,2,0]},
         approved_titles=topics, respect_stages=True)
     assert result['sections'][-1]['blocks'][0]['snippet_ids'] == ['S2']
+
+
+def test_generic_before_sending_keeps_numbered_setup_checklist_available_to_both_parts():
+    topics = ['Source context', 'What should a setup call cover before the store is sending?',
+              'What outcome should be recorded?']
+    rows = [{'quote': text} for text in [
+        '**Fix.**',
+        '1. Every call checks the sender, enables the embed and sends a test email.',
+        '2. Record whether sending works and note any blocker.',
+    ]]
+    options = view._assignment_options(topics, rows, [[0], [1], [2]])
+    assert 'P1' in options['r1'] and 'P1+P2' in options['r1']
+    assert 'P1+P2' in options['r2']
+    answer, evidence, _ = fixture()
+    answer['source_excerpts'] = [{'snippet_id': f'S{i}', 'citation_id': 'claim:one', 'quote': row['quote']}
+                                 for i, row in enumerate(rows)]
+    answer['snippet_ids'] = [r['snippet_id'] for r in answer['source_excerpts']]
+    evidence[0]['content'] = '\n\n'.join(row['quote'] for row in rows)
+    output = view.compile_shared(QUESTION, answer, evidence,
+        {'titles': topics, 'groups': [0, 3, 2]}, approved_titles=topics, respect_stages=True)
+    blocks = [b for section in output['sections'] for b in section['blocks']]
+    assert {sid for b in blocks for sid in b['snippet_ids']} == {'S0', 'S1', 'S2'}
+    assert output['original_text'] == answer['text']
+    assert output['original_snippet_ids'] == answer['snippet_ids']
+    assert 'S1' in output['sections'][0]['blocks'][0]['snippet_ids']
+    assert all(row['quote'] in evidence[0]['content'] for row in rows)
+
+
+def test_separate_after_boundary_keeps_later_steps_out_of_before_question():
+    topics = ['Source context', 'What happens before approval?', 'What happens after?']
+    rows = [{'quote': text} for text in ['**Fix.**', 'After approval:', '1. Send the message.']]
+    options = view._assignment_options(topics, rows, [[0], [1], [2]])
+    assert all('P1' not in key for key in options['r2'])
+    assert 'P2' in options['r2']
