@@ -344,3 +344,22 @@ A generic before-event question cannot alone exclude every numbered Fix step.
 Implementation-before questions, explicit After boundaries, completion stages
 and conditional packets retain their existing guards. Source facts and old saved
 views are unchanged; organization is not independent correctness verification.
+## Guided coverage review
+
+`QuestionPartsEditor` owns both the existing manual editor and its guided
+`reviewFirst` variant. Guided setup displays a literal ordered list by default;
+editing and adding parts are optional. `questionPartSuggestions` proposes only
+original substrings, preserving separators. Conditional, quoted, negative,
+multiline or otherwise uncertain requests stay whole. Bounds are never bypassed
+by clipping or automatic splitting. Suggestions are review aids with unverified
+coverage, not source authority or model-verified planning.
+
+The original question remains visible and unchanged. Editing, keeping it whole,
+restoring suggestions, scope/model/source changes and errors invalidate explicit
+confirmation. No proposal or review control dispatches inference or approves a
+source. Edited parts survive failed setup/scan/same-scope refresh requests;
+intentional question/scope changes clear stale parts. The shared editor retains
+Hearth controls, native fields/checkbox, error/disabled states and keyboard access.
+Existing Advanced investigations keep the manual default. Frontend simulation
+checks and deterministic setup qualification do not establish native answer
+quality, owner acceptance or human review time.

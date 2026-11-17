@@ -13,6 +13,7 @@ import {
 } from '@/components/investigations/controls';
 import { localApi } from '@/lib/localApi';
 import { ipc } from '@/lib/ipc';
+import { suggestQuestionParts } from '@/lib/questionPartSuggestions';
 import { useHealth } from '@/hooks/useHealth';
 import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceStore';
 import { useModelStore } from '@/stores/modelStore';
@@ -102,6 +103,7 @@ export function GuidedCompanyBrainView({
   const epoch = useRef(0);
   const lock = useRef(false);
   const touched = useRef(false);
+  const partsEdited = useRef(false);
   const recentTicket = useRef(0);
   const confirmSection = useRef<HTMLElement>(null);
   const sourceCard = useRef<HTMLElement>(null);
@@ -161,14 +163,17 @@ export function GuidedCompanyBrainView({
     touched.current = true;
     useCompanyBrainWorkspaceStore.setState((s) => ({ revision: s.revision + 1 }));
   }
-  function clearDraft() {
+  function clearDraft(keepParts = false) {
     setConfirmation('');
     setDrafts([]);
     setSuggestionNotes([]);
     setSuggestionIncomplete(false);
     setPrepared(false);
     setContinueReviewed(false);
-    setParts([]);
+    if (!keepParts) {
+      setParts([]);
+      partsEdited.current = false;
+    }
     setAnswer(null);
   }
   function remember(name: string, selected: string[], slug = model) {
@@ -198,7 +203,7 @@ export function GuidedCompanyBrainView({
       await action(ticket);
     } catch (e) {
       if (current(ticket)) {
-        clearDraft();
+        clearDraft(true);
         setApproved([]);
         setError(failure(e));
         // A timed-out write may have committed; refresh inventory without repeating it.
@@ -286,7 +291,7 @@ export function GuidedCompanyBrainView({
 
   async function openWorkspace() {
     protect();
-    clearDraft();
+    clearDraft(true);
     recentTicket.current++;
     setRecentLoading(false);
     setRecent([]);
@@ -304,6 +309,11 @@ export function GuidedCompanyBrainView({
         saved?.workspace === name
           ? saved.collectionIds.filter((id) => data.collections.some((c) => c.id === id))
           : [];
+      if (
+        name !== loaded ||
+        JSON.stringify([...selected].sort()) !== JSON.stringify([...ids].sort())
+      )
+        clearDraft();
       setLoaded(name);
       setCollections(data.collections);
       setIds(selected);
@@ -312,7 +322,7 @@ export function GuidedCompanyBrainView({
     });
   }
   async function prepare() {
-    clearDraft();
+    clearDraft(true);
     await run('Finding source drafts…', async (ticket) => {
       const [draft, knowledge] = await Promise.all([
         localApi.pilotSetupDrafts({
@@ -333,7 +343,7 @@ export function GuidedCompanyBrainView({
           : []),
       ]);
       setSuggestionIncomplete(draft.truncated || omitted.length > 0);
-      setParts(draft.question_parts.parts);
+      if (!partsEdited.current) setParts(suggestQuestionParts(question).parts);
       setPrepared(true);
       setNotice('Review the suggested documents below. No source was saved or approved.');
     });
@@ -396,7 +406,7 @@ export function GuidedCompanyBrainView({
     });
   }
   async function scan(collection: SourceCollection) {
-    clearDraft();
+    clearDraft(true);
     recentTicket.current++;
     setRecentLoading(false);
     setRecent([]);
@@ -446,7 +456,7 @@ export function GuidedCompanyBrainView({
         question: question.trim(),
         model_slug: model,
         pilot_confirmed: true,
-        question_parts: parts.map((p) => p.trim()),
+        question_parts: parts,
         question_parts_confirmed: true,
         ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
       });
@@ -1066,11 +1076,30 @@ export function GuidedCompanyBrainView({
                 Review all requested parts and shared conditions.
               </p>
               <QuestionPartsEditor
+                reviewFirst
+                note={
+                  partsEdited.current
+                    ? 'These parts include your changes. Compare them with the original question before confirming.'
+                    : suggestQuestionParts(question).note
+                }
                 parts={parts}
                 confirmed={confirmation === binding}
                 disabled={!!busy}
                 onChange={(next) => {
+                  partsEdited.current = true;
                   setParts(next);
+                  setConfirmation('');
+                  setAnswer(null);
+                }}
+                onUseWholeQuestion={() => {
+                  partsEdited.current = true;
+                  setParts([question]);
+                  setConfirmation('');
+                  setAnswer(null);
+                }}
+                onRestoreSuggestions={() => {
+                  partsEdited.current = false;
+                  setParts(suggestQuestionParts(question).parts);
                   setConfirmation('');
                   setAnswer(null);
                 }}

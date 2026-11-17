@@ -179,6 +179,92 @@ beforeEach(() => {
   api.scanPilotCollection.mockResolvedValue(report);
 });
 describe('guided Company Brain', () => {
+  it('proposes a compound question without manual part edits and sends the unchanged original only after review', async () => {
+    approved = [claim];
+    mount();
+    await screen.findByRole('checkbox', { name: /Docs/ });
+    const original = 'What caused the import failure, and what recovery was implemented?';
+    fireEvent.change(screen.getByLabelText('Your question'), { target: { value: original } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review sources for this question' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Continue with current/ }));
+    expect(screen.queryByLabelText('Part 1')).not.toBeInTheDocument();
+    expect(screen.getByText('and what recovery was implemented?')).toBeVisible();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
+    await screen.findByRole('region', { name: 'Your answer' });
+    expect(api.askReviewedPilot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: original,
+        question_parts: ['What caused the import failure,', ' and what recovery was implemented?'],
+        question_parts_confirmed: true,
+      }),
+    );
+  });
+  it('requires confirmation again after keeping a compound question whole or restoring suggestions', async () => {
+    approved = [claim];
+    mount();
+    await screen.findByRole('checkbox', { name: /Docs/ });
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'What changed, and what remains?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review sources for this question' }));
+    await screen.findByRole('button', { name: /Continue with current/ });
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Keep as one question' }));
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('region', { name: 'Confirm question' })).getByText(
+        'What changed, and what remains?',
+      ),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore suggestions' }));
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('preserves edited parts across a source setup failure and retry but clears confirmation', async () => {
+    approved = [claim];
+    mount();
+    await question();
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit question parts' }));
+    fireEvent.change(screen.getByLabelText('Part 1'), {
+      target: { value: 'Who approves an exception?' },
+    });
+    api.pilotSetupDrafts.mockRejectedValueOnce(new Error('source unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: 'Review sources for this question' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Your question')).toHaveValue('Who approves?');
+    fireEvent.click(screen.getByRole('button', { name: 'Review sources for this question' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Continue with current/ }));
+    expect(screen.getByText('Who approves an exception?')).toBeVisible();
+    expect(
+      screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }),
+    ).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('keeps edited parts after a failed scan while requiring new source preparation and confirmation', async () => {
+    approved = [claim];
+    mount();
+    await question();
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit question parts' }));
+    fireEvent.change(screen.getByLabelText('Part 1'), {
+      target: { value: 'Who approves the documented exception?' },
+    });
+    fireEvent.click(screen.getByText(/Workspace and folders/));
+    api.scanPilotCollection.mockRejectedValueOnce(new Error('scan failed'));
+    fireEvent.click(screen.getByRole('button', { name: 'Scan Docs' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Review sources for this question' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Continue with current/ }));
+    expect(screen.getByText('Who approves the documented exception?')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
   it('opts into whole-statement packing only when explicitly selected', async () => {
     approved = [claim];
     mount('v6');
@@ -471,6 +557,7 @@ describe('guided Company Brain', () => {
     expect(screen.getByRole('button', { name: 'Already reviewed' })).toBeDisabled();
     await confirm();
     expect(screen.getByRole('button', { name: 'Get answer' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit question parts' }));
     fireEvent.change(screen.getByLabelText('Part 1'), {
       target: { value: 'Who approves an incident?' },
     });

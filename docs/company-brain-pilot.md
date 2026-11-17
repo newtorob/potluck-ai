@@ -289,3 +289,20 @@ Review-effort pilots record approvals/reuse, manual part edits, source text
 presented, API wait and native generation time separately. Assistant wall spans
 include tool and inspection delays; they are not active human minutes. These
 measurements do not establish customer usefulness or time saved.
+## Guided question setup
+
+Type the complete question once and choose **Review sources for this question**.
+After source review, **What the answer should cover** shows literal suggested
+parts. Review the list and confirm it; editing or adding parts is optional.
+**Edit question parts**, **Keep as one question** and **Restore suggestions**
+let you adjust the list without retyping the original question. Each adjustment
+clears confirmation. Sources still require explicit approval before answering.
+
+Suggestions separate simple explicit question clauses without a model call or
+paraphrasing. Ambiguous wording, quotes, lists, conditions and exceptions stay
+together as one question. The original wording and separators remain intact;
+coverage is still unverified. The existing six-part/500-character bounds apply.
+Question-part edits survive recoverable source preparation, scan and same-scope
+workspace refresh failures. A changed question or folder scope requires fresh
+setup. This frontend workflow does not change backend selection, model routing,
+saved answer text, citations, source freshness or authority checks.
