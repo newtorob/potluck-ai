@@ -61,10 +61,12 @@ export function GuidedCompanyBrainView({
   onAdvanced,
   initialQuestion = '',
   reviewedEvidenceVersion = 'v5',
+  reviewedAnswerVersion = 'v32',
 }: {
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
   reviewedEvidenceVersion?: 'v5' | 'v6';
+  reviewedAnswerVersion?: 'v32' | 'v33';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);
@@ -136,6 +138,7 @@ export function GuidedCompanyBrainView({
     model,
     activeModel,
     reviewedEvidenceVersion,
+    reviewedAnswerVersion,
     collections.map((c) => [c.id, c.scan_status, c.last_scan_at]),
     approved.map((c) => [c.id, c.sources.map((s) => [s.citation_id, s.revision_id])]),
   ]);
@@ -236,7 +239,7 @@ export function GuidedCompanyBrainView({
   useEffect(() => {
     setConfirmation('');
     setAnswer(null);
-  }, [reviewedEvidenceVersion]);
+  }, [reviewedEvidenceVersion, reviewedAnswerVersion]);
   useEffect(() => {
     if (!saved || touched.current) return;
     const ticket = ++epoch.current;
@@ -459,6 +462,7 @@ export function GuidedCompanyBrainView({
         question_parts: parts,
         question_parts_confirmed: true,
         ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
+        ...(reviewedAnswerVersion === 'v33' ? { reviewed_answer_version: 'v33' as const } : {}),
       });
       if (!current(ticket)) return;
       setAnswer(result);

@@ -210,13 +210,17 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
         }
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v6'}, headers=headers).status_code == 200
         assert calls[-1][1]['evidence_selection'] == 'reviewed-collection-v6'
+        assert client.post(path, json={**body, 'reviewed_answer_version': 'v33'}, headers=headers).status_code == 200
+        assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v33'
+        assert client.post(path, json={**body, 'reviewed_answer_version': 'v34'}, headers=headers).status_code == 422
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7'}, headers=headers).status_code == 422
 
 
 
 @pytest.mark.parametrize('organize', [False, True])
 @pytest.mark.parametrize('evidence_version', ['v5', 'v6'])
-def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize, evidence_version):
+@pytest.mark.parametrize('answer_version', ['v32', 'v33'])
+def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize, evidence_version, answer_version):
     import json
     from copy import deepcopy
     import test_investigation_fixed_part_answers_service as shared
@@ -247,14 +251,14 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
             question=shared.QUESTION, model_slug='model', pilot_confirmed=True,
             question_parts=['What is required for access?', 'What exact expiry is stated?'],
             question_parts_confirmed=True, organize_answer=organize,
-            reviewed_evidence_version=evidence_version)
+            reviewed_evidence_version=evidence_version, reviewed_answer_version=answer_version)
         item = await pilot.ask_reviewed(body)
         assert item['provenance']['evidence_selection']['version'] == f'reviewed-collection-{evidence_version}'
         assert len(runtime.calls) == 2 + int(organize), (item['brief']['answers'][0].get('status'), item['brief']['answers'][0].get('passage_presentation', {}).get('version'), item['provenance'].get('automatic_answer_outlines'))
         assert bool(item.get('answer_outlines')) is organize, item['provenance'].get('automatic_answer_outlines')
         assert all(options['max_tokens'] == 256 for _, options in runtime.calls[:2])
         if organize: assert runtime.calls[-1][1]['max_tokens'] == 768
-        assert item['provenance']['presentation_mode'] == 'fixed-part-selection-v32'
+        assert item['provenance']['presentation_mode'] == f'fixed-part-selection-{answer_version}'
         assert item['provenance']['question_part_plan']['origin'] == 'reviewer_supplied'
         assert (await inv.get_investigation(scope, item['id']))['brief'] == item['brief']
         reviewed = await inv.review_investigation(
@@ -276,7 +280,7 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
         with sqlite3.connect(path) as db:
             assert db.execute('SELECT COUNT(*) FROM investigations').fetchone()[0] == 1
             contract = json.loads(db.execute('SELECT question_part_contract FROM investigations').fetchone()[0])
-        assert contract['version'] == 'fixed-part-selection-v32'
+        assert contract['version'] == f'fixed-part-selection-{answer_version}'
     asyncio.run(run())
 
 

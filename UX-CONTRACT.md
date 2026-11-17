@@ -363,3 +363,17 @@ Hearth controls, native fields/checkbox, error/disabled states and keyboard acce
 Existing Advanced investigations keep the manual default. Frontend simulation
 checks and deterministic setup qualification do not establish native answer
 quality, owner acceptance or human review time.
+
+### Observation scope in guided answers
+
+The Company Brain desktop entry explicitly selects qualified reviewed-answer
+V33. Direct guided callers can retain V32, and the raw API and Advanced defaults
+remain unchanged. The requested version is bound to question confirmation;
+changing it invalidates that confirmation. No source approval or runtime load
+is implied. V33 keeps the existing wire, evidence, budget and citation checks,
+with instructions to distinguish reported or observed events from an actual
+total when observation is incomplete. Explicit facts can still be supported;
+missing requested facts are unknown within the selected reviewed statements.
+This is model-assisted selection, not a correctness guarantee. Saved V32 records
+and verdicts are not rewritten. Readable answers, original drafts, complete
+evidence, corrections and exports retain their existing ownership and guards.

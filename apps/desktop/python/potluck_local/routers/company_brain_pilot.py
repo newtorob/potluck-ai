@@ -82,6 +82,7 @@ class AskReviewed(Scope):
     question_parts_confirmed: StrictBool
     organize_answer: StrictBool = False
     reviewed_evidence_version: Literal['v5', 'v6'] = 'v5'
+    reviewed_answer_version: Literal['v32', 'v33'] = 'v32'
 
 def _pilot_error(exc: Exception) -> HTTPException:
     messages = {
@@ -291,7 +292,7 @@ async def ask_reviewed(body: AskReviewed) -> dict[str, Any]:
             generation_profile='qwen3.8-27b-native-non-thinking', seed=7,
             reviewed_operations=[{'request': body.question, 'operation': 'answer'}],
             prompt_encoding='compact-calculation-v1', reliability_mode='bounded-evidence-v1',
-            presentation_mode='fixed-part-selection-v32',
+            presentation_mode=f'fixed-part-selection-{body.reviewed_answer_version}',
             evidence_selection=f'reviewed-collection-{body.reviewed_evidence_version}', question_part_plan=plan,
             **({'organize_answer': True} if body.organize_answer else {})))
     except (ValueError, PermissionError, LookupError) as exc:

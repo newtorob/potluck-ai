@@ -39,9 +39,11 @@ Inspect the answer, cited excerpts, retrieval limits and original draft. Use **A
 
 ## Fixed-part review API
 
-`POST /company-brain/pilot/ask-reviewed` explicitly selects
-`fixed-part-selection-v32`. The existing desktop controls and `/ask` route keep
-their previous defaults. This separate route accepts the same exact workspace,
+`POST /company-brain/pilot/ask-reviewed` defaults to
+`fixed-part-selection-v32`. Callers can explicitly select the qualified V33
+observation-scope review with `reviewed_answer_version: "v33"`. The guided
+Company Brain desktop entry selects V33; Advanced and `/ask` retain their
+previous defaults. This separate route accepts the same exact workspace,
 collection IDs, loaded model ID and question, plus:
 
 ```json
@@ -59,8 +61,14 @@ origin and `coverage: not_verified`; confirmation does not prove completeness
 or approve knowledge. Authentication, privacy and current-source checks apply.
 The desktop question-parts editor uses this same explicit API integration.
 
-The route fixes the native profile, seed, approved-collection retrieval and V32
-contract. The service makes two bounded 256-token model calls, preserves both
+The route fixes the native profile, seed and approved-collection retrieval.
+V33 keeps the V32 wire contract and adds review instructions to distinguish
+known or observed events from an actual total when observation is incomplete.
+A complete explicit count or scoped negative can still support an answer.
+Missing requested facts remain unknown within the selected reviewed statements;
+this instruction is not an independent correctness check. Older saved answers
+keep their original version and verdict. The service makes two bounded
+256-token model calls, preserves both
 actual replies and replays their source/plan bindings on save and read. It does
 not load a model or retry. Approved source-unit plans are used when present;
 otherwise a reviewed statement remains one whole source unit. No source-unit
@@ -73,7 +81,7 @@ Use a separate data directory and a non-8321 loopback port for an isolated pilot
 
 ## Readable fixed-part answers
 
-V32 answers have a deterministic readable view in the desktop and Markdown export.
+V32 and V33 answers have a deterministic readable view in the desktop and Markdown export.
 Identical leading paragraphs from the same source revision are shown once, with
 the evidence groups they apply to. Standalone table rows become labelled fields
 only when the exact row has unambiguous headers in its cited source. Missing or

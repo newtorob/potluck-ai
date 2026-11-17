@@ -128,7 +128,7 @@ export function ReviewedPassageAnswer({
   const presentation = answer.passage_presentation;
   if (!presentation) return <AnswerMarkdown text={answer.text} />;
   const display =
-    presentation.version === 'fixed-part-selection-v32' &&
+    (presentation.version === 'fixed-part-selection-v32' || presentation.version === 'fixed-part-selection-v33') &&
     readable?.version === 'readable-source-groups-v1' &&
     readable.original_text === answer.text &&
     readable.original_status === answer.status &&

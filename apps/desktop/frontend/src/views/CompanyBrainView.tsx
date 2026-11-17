@@ -6,8 +6,10 @@ import { investigationButton as button } from '@/components/investigations/contr
 
 export function CompanyBrainView({
   reviewedEvidenceVersion = 'v6',
+  reviewedAnswerVersion = 'v33',
 }: {
   reviewedEvidenceVersion?: 'v5' | 'v6';
+  reviewedAnswerVersion?: 'v32' | 'v33';
 } = {}) {
   const [params, setParams] = useSearchParams();
   const [handoff, setHandoff] = useState<{ question: string; answerId?: string }>({ question: '' });
@@ -30,6 +32,7 @@ export function CompanyBrainView({
   return (
     <GuidedCompanyBrainView
       reviewedEvidenceVersion={reviewedEvidenceVersion}
+      reviewedAnswerVersion={reviewedAnswerVersion}
       initialQuestion={handoff.question}
       onAdvanced={(question, answerId) => {
         setHandoff(answerId ? { question, answerId } : { question });
