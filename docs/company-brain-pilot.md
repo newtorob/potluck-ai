@@ -244,3 +244,24 @@ conditions, exceptions and citations. A rank never grants approval or restricts
 answers to suggested documents: answers use all current approved statements in
 the selected folders. The API's omitted-version default and Advanced source setup
 retain the legacy suggestion method; answer retrieval and model settings are unchanged.
+
+## Desktop setup and scan reports
+
+The guided workspace keeps engine connection, selected folders and loaded model
+status visible above the question. Connection checks use GET `/health` only.
+Retry never loads a model, scans sources, approves knowledge or runs inference.
+Startup restoration is shown as pending or failed rather than as a loaded model.
+Source review works without a loaded model; answers require the current connected
+model to match the explicit selection. A connection/model change clears question
+confirmation. The server still enforces the supported native profile and freshness.
+
+Folders need a successful scan within the existing 24-hour source snapshot window.
+The frontend provides early guidance; server validation is final. Document-change
+paths start collapsed in a bounded scroll area. Last-successful scan totals and
+revoked-statement/cleared-answer counts remain visible. Failed scans label the prior
+report, removed paths have no review action, and bounded-report notices stay visible.
+Opening setup or expanding paths does not scan, approve, infer or change scope.
+
+The full supplied-evidence drawer preserves string values verbatim. Other JSON
+values remain inspectable as JSON rather than displaying object coercion labels;
+this changes no source bindings, answer generation or authority.

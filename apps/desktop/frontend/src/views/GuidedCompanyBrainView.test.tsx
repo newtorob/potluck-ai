@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   scanPilotCollection: vi.fn(),
   registerPilotCollection: vi.fn(),
   fetchModels: vi.fn().mockResolvedValue(undefined),
+  health: vi.fn(),
 }));
 vi.mock('@/lib/localApi', () => ({ localApi: api }));
 vi.mock('@/lib/ipc', () => ({ ipc: { selectDirectory: api.selectDirectory } }));
@@ -72,7 +73,7 @@ const report = {
   chunks_inserted: 1,
   invalidated_answers: 1,
   revoked_claims: 1,
-  scanned_at: '2026-11-16T12:00:00Z',
+  scanned_at: new Date().toISOString(),
   changes: [{ relative_path: 'policy.md', change: 'updated' as const }],
   changes_truncated: false,
 };
@@ -146,6 +147,7 @@ beforeEach(() => {
   api.sourceCollections.mockResolvedValue({ collections: [collection] });
   api.investigations.mockResolvedValue({ investigations: [] });
   api.fetchModels.mockResolvedValue(undefined);
+  api.health.mockResolvedValue({ model_loaded: true, active_model_id: 'loaded-model' });
   api.pilotSetupDrafts.mockResolvedValue({
     version: 'pilot-setup-drafts-v1',
     question: 'Who approves?',
@@ -174,6 +176,167 @@ beforeEach(() => {
   api.scanPilotCollection.mockResolvedValue(report);
 });
 describe('guided Company Brain', () => {
+  it('keeps literal evidence and citations intact and exposes structured values on reopen without inference', async () => {
+    const text = 'Approval required unless incident response applies.';
+    const savedAnswer = {
+      ...result,
+      evidence: [
+        {
+          citation_id: 'source:exact:rev1',
+          content: text,
+          sources: [
+            {
+              relative_path: 'policy.md',
+              heading: 'Conditions',
+              content: { prerequisite: 'owner approval', exception: 'incident response' },
+            },
+          ],
+        },
+      ],
+    };
+    api.investigations.mockResolvedValue({ investigations: [savedAnswer] });
+    api.investigation.mockResolvedValue(savedAnswer);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Who approves? · draft' }));
+    await screen.findByRole('region', { name: 'Your answer' });
+    fireEvent.click(screen.getByText('Full supplied evidence'));
+    expect(screen.getByText('source:exact:rev1')).toBeVisible();
+    expect(screen.getByText(text)).toBeVisible();
+    expect(
+      screen.getByText('{"prerequisite":"owner approval","exception":"incident response"}'),
+    ).toBeVisible();
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+  });
+  it('distinguishes initial connection checking and gives a read-only retry after failure', async () => {
+    let reject!: (error: Error) => void;
+    api.health.mockReturnValueOnce(
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+    );
+    mount();
+    expect(screen.getByRole('heading', { name: 'Checking local engine…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check connection' })).toBeDisabled();
+    reject(new Error('offline'));
+    expect(
+      await screen.findByRole('heading', { name: 'Local engine unavailable' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Ready to review sources' }),
+    ).toBeInTheDocument();
+    expect(api.health).toHaveBeenCalledTimes(2);
+    expect(api.scanPilotCollection).not.toHaveBeenCalled();
+    expect(api.proposePilotClaim).not.toHaveBeenCalled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('keeps source review available without a model but blocks getting an answer', async () => {
+    api.health.mockResolvedValue({ model_loaded: false, active_model_id: null });
+    mount();
+    await question();
+    expect(screen.getByText(/No model loaded. You can review sources now/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve document for answers' }));
+    await screen.findByRole('button', { name: 'Already reviewed' });
+    await confirm();
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('explains failed startup restore without loading or switching a model', async () => {
+    api.health.mockResolvedValue({
+      model_loaded: false,
+      active_model_id: null,
+      model_restore: { status: 'failed', model_id: 'saved-model' },
+    });
+    mount();
+    expect(await screen.findByText(/Startup restore failed/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Open Models' })[0]).toHaveAttribute(
+      'href',
+      '/models',
+    );
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('invalidates question confirmation after connection loss and does not revive it on recovery', async () => {
+    approved = [claim];
+    mount();
+    await question();
+    await confirm();
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeEnabled();
+    api.health.mockRejectedValueOnce(new Error('offline'));
+    fireEvent(document, new Event('visibilitychange'));
+    await screen.findByRole('heading', { name: 'Local engine unavailable' });
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
+    await screen.findByRole('heading', { name: 'Ready to review sources' });
+    expect(
+      screen.getByRole('checkbox', { name: 'I reviewed these question parts.' }),
+    ).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('blocks stale scans and explains the next action in the visible readiness summary', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ ...collection, last_scan_at: '2000-01-01T00:00:00Z' }],
+    });
+    mount();
+    await screen.findByText(/Scan every selected folder successfully. Scans must/);
+    fireEvent.change(screen.getByLabelText('Your question'), { target: { value: 'Question?' } });
+    expect(screen.getByRole('button', { name: 'Review sources for this question' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Set up workspace and folders' }));
+    expect(screen.getByRole('textbox', { name: 'Workspace name' })).toBeVisible();
+    expect(api.pilotSetupDrafts).not.toHaveBeenCalled();
+  });
+  it('collapses paths while retaining failed-scan context, counts and truncation notice', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [
+        {
+          ...collection,
+          scan_status: 'failed',
+          last_scan_report: {
+            ...report,
+            files_removed: 1,
+            changes_truncated: true,
+            changes: [...report.changes, { relative_path: 'removed.md', change: 'removed' }],
+          },
+        },
+      ],
+    });
+    mount();
+    await screen.findByText(/The report below is from its last successful scan/);
+    expect(
+      screen.getByText(/Approved statements revoked: 1. Saved answers cleared: 1/),
+    ).toBeVisible();
+    expect(screen.getByText(/Showing the first 100 changed paths/)).toBeVisible();
+    expect(screen.getByText('Changed documents (2)').closest('details')).not.toHaveAttribute(
+      'open',
+    );
+    fireEvent.click(screen.getByText('Changed documents (2)'));
+    expect(screen.getByRole('button', { name: 'Review policy.md' })).toBeDisabled();
+    expect(screen.getByText('removed: removed.md')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Review removed.md' })).not.toBeInTheDocument();
+  });
+  it('shows an explicit unchanged scan state without an empty path disclosure', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [
+        {
+          ...collection,
+          last_scan_report: {
+            ...report,
+            files_updated: 0,
+            revoked_claims: 0,
+            invalidated_answers: 0,
+            changes: [],
+          },
+        },
+      ],
+    });
+    mount();
+    expect(
+      await screen.findByText('No document changes in the last successful scan.'),
+    ).toBeVisible();
+    expect(screen.queryByText(/Changed documents \(/)).not.toBeInTheDocument();
+  });
   it('makes omitted query words visible even when document search is otherwise complete', async () => {
     api.pilotSetupDrafts.mockResolvedValueOnce({
       version: 'pilot-setup-drafts-v2',
@@ -282,6 +445,7 @@ describe('guided Company Brain', () => {
     fireEvent.change(screen.getByLabelText('Your question'), {
       target: { value: 'Keep this question' },
     });
+    fireEvent.click(screen.getByText('Changed documents (1)'));
     fireEvent.click(screen.getByRole('button', { name: 'Review policy.md' }));
     await screen.findByRole('article', { name: 'Source policy.md' });
     expect(api.pilotSourceDraft).toHaveBeenCalledWith({

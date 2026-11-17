@@ -13,10 +13,17 @@ import {
 } from '@/components/investigations/controls';
 import { localApi } from '@/lib/localApi';
 import { ipc } from '@/lib/ipc';
+import { useHealth } from '@/hooks/useHealth';
 import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceStore';
 import { useModelStore } from '@/stores/modelStore';
 import type { Investigation, SourceCollection } from '@/types/investigations';
 import type { PilotClaim, PilotSourceDraft } from '@/types/companyBrainPilot';
+
+function evidenceText(value: unknown, fallback = ''): string {
+  if (value == null) return fallback;
+  // Preserve normal source text verbatim and keep structured JSON inspectable.
+  return typeof value === 'string' ? value : (JSON.stringify(value) ?? fallback);
+}
 
 function sameSource(claim: PilotClaim, draft: PilotSourceDraft): boolean {
   const preview = draft.preview;
@@ -56,6 +63,7 @@ export function GuidedCompanyBrainView({
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
 }) {
+  const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);
   const activeModel = useModelStore((s) => s.activeModelSlug);
   const fetchModels = useModelStore((s) => s.fetchModels);
@@ -96,12 +104,27 @@ export function GuidedCompanyBrainView({
   const confirmSection = useRef<HTMLElement>(null);
   const sourceCard = useRef<HTMLElement>(null);
   const answerSection = useRef<HTMLElement>(null);
+  const workspaceDetails = useRef<HTMLDetailsElement>(null);
   const scope = { workspace: loaded, collection_ids: ids };
   const scopeKey = JSON.stringify([loaded, [...ids].sort()]);
   const ready =
     loaded === workspace.trim() &&
     ids.length > 0 &&
-    ids.every((id) => collections.some((c) => c.id === id && c.scan_status === 'ready'));
+    ids.every((id) =>
+      collections.some((c) => {
+        if (c.id !== id || c.scan_status !== 'ready' || !c.last_scan_at) return false;
+        // Match the source snapshot's 24-hour bound; the server rechecks freshness.
+        const age = Date.now() - Date.parse(c.last_scan_at);
+        return age >= 0 && age <= 24 * 60 * 60 * 1000;
+      }),
+    );
+  const connected = health.hasChecked && health.sidecarUp;
+  const selectedModelLoaded =
+    connected &&
+    health.modelLoaded &&
+    !!model &&
+    model === activeModel &&
+    model === health.activeModelId;
   const binding = JSON.stringify([
     scopeKey,
     question,
@@ -119,10 +142,16 @@ export function GuidedCompanyBrainView({
     !truncated &&
     !!model &&
     model === activeModel &&
+    selectedModelLoaded &&
     !questionPartsError(parts) &&
     confirmation === binding;
   function current(ticket: number) {
     return alive.current && epoch.current === ticket;
+  }
+  function showWorkspace() {
+    if (!workspaceDetails.current) return;
+    workspaceDetails.current.open = true;
+    workspaceDetails.current.querySelector('summary')?.focus();
   }
   function protect() {
     if (touched.current) return;
@@ -193,6 +222,9 @@ export function GuidedCompanyBrainView({
       epoch.current++;
     };
   }, []);
+  useEffect(() => {
+    setConfirmation('');
+  }, [health.hasChecked, health.sidecarUp, health.modelLoaded, health.activeModelId]);
   useEffect(() => {
     if (!saved || touched.current) return;
     const ticket = ++epoch.current;
@@ -463,7 +495,84 @@ export function GuidedCompanyBrainView({
           <div className="min-h-6 text-sm" role="status">
             {busy || notice}
           </div>
+          <section
+            className="space-y-3 rounded-lg border border-border bg-card p-4"
+            aria-label="Workspace readiness"
+          >
+            <h2 className="font-serif text-xl">
+              {!health.hasChecked
+                ? 'Checking local engine…'
+                : !connected
+                  ? 'Local engine unavailable'
+                  : ready
+                    ? 'Ready to review sources'
+                    : 'Finish workspace setup'}
+            </h2>
+            <dl className="space-y-2 text-sm">
+              <div>
+                <dt className="inline font-medium">Engine: </dt>
+                <dd className="inline">
+                  {!health.hasChecked
+                    ? 'Checking connection.'
+                    : connected
+                      ? 'Connected.'
+                      : 'Not connected. Start or reopen Potluck, then check the connection.'}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">Folders: </dt>
+                <dd className="inline">
+                  {!loaded
+                    ? 'Open a workspace to see its folders.'
+                    : !ids.length
+                      ? 'Add or select a document folder.'
+                      : !ready
+                        ? 'Scan every selected folder successfully. Scans must be less than 24 hours old.'
+                        : `${ids.length} selected; recent scans available.`}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">Model: </dt>
+                <dd className="inline">
+                  {!connected
+                    ? 'Waiting for the engine check.'
+                    : health.modelRestore?.status === 'loading'
+                      ? `Restoring ${health.modelRestore.model_id ?? 'the saved model'}…`
+                      : health.modelRestore?.status === 'failed' && !health.modelLoaded
+                        ? 'Startup restore failed. Open Models to check or load the model.'
+                        : !health.modelLoaded
+                          ? 'No model loaded. You can review sources now; load a model before asking for an answer.'
+                          : selectedModelLoaded
+                            ? `Loaded: ${health.activeModelId}.`
+                            : `Loaded: ${health.activeModelId ?? 'unknown'}. Choose this model in Workspace and folders, or refresh the workspace to update the choices.`}
+                </dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap gap-2">
+              {!connected && (
+                <button
+                  className={button}
+                  disabled={!!busy || !health.hasChecked}
+                  onClick={health.refresh}
+                >
+                  Check connection
+                </button>
+              )}
+              <button className={button} disabled={!!busy} onClick={showWorkspace}>
+                {ready ? 'Edit workspace and folders' : 'Set up workspace and folders'}
+              </button>
+              <Link to="/models" className={button}>
+                Open Models
+              </Link>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Source review does not need a model. Answers require the supported Qwen3.8 27B native
+              profile, checked again when asking. Nothing is loaded, scanned or approved
+              automatically here.
+            </p>
+          </section>
           <details
+            ref={workspaceDetails}
             open={!loaded || !collections.length}
             className="rounded-lg border border-border bg-card p-4"
           >
@@ -671,6 +780,12 @@ export function GuidedCompanyBrainView({
                     </div>
                     {c.last_scan_report && (
                       <>
+                        {c.scan_status !== 'ready' && (
+                          <p className="text-sm">
+                            This folder needs a successful scan. The report below is from its last
+                            successful scan.
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           Last successful scan: {c.last_scan_report.files_updated} updated or
                           reindexed, {c.last_scan_report.files_added} added,{' '}
@@ -678,25 +793,40 @@ export function GuidedCompanyBrainView({
                           {c.last_scan_report.revoked_claims}. Saved answers cleared:{' '}
                           {c.last_scan_report.invalidated_answers}.
                         </p>
-                        {c.last_scan_report.changes.map((change, index) => (
-                          <div
-                            key={index}
-                            className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                          >
-                            <span className="break-all">
-                              {change.change}: {change.relative_path}
-                            </span>
-                            {change.change !== 'removed' && (
-                              <button
-                                className={button}
-                                disabled={!!busy || !ready}
-                                onClick={() => void changedDocument(c.id, change.relative_path)}
-                              >
-                                Review {change.relative_path}
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                        {c.last_scan_report.changes.length > 0 ? (
+                          <details>
+                            <summary className="cursor-pointer text-sm hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+                              Changed documents ({c.last_scan_report.changes.length})
+                            </summary>
+                            <div className="mt-3 max-h-80 space-y-3 overflow-y-auto">
+                              {c.last_scan_report.changes.map((change, index) => (
+                                <div
+                                  key={index}
+                                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                                >
+                                  <span className="break-all">
+                                    {change.change}: {change.relative_path}
+                                  </span>
+                                  {change.change !== 'removed' && (
+                                    <button
+                                      className={button}
+                                      disabled={!!busy || !ready}
+                                      onClick={() =>
+                                        void changedDocument(c.id, change.relative_path)
+                                      }
+                                    >
+                                      Review {change.relative_path}
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No document changes in the last successful scan.
+                          </p>
+                        )}
                         {c.last_scan_report.changes_truncated && (
                           <p className="text-xs text-muted-foreground">
                             Showing the first 100 changed paths. Use Advanced investigations for the
@@ -736,7 +866,7 @@ export function GuidedCompanyBrainView({
             )}
             <button
               className={button}
-              disabled={!!busy || !ready || !question.trim()}
+              disabled={!!busy || !connected || !ready || !question.trim()}
               onClick={() => void prepare()}
             >
               Review sources for this question
@@ -938,9 +1068,10 @@ export function GuidedCompanyBrainView({
                 }}
                 onConfirm={(yes) => setConfirmation(yes ? binding : '')}
               />
-              {(!model || model !== activeModel) && (
+              {!selectedModelLoaded && (
                 <p className="text-sm text-muted-foreground">
-                  Choose the loaded local model in Workspace and folders before asking.
+                  Check the engine connection and choose the loaded local model in Workspace and
+                  folders before asking. Source review stays available without a loaded model.
                 </p>
               )}
               <button
@@ -993,16 +1124,16 @@ export function GuidedCompanyBrainView({
                 {answer.evidence.map((e, i) => (
                   <div key={i} className="mt-3 space-y-2">
                     <p className="break-all text-xs text-muted-foreground">
-                      {String(e.citation_id ?? 'Source')}
+                      {evidenceText(e.citation_id, 'Source')}
                     </p>
-                    <AnswerMarkdown text={String(e.content ?? '')} />
+                    <AnswerMarkdown text={evidenceText(e.content)} />
                     {Array.isArray(e.sources) &&
                       e.sources.map((s: Record<string, unknown>, j: number) => (
                         <div key={j} className="mt-2 border-l border-border pl-3">
                           <p className="text-xs">
-                            {String(s.relative_path ?? '')} · {String(s.heading ?? '')}
+                            {evidenceText(s.relative_path)} · {evidenceText(s.heading)}
                           </p>
-                          <AnswerMarkdown text={String(s.content ?? '')} />
+                          <AnswerMarkdown text={evidenceText(s.content)} />
                         </div>
                       ))}
                   </div>

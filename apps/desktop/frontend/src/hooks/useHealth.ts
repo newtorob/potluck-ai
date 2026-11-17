@@ -12,10 +12,14 @@
  * by useModels.
  */
 
-import { useEffect, useState } from 'react';
-import { localApi, type PipelineStatus } from '@/lib/localApi';
+import { useCallback, useEffect, useState } from 'react';
+import { localApi, type HealthResponse, type PipelineStatus } from '@/lib/localApi';
 
 export interface UseHealthReturn {
+  hasChecked: boolean;
+  /** Recheck liveness only; never load a model or run inference. */
+  refresh: () => void;
+  modelRestore: HealthResponse['model_restore'] | null;
   modelLoaded: boolean;
   activeModelId: string | null;
   nCtxLoaded: number | null;
@@ -36,7 +40,9 @@ export interface UseHealthReturn {
 
 const POLL_INTERVAL_MS = 10_000;
 
-const INITIAL_STATE: UseHealthReturn = {
+const INITIAL_STATE: Omit<UseHealthReturn, 'refresh'> = {
+  hasChecked: false,
+  modelRestore: null,
   modelLoaded: false,
   activeModelId: null,
   nCtxLoaded: null,
@@ -47,17 +53,26 @@ const INITIAL_STATE: UseHealthReturn = {
 };
 
 export function useHealth(): UseHealthReturn {
-  const [state, setState] = useState<UseHealthReturn>(INITIAL_STATE);
+  const [state, setState] = useState(INITIAL_STATE);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => {
+    setState((prev) => ({ ...prev, hasChecked: false }));
+    setRefreshKey((key) => key + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    let latest = 0;
 
     async function poll() {
       if (document.hidden) return;
+      const ticket = ++latest;
       try {
         const health = await localApi.health();
-        if (cancelled) return;
+        if (cancelled || ticket !== latest) return;
         setState({
+          hasChecked: true,
+          modelRestore: health.model_restore ?? null,
           modelLoaded: health.model_loaded,
           activeModelId: health.active_model_id,
           // n_ctx_loaded is optional for backwards compat with older backends.
@@ -70,18 +85,16 @@ export function useHealth(): UseHealthReturn {
           // PipelineModeCard only wants the pipeline shape, so keep it null for
           // whole-model. continuousBatch is the cross-cutting flag both paths share.
           loadedPipeline:
-            health.loaded_pipeline?.strategy === 'pipeline'
-              ? health.loaded_pipeline
-              : null,
+            health.loaded_pipeline?.strategy === 'pipeline' ? health.loaded_pipeline : null,
           continuousBatch: health.continuous_batch ?? false,
         });
       } catch {
-        if (cancelled) return;
+        if (cancelled || ticket !== latest) return;
         // Preserve the last known model and pipeline state on a transient
         // error so a single timeout or 5xx doesn't flip PipelineModeCard to
         // 'disabled' and briefly re-enable its Enable button. Only sidecarUp
         // is authoritative from a failed poll - the model didn't unload.
-        setState((prev) => ({ ...prev, sidecarUp: false }));
+        setState((prev) => ({ ...prev, hasChecked: true, sidecarUp: false }));
       }
     }
 
@@ -102,7 +115,7 @@ export function useHealth(): UseHealthReturn {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [refreshKey]);
 
-  return state;
+  return { ...state, refresh };
 }

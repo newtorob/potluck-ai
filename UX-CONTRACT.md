@@ -309,3 +309,21 @@ altering any complete source preview. Incomplete/bounded results are visible and
 never establish absence. Source ranking creates no authority and does not narrow
 the all-approved selected-folder answer scope. Existing details, status and source
 card owners provide explanations; scope changes/errors clear those explanations.
+
+### Guided workspace readiness and compact scan reports
+
+`useHealth` owns engine liveness, explicit read-only retry and startup-restore
+metadata. Initial checking differs from checked unavailable. Older interval/refresh
+responses cannot overwrite newer checks. Failed health retains last-known metadata
+for other desktop consumers; guided answering requires a successful current check.
+The guided setup summary reuses ViewHeader/Hearth/native disclosures and the existing
+Models route. Source review needs connected sources, not a loaded model. Connection
+or active-model changes clear question confirmation; no automatic model action,
+scan, approval or routing change occurs. The source service's 24-hour freshness
+bound is mirrored only for early guidance; it remains the authority.
+
+`GuidedCompanyBrainView` owns document-change disclosures. Native details start
+closed; counts and authority consequences remain outside the bounded path scroller.
+Failed scans distinguish their prior successful report. Removed paths cannot be
+reviewed, bounded-result notices remain outside disclosures, and existing direct
+changed-document review keeps the question. No table selection or new UI primitive.
