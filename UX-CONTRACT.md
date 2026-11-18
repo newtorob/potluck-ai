@@ -381,3 +381,7 @@ missing requested facts are unknown within the selected reviewed statements.
 This is model-assisted selection, not a correctness guarantee. Saved V32 records
 and verdicts are not rewritten. Readable answers, original drafts, complete
 evidence, corrections and exports retain their existing ownership and guards.
+
+## Guided answer reading
+
+Guided `FocusedSourceAnswer` retains supported source context visibly open by default; the user may collapse it. A single-part unknown may use the concise view only after exact request, verdict, source ranges, snippets and original text are bound; declared dependencies or request-wide safeguards prevent this concise layout. All other cases keep the complete existing view. The exact original and scope evidence remain available in a disclosure, and current corrected text takes precedence over a stale prior presentation. Other callers keep the default presentation.

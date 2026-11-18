@@ -317,3 +317,5 @@ Question-part edits survive recoverable source preparation, scan and same-scope
 workspace refresh failures. A changed question or folder scope requires fresh
 setup. This frontend workflow does not change backend selection, model routing,
 saved answer text, citations, source freshness or authority checks.
+
+Guided reading keeps all supported cited context visible by default, including conditions. A narrowly bound single-part unknown can show its scoped verdict and citation first; open **Scope evidence and original answer** for the complete original. Other unknowns retain the full existing display. This changes display only, not the saved answer or source authority.

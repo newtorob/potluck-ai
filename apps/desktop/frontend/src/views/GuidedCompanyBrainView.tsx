@@ -1160,6 +1160,9 @@ export function GuidedCompanyBrainView({
                         : 'Conflicting statements'}
                   </p>
                   <FocusedSourceAnswer
+                    key={`${answer.id}:${a.question_id}`}
+                    guidedReading
+                    question={answer.review?.corrected_brief ? undefined : answer.issue}
                     answer={a}
                     evidence={answer.evidence}
                     readable={answer.readable_answers?.[a.question_id]}

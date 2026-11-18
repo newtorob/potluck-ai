@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import type { Brief, ReadableAnswer, ReviewedAnswerOutline } from '@/types/investigations';
 import { AnswerMarkdown, ReviewedPassageAnswer } from './ReviewedPassageAnswer';
+import { resolveConciseUnknown } from './resolveConciseUnknown';
 
 type Answer = NonNullable<Brief['answers']>[number];
 export type { ReviewedAnswerOutline } from '@/types/investigations';
@@ -9,6 +10,7 @@ function resolveBoundOutline(
   answer: Answer,
   evidence: Array<Record<string, unknown>>,
   plan: ReviewedAnswerOutline,
+  preserveLabels = false,
 ) {
   if (
     plan.version !== 'reviewed-answer-outline-v1' ||
@@ -84,6 +86,7 @@ function resolveBoundOutline(
     }
     sections.push({ title: section.title, blocks });
   }
+  const retainedLabels: Array<{ label: string; text: string; citations: string[] }> = [];
   for (const id of plan.source_label_snippet_ids) {
     const rows = take([id]);
     if (!rows) return null;
@@ -94,6 +97,17 @@ function resolveBoundOutline(
       !/\b(if|unless|only|must|except|until|before|after|when|provided|without)\b|\d/i.test(text);
     const documentLabel = /^Document: [^\n]+$/.test(text);
     if (text && !label && !documentLabel && !displayedQuotes.has(text)) return null;
+    if (preserveLabels && text)
+      retainedLabels.push({
+        label: 'Cited passages',
+        text: rows[0]!.quote,
+        citations: [rows[0]!.citation_id],
+      });
+  }
+  if (retainedLabels.length) {
+    const context = sections.find((section) => section.title === 'Source context');
+    if (context) context.blocks.push(...retainedLabels);
+    else sections.push({ title: 'Source context', blocks: retainedLabels });
   }
   return used.size === selected.size ? sections : null;
 }
@@ -113,6 +127,8 @@ export function FocusedSourceAnswer({
   outline,
   sourceLink,
   fullEvidenceId,
+  guidedReading = false,
+  question,
 }: {
   answer: Answer;
   evidence: Array<Record<string, unknown>>;
@@ -120,9 +136,54 @@ export function FocusedSourceAnswer({
   outline?: ReviewedAnswerOutline | undefined;
   sourceLink: (citation: string) => ReactNode;
   fullEvidenceId?: string;
+  guidedReading?: boolean;
+  question?: string | undefined;
 }) {
   const id = useId();
-  const sections = outline ? resolveAnswerOutline(answer, evidence, outline) : null;
+  const sections = outline ? resolveAnswerOutline(answer, evidence, outline, guidedReading) : null;
+  const concise =
+    guidedReading && question ? resolveConciseUnknown(question, answer, evidence) : null;
+  if (concise)
+    return (
+      <div className="space-y-3">
+        <p>Not established by the selected reviewed statements.</p>
+        <div className="text-xs">{sourceLink(concise.citation)}</div>
+        <details
+          key={`${answer.text}:${concise.citation}`}
+          className="rounded-md border border-border p-4"
+        >
+          <summary className="cursor-pointer font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+            Scope evidence and original answer
+          </summary>
+          <div className="mt-4">
+            <ReviewedPassageAnswer
+              answer={answer}
+              evidence={evidence}
+              readable={readable}
+              sourceLink={sourceLink}
+            />
+          </div>
+        </details>
+      </div>
+    );
+  if (
+    !sections &&
+    guidedReading &&
+    answer.passage_presentation &&
+    answer.passage_presentation.answer !== answer.text
+  ) {
+    const citations = [...new Set((answer.source_excerpts ?? []).map((row) => row.citation_id))];
+    return (
+      <div className="space-y-3">
+        <AnswerMarkdown text={answer.text} />
+        <div className="flex flex-wrap gap-3 text-xs" aria-label="Answer sources">
+          {citations.map((citation) => (
+            <span key={citation}>{sourceLink(citation)}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (!sections)
     return (
       <ReviewedPassageAnswer
@@ -134,42 +195,78 @@ export function FocusedSourceAnswer({
     );
   return (
     <div className="space-y-5" aria-label="Focused source-backed answer">
-      <nav aria-label="Answer sections" className="flex flex-wrap gap-3 text-sm">
-        {sections.map((section, index) => (
-          <a
-            key={section.title}
-            className="cursor-pointer underline hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={`#${id}-${index}`}
-          >
-            {section.title}
-          </a>
-        ))}
-      </nav>
-      {sections.map((section, index) => (
-        <section
-          key={section.title}
-          aria-labelledby={`${id}-${index}`}
-          className="space-y-4 rounded-md border border-border p-4"
-        >
-          <h3 id={`${id}-${index}`} className="font-serif text-2xl">
-            {section.title}
-          </h3>
-          {section.blocks.map((block, blockIndex) => (
-            <div key={`${block.label}-${blockIndex}`} className="space-y-2">
-              <h4 className="text-sm font-medium">{block.label}</h4>
-              <AnswerMarkdown text={block.text} />
-              <div
-                className="flex flex-wrap gap-3 text-xs"
-                aria-label={`Sources for ${block.label}`}
-              >
-                {block.citations.map((citation) => (
-                  <span key={citation}>{sourceLink(citation)}</span>
-                ))}
-              </div>
-            </div>
+      {(!guidedReading ||
+        sections.filter((section) => section.title !== 'Source context').length > 1) && (
+        <nav aria-label="Answer sections" className="flex flex-wrap gap-3 text-sm">
+          {sections.map((section, index) => (
+            <a
+              key={section.title}
+              className="cursor-pointer underline hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={`#${id}-${index}`}
+              onClick={() => {
+                if (guidedReading && section.title === 'Source context') {
+                  const summary = document.getElementById(`${id}-${index}`);
+                  const details = summary?.closest('details');
+                  if (details) details.open = true;
+                }
+              }}
+            >
+              {guidedReading && section.title === 'Source context'
+                ? 'Additional cited context (may contain conditions)'
+                : section.title}
+            </a>
           ))}
-        </section>
-      ))}
+        </nav>
+      )}
+      {sections.map((section, index) => {
+        const body = section.blocks.map((block, blockIndex) => (
+          <div key={`${block.label}-${blockIndex}`} className="space-y-2">
+            {(!guidedReading || block.label !== 'Cited passages') && (
+              <h4 className="text-sm font-medium">{block.label}</h4>
+            )}
+            <AnswerMarkdown text={block.text} />
+            <div className="flex flex-wrap gap-3 text-xs" aria-label={`Sources for ${block.label}`}>
+              {block.citations.map((citation) => (
+                <span key={citation}>{sourceLink(citation)}</span>
+              ))}
+            </div>
+          </div>
+        ));
+        if (guidedReading && section.title === 'Source context')
+          return (
+            <details
+              key={`${answer.question_id}:${answer.text}:${JSON.stringify(outline)}:${index}`}
+              open
+              className="space-y-4 rounded-md border border-border p-4"
+            >
+              <summary
+                id={`${id}-${index}`}
+                className="cursor-pointer font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Additional cited context (may contain conditions)
+              </summary>
+              <div className="mt-4 space-y-4">{body}</div>
+            </details>
+          );
+        return (
+          <section
+            key={section.title}
+            aria-labelledby={
+              guidedReading && section.title === question ? undefined : `${id}-${index}`
+            }
+            aria-label={guidedReading && section.title === question ? section.title : undefined}
+            className="space-y-4 rounded-md border border-border p-4"
+          >
+            {(!guidedReading || section.title !== question) && (
+              <h3 id={`${id}-${index}`} className="font-serif text-2xl">
+                {section.title}
+              </h3>
+            )}
+            {guidedReading && section.title === question && <span id={`${id}-${index}`} />}
+            {body}
+          </section>
+        );
+      })}
       <details id={fullEvidenceId} className="rounded-md border border-border p-4">
         <summary className="cursor-pointer font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Full evidence and original answer
