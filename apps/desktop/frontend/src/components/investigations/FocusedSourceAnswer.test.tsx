@@ -306,3 +306,91 @@ it('guided eligible unknown shows only the scoped verdict and preserves the full
   expect(details.textContent).toContain(question);
   expect(details.textContent).toContain(source);
 });
+
+it('guided reading exposes exact source section headings without changing conditions or context', () => {
+  const request = 'What applies to launch?';
+  const sections = [
+    { heading: 'Approvals', content: 'Launch only after both reviewers approve.' },
+    {
+      heading: 'Exception until 17:00',
+      content: 'An incident lead may approve the exception; keep rollback ready.',
+    },
+  ];
+  const original =
+    'Document: Policy\n\n' + sections.map((s) => `${s.heading}\n\n${s.content}`).join('\n\n');
+  const supported: Answer = {
+    question_id: 'R1',
+    status: 'supported',
+    text: 'Original answer kept intact.',
+    snippet_ids: ['S1', 'S2', 'S3'],
+    source_excerpts: ['Document: Policy', ...sections.map((s) => s.content)].map((quote, i) => ({
+      quote,
+      snippet_id: `S${i + 1}`,
+      citation_id: 'claim:policy',
+    })),
+  };
+  const source = [
+    {
+      kind: 'reviewed_claim',
+      status: 'approved',
+      citation_id: 'claim:policy',
+      content: original,
+      sources: sections.map((s, i) => ({
+        ...s,
+        kind: 'source_chunk',
+        freshness: 'recent',
+        document_id: 'document',
+        revision_id: 'revision',
+        relative_path: 'policy.md',
+        chunk_id: `chunk${i}`,
+        citation_id: `source:chunk${i}:revision`,
+      })),
+    },
+  ];
+  const outline: ReviewedAnswerOutline = {
+    version: 'reviewed-answer-outline-v1',
+    original_text: supported.text,
+    original_status: 'supported',
+    original_snippet_ids: supported.snippet_ids,
+    source_contents: { 'claim:policy': original },
+    sections: [
+      { title: request, blocks: [{ label: 'Cited passages', snippet_ids: ['S2', 'S3'] }] },
+    ],
+    source_label_snippet_ids: ['S1'],
+  };
+  const { container, rerender } = render(
+    <FocusedSourceAnswer
+      guidedReading
+      question={request}
+      answer={supported}
+      evidence={source}
+      outline={outline}
+      sourceLink={link}
+    />,
+  );
+  expect(screen.getAllByRole('heading', { level: 3 }).map((x) => x.textContent)).toEqual(
+    sections.map((s) => s.heading),
+  );
+  sections.forEach((s) => expect(screen.getByText(s.content)).toBeVisible());
+  const context = screen
+    .getByText('Additional cited context (may contain conditions)', { selector: 'summary' })
+    .closest('details')!;
+  expect(context).toHaveAttribute('open');
+  expect(context.textContent).toContain('Document: Policy');
+  const groups = Array.from(container.querySelectorAll('[aria-label^="Sources for "]'));
+  expect(groups.slice(0, 2).map((x) => x.textContent)).toEqual(['claim:policy', 'claim:policy']);
+  fireEvent.click(screen.getByText('Full evidence and original answer'));
+  expect(screen.getByText(supported.text)).toBeVisible();
+  rerender(
+    <FocusedSourceAnswer
+      guidedReading
+      question={request}
+      answer={{ ...supported, text: 'Current corrected answer.' }}
+      evidence={source}
+      outline={outline}
+      sourceLink={link}
+    />,
+  );
+  expect(screen.queryByRole('heading', { name: 'Approvals' })).not.toBeInTheDocument();
+  expect(screen.getByText('Current corrected answer.')).toBeVisible();
+});

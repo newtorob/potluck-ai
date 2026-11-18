@@ -319,3 +319,16 @@ setup. This frontend workflow does not change backend selection, model routing,
 saved answer text, citations, source freshness or authority checks.
 
 Guided reading keeps all supported cited context visible by default, including conditions. A narrowly bound single-part unknown can show its scoped verdict and citation first; open **Scope evidence and original answer** for the complete original. Other unknowns retain the full existing display. This changes display only, not the saved answer or source authority.
+
+
+### Source sections in guided answers
+
+A supported guided answer may show the approved document's own section headings
+above its cited passages. This requires explicit approved/recent evidence metadata, one exact document revision, unambiguous
+heading and source-chunk bindings, and passages in their original source order.
+The interface does not invent answer categories or rewrite the passages.
+Missing or ambiguous metadata keeps the existing reading view. Additional cited
+context stays open; full evidence and the original answer remain expandable.
+These headings organize source text and do not establish factual correctness or
+current policy. Saved answers, exports, model requests and source approvals are
+unchanged.

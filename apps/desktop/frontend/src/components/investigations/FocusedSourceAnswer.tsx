@@ -2,8 +2,15 @@ import { useId, type ReactNode } from 'react';
 import type { Brief, ReadableAnswer, ReviewedAnswerOutline } from '@/types/investigations';
 import { AnswerMarkdown, ReviewedPassageAnswer } from './ReviewedPassageAnswer';
 import { resolveConciseUnknown } from './resolveConciseUnknown';
+import { sourceHeadingGroups, type SourceHeadingGroup } from './sourceHeadingGroups';
 
 type Answer = NonNullable<Brief['answers']>[number];
+type DisplayBlock = {
+  label: string;
+  text: string;
+  citations: string[];
+  groups?: SourceHeadingGroup[] | null;
+};
 export type { ReviewedAnswerOutline } from '@/types/investigations';
 
 function resolveBoundOutline(
@@ -68,11 +75,11 @@ function resolveBoundOutline(
     new Set(plan.sections.map((s) => s.title)).size !== plan.sections.length
   )
     return null;
-  const sections = [];
+  const sections: Array<{ title: string; blocks: DisplayBlock[] }> = [];
   const displayedQuotes = new Set<string>();
   for (const section of plan.sections) {
     if (!section.title.trim() || !section.blocks.length) return null;
-    const blocks = [];
+    const blocks: DisplayBlock[] = [];
     for (const block of section.blocks) {
       const rows = take(block.snippet_ids);
       if (!block.label.trim() || !rows) return null;
@@ -82,6 +89,9 @@ function resolveBoundOutline(
         label: block.label,
         text: rows.map((row) => row.quote.trim()).join('\n\n'),
         citations: [...new Set(rows.map((row) => row.citation_id))],
+        ...(preserveLabels && block.label === 'Cited passages' && section.title !== 'Source context'
+          ? { groups: sourceHeadingGroups(rows, evidence) }
+          : {}),
       });
     }
     sections.push({ title: section.title, blocks });
@@ -219,19 +229,39 @@ export function FocusedSourceAnswer({
         </nav>
       )}
       {sections.map((section, index) => {
-        const body = section.blocks.map((block, blockIndex) => (
-          <div key={`${block.label}-${blockIndex}`} className="space-y-2">
-            {(!guidedReading || block.label !== 'Cited passages') && (
-              <h4 className="text-sm font-medium">{block.label}</h4>
-            )}
-            <AnswerMarkdown text={block.text} />
-            <div className="flex flex-wrap gap-3 text-xs" aria-label={`Sources for ${block.label}`}>
-              {block.citations.map((citation) => (
-                <span key={citation}>{sourceLink(citation)}</span>
+        const SourceHeading = guidedReading && section.title === question ? 'h3' : 'h4';
+        const body = section.blocks.map((block, blockIndex) =>
+          block.groups ? (
+            <div key={`${block.label}-${blockIndex}`} className="space-y-6">
+              {block.groups.map((group) => (
+                <div key={group.heading} className="space-y-2">
+                  <SourceHeading className="break-words font-serif text-xl">
+                    {group.heading}
+                  </SourceHeading>
+                  <AnswerMarkdown text={group.text} />
+                  <div className="text-xs" aria-label={`Sources for ${group.heading}`}>
+                    {sourceLink(group.citation)}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        ));
+          ) : (
+            <div key={`${block.label}-${blockIndex}`} className="space-y-2">
+              {(!guidedReading || block.label !== 'Cited passages') && (
+                <h4 className="text-sm font-medium">{block.label}</h4>
+              )}
+              <AnswerMarkdown text={block.text} />
+              <div
+                className="flex flex-wrap gap-3 text-xs"
+                aria-label={`Sources for ${block.label}`}
+              >
+                {block.citations.map((citation) => (
+                  <span key={citation}>{sourceLink(citation)}</span>
+                ))}
+              </div>
+            </div>
+          ),
+        );
         if (guidedReading && section.title === 'Source context')
           return (
             <details

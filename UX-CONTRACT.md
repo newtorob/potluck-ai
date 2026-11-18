@@ -24,6 +24,14 @@ shared investigation controls lock during dispatch; a ref guard rejects duplicat
 clicks before React commits the busy state. The server retains final validation,
 source freshness, part IDs and model identity authority.
 
+Guided supported outlines may add exact supplied source headings when one
+approved document revision with recent source metadata uniquely binds every displayed passage to an adjacent
+heading and source chunk in monotonic source order. `sourceHeadingGroups` owns
+this conservative display check; `FocusedSourceAnswer` renders the groups. No
+passage text, ordering or context placement changes, and missing/ambiguous
+metadata retains the existing block. Additional context remains open. Legacy,
+unknown and stale-answer behavior and original/exported data stay unchanged.
+
 ## Product rules and evidence
 
 | Rule | Source |
