@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
-import { AnswerMarkdown } from '@/components/investigations/ReviewedPassageAnswer';
+import {
+  SuppliedEvidencePanel,
+  type SuppliedEvidencePanelHandle,
+} from '@/components/investigations/SuppliedEvidencePanel';
 import {
   QuestionPartsEditor,
   questionPartsError,
@@ -19,12 +22,6 @@ import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceSto
 import { useModelStore } from '@/stores/modelStore';
 import type { Investigation, SourceCollection } from '@/types/investigations';
 import type { PilotClaim, PilotSourceDraft } from '@/types/companyBrainPilot';
-
-function evidenceText(value: unknown, fallback = ''): string {
-  if (value == null) return fallback;
-  // Preserve normal source text verbatim and keep structured JSON inspectable.
-  return typeof value === 'string' ? value : (JSON.stringify(value) ?? fallback);
-}
 
 function sameSource(claim: PilotClaim, draft: PilotSourceDraft): boolean {
   const preview = draft.preview;
@@ -110,6 +107,7 @@ export function GuidedCompanyBrainView({
   const confirmSection = useRef<HTMLElement>(null);
   const sourceCard = useRef<HTMLElement>(null);
   const answerSection = useRef<HTMLElement>(null);
+  const suppliedEvidence = useRef<SuppliedEvidencePanelHandle>(null);
   const workspaceDetails = useRef<HTMLDetailsElement>(null);
   const scope = { workspace: loaded, collection_ids: ids };
   const scopeKey = JSON.stringify([loaded, [...ids].sort()]);
@@ -474,9 +472,9 @@ export function GuidedCompanyBrainView({
     <a
       className="underline underline-offset-4 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
       href="#guided-answer-sources"
-      onClick={() => {
-        const node = document.getElementById('guided-answer-sources');
-        if (node instanceof HTMLDetailsElement) node.open = true;
+      onClick={(event) => {
+        event.preventDefault();
+        suppliedEvidence.current?.openCitation(citation);
       }}
     >
       {answer?.evidence.find((e) => e.citation_id === citation)?.kind === 'reviewed_claim'
@@ -1170,31 +1168,12 @@ export function GuidedCompanyBrainView({
                   />
                 </div>
               ))}
-              <details id="guided-answer-sources" className="rounded-md border border-border p-3">
-                <summary className="cursor-pointer font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
-                  Full supplied evidence
-                </summary>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Reviewed statements supplied to the answer. Some may not be cited in the response.
-                </p>
-                {answer.evidence.map((e, i) => (
-                  <div key={i} className="mt-3 space-y-2">
-                    <p className="break-all text-xs text-muted-foreground">
-                      {evidenceText(e.citation_id, 'Source')}
-                    </p>
-                    <AnswerMarkdown text={evidenceText(e.content)} />
-                    {Array.isArray(e.sources) &&
-                      e.sources.map((s: Record<string, unknown>, j: number) => (
-                        <div key={j} className="mt-2 border-l border-border pl-3">
-                          <p className="text-xs">
-                            {evidenceText(s.relative_path)} · {evidenceText(s.heading)}
-                          </p>
-                          <AnswerMarkdown text={evidenceText(s.content)} />
-                        </div>
-                      ))}
-                  </div>
-                ))}
-              </details>
+              <SuppliedEvidencePanel
+                key={answer.id}
+                ref={suppliedEvidence}
+                answerId={answer.id}
+                evidence={answer.evidence}
+              />
               <button
                 className={button}
                 disabled={!!busy}

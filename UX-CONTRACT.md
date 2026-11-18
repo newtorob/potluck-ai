@@ -298,9 +298,13 @@ record ID. The advanced view reopens that record only after restoring and
 revalidating its exact scope; it performs no inference. Returning preserves the
 question but resets guided confirmations. No question text is added to UI settings.
 
-The answer drawer is named **Full supplied evidence** because its contents may
-include reviewed statements that were supplied but not cited in the response.
-Changing this label does not filter or remove any evidence or original answer.
+The canonical `SuppliedEvidencePanel` lists **Full supplied evidence**, including
+statements supplied but not cited. Identities and count remain visible; each full
+statement has a disclosure retaining all of its raw sources as literal text. Citation navigation
+opens and focuses a uniquely matching statement or source. Missing or ambiguous
+mappings focus the complete inventory with an explanation, never a different source.
+Changing answers resets disclosures. This display does not filter evidence, alter
+the original answer, grant authority or run inference.
 
 Guided source setup explicitly requests `document-topics-v4`; other callers retain
 the legacy default. Suggestion cards show normalized matching words rather than

@@ -339,7 +339,7 @@ describe('guided Company Brain', () => {
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Who approves? · draft' }));
     await screen.findByRole('region', { name: 'Your answer' });
-    fireEvent.click(screen.getByText('Full supplied evidence'));
+    fireEvent.click(screen.getByText('policy.md'));
     expect(screen.getByText('source:exact:rev1')).toBeVisible();
     expect(screen.getByText(text)).toBeVisible();
     expect(

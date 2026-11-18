@@ -232,8 +232,11 @@ the question in this app session and requires fresh source/question confirmation
 these drafts and confirmations are not written to durable preferences.
 
 **Full supplied evidence** includes the reviewed statements supplied to the answer,
-including statements the response did not cite. Citation links open this same
-expandable evidence drawer. The full evidence and original answer remain available.
+including statements the response did not cite. The inventory shows the count and
+source identities with each statement initially collapsed. A citation opens its
+uniquely matching statement or source; an unavailable or ambiguous match returns
+to the full inventory for manual review. Complete statements and raw source text
+remain available without generating a summary. The original answer remains available.
 
 ## Source suggestions
 
@@ -270,7 +273,7 @@ revoked-statement/cleared-answer counts remain visible. Failed scans label the p
 report, removed paths have no review action, and bounded-report notices stay visible.
 Opening setup or expanding paths does not scan, approve, infer or change scope.
 
-The full supplied-evidence drawer preserves string values verbatim. Other JSON
+The supplied-evidence panel renders raw text literally, preserving string values verbatim. Other JSON
 values remain inspectable as JSON rather than displaying object coercion labels;
 this changes no source bindings, answer generation or authority.
 
