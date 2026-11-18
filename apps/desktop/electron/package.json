@@ -27,6 +27,7 @@
   "build": {
     "afterSign": "scripts/notarize.js",
     "beforePack": "scripts/check-native-architecture.js",
+    "afterPack": "scripts/check-pilot-resources.js",
     "appId": "ai.trypotluck.app",
     "productName": "Potluck AI",
     "protocols": [

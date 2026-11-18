@@ -154,7 +154,9 @@ requires the matching engine manifest, both native binaries and license, checks
 architecture/dependencies and runs only `llama-server --version`. Linux pilot
 builds require the CPU engine; macOS pilot builds require the Metal engine (the
 pilot session still requests zero GPU layers). The resulting resource-hash marker
-is rechecked by Electron's `beforePack` hook. Ordinary builds retain their
+is rechecked by Electron's `beforePack` hook. The pilot-only `afterPack` check
+also requires every frozen Python/MCP resource to match its staged bytes at the
+actual external resource path; a successful pack command alone is not enough. Ordinary builds retain their
 existing optional-engine behavior. Build with the existing local engine source
 and dependencies; do not enable publication or replace an installed app when
 creating a private review candidate. Signing, clean-machine installation and
