@@ -212,14 +212,16 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
         assert calls[-1][1]['evidence_selection'] == 'reviewed-collection-v6'
         assert client.post(path, json={**body, 'reviewed_answer_version': 'v33'}, headers=headers).status_code == 200
         assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v33'
-        assert client.post(path, json={**body, 'reviewed_answer_version': 'v34'}, headers=headers).status_code == 422
+        assert client.post(path, json={**body, 'reviewed_answer_version': 'v34'}, headers=headers).status_code == 200
+        assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v34'
+        assert client.post(path, json={**body, 'reviewed_answer_version': 'v0'}, headers=headers).status_code == 422
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7'}, headers=headers).status_code == 422
 
 
 
 @pytest.mark.parametrize('organize', [False, True])
 @pytest.mark.parametrize('evidence_version', ['v5', 'v6'])
-@pytest.mark.parametrize('answer_version', ['v32', 'v33'])
+@pytest.mark.parametrize('answer_version', ['v32', 'v33', 'v34'])
 def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp_path, monkeypatch, organize, evidence_version, answer_version):
     import json
     from copy import deepcopy
@@ -233,6 +235,9 @@ def test_reviewed_pilot_uses_real_persistence_review_export_and_stale_guards(tmp
             value = json.loads(wire('supported', ['C1:rule', 'C1:exception'] if organize else ['C1:rule']))
             if organize:
                 value['parts']['P2'] = deepcopy(value['parts']['P1'])
+            if answer_version == 'v34':
+                for key, part in value['parts'].items():
+                    part['unresolved'] = ['What exact expiry is stated?'] if key == 'P2' and part['verdict'] == 'unknown' else []
             raw = (json.dumps({'groups': {key: ('P2' if i == 1 else 'P1') for i,key in enumerate(json.loads(messages[1]['content'])['ROWS'])}})
                    if messages[0]['content'].startswith('Organize cited passages') else json.dumps(value))
             return {'choices': [{'message': {'content': raw},

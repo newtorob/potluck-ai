@@ -416,6 +416,15 @@ evidence, corrections and exports retain their existing ownership and guards.
 
 ## Guided answer reading
 
+Explicit V34 callers retain literal unresolved question clauses before the exact
+known evidence. These fragments are model assessments scoped to selected reviewed
+statements, with unverified coverage. Supported plus an unresolved clause becomes
+Unknown; conflicting evidence retains its priority. The mixed answer does not use
+the concise Unknown layout, so known facts, prerequisites, exceptions and citations
+stay visible. Original drafts, full statements and exact excerpts remain available.
+V34 remains opt-in until native qualification; saved versions and defaults are
+unchanged.
+
 Guided `FocusedSourceAnswer` retains supported source context visibly open by default; the user may collapse it. A single-part unknown may use the concise view only after exact request, verdict, source ranges, snippets and original text are bound; declared dependencies or request-wide safeguards prevent this concise layout. All other cases keep the complete existing view. The exact original and scope evidence remain available in a disclosure, and current corrected text takes precedence over a stale prior presentation. Other callers keep the default presentation.
 
 ## Company Brain local pilot setup

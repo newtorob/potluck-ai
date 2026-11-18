@@ -62,3 +62,41 @@ def test_macos_rpc_dependency_failure_cannot_bless_bundle(bundle, monkeypatch):
         return SimpleNamespace(returncode=0,stdout='version',stderr='')
     monkeypatch.setattr(check.subprocess,'run',probe)
     with pytest.raises(subprocess.CalledProcessError):check.validate(root,pin)
+
+
+@pytest.mark.parametrize('dependency', ['/opt/homebrew/lib/libprivate.dylib', '@rpath/libprivate.dylib'])
+def test_macos_build_machine_library_is_refused(bundle, monkeypatch, dependency):
+    check,root,pin,_=bundle
+    monkeypatch.setattr(check.platform,'system',lambda:'Darwin')
+    monkeypatch.setattr(check.platform,'machine',lambda:'arm64')
+    (root/'manifest.json').write_text(json.dumps({**pin,'backend':'metal'}))
+    monkeypatch.setattr(check.subprocess,'check_output',lambda argv,**kw:
+                        'arm64' if argv[0]=='lipo' else f'{argv[-1]}:\n\t{dependency} (compatibility version 1.0.0)\n')
+    with pytest.raises(ValueError, match='build-machine'):check.validate(root,pin)
+
+
+def test_macos_freeze_keeps_exact_engine_identity_even_when_replacement_passes_probes(bundle, monkeypatch):
+    check,root,pin,calls=bundle
+    monkeypatch.setattr(check.platform,'system',lambda:'Darwin')
+    monkeypatch.setattr(check.platform,'machine',lambda:'arm64')
+    (root/'manifest.json').write_text(json.dumps({**pin,'backend':'metal'}))
+    monkeypatch.setattr(check.subprocess,'check_output',lambda argv,**kw:
+                        'arm64' if argv[0]=='lipo' else f'{argv[-1]}:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n')
+    original=check.validate(root,pin)
+    frozen=check.finalize(root,pin,original)
+    assert frozen['build_input_files']==original['files']
+    assert frozen['files']==original['files']
+    assert len([call for call in calls if '--version' in call])==2
+    (root/'llama-server').write_bytes(b'different executable that passes mocked arm64/system-dependency/probes')
+    with pytest.raises(ValueError, match='validated build input'):check.finalize(root,pin,original)
+    assert len([call for call in calls if '--version' in call])==2
+    (root/'llama-server').write_bytes(b'\x7fELF\x02\x01' + b'\0'*12 + b'\x3e\x00' + b'\0'*12)
+    (root/'LICENSE').write_text('changed license')
+    with pytest.raises(ValueError, match='validated build input'):check.finalize(root,pin,original)
+
+
+def test_linux_freeze_cannot_silently_replace_a_valid_executable(bundle):
+    check,root,pin,_=bundle
+    original=check.validate(root,pin)
+    with (root/'llama-server').open('ab') as stream:stream.write(b'changed')
+    with pytest.raises(ValueError, match='validated build input'):check.finalize(root,pin,original)

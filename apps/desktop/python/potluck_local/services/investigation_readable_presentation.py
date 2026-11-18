@@ -110,7 +110,7 @@ def _prefix(texts: list[str]) -> str:
 def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
             escape: Callable[[str], str] = lambda value: value) -> dict[str, Any] | None:
     presentation = answer.get('passage_presentation') or {}
-    if presentation.get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33'):
+    if presentation.get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34'):
         return None
     text = answer['text']
     passages = presentation.get('passages', [])

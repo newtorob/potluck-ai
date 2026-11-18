@@ -106,7 +106,7 @@ export function GuidedCompanyBrainView({
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
   reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33';
+  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);

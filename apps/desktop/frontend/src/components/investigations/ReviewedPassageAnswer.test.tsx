@@ -202,3 +202,19 @@ it('leaves metadata examples inside existing code fences as literal code', () =>
   expect(container.querySelectorAll('pre')).toHaveLength(1);
   expect(container.querySelector('pre')?.textContent?.trim()).toBe(metadata);
 });
+
+it('keeps a V34 unresolved clause explicit beside its conditions and citation', () => {
+  const text = 'Not established by the selected reviewed statements (model assessment; review required):\n- P1: what is the deadline?\n\nOnly approved members may book. Suspended members are excluded.';
+  const value: Answer = {
+    ...answer(text), status: 'unknown',
+    passage_presentation: {
+      version: 'fixed-part-selection-v34', answer: text,
+      passages: [{ unit_id: 'C1:whole', text: passage, citation_id: 'claim:one', snippet_ids: ['S1'] }],
+    },
+  };
+  render(<ReviewedPassageAnswer answer={value} evidence={[{kind:'reviewed_claim',citation_id:'claim:one',content:passage}]} sourceLink={sourceLink} />);
+  expect(screen.getAllByText(/what is the deadline/)[0]).toBeVisible();
+  expect(screen.getAllByText(passage)[0]).toBeVisible();
+  expect(screen.getAllByRole('link', {name:'Open claim:one'})[0]).toBeVisible();
+  expect(screen.getByText('Selected source passages (1)').closest('details')).not.toHaveAttribute('open');
+});

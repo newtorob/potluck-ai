@@ -30,15 +30,26 @@ async function verifyResources(staged, packaged) {
     throw new Error('Packaged pilot Python resources are missing or incomplete.');
   }
   for (const relative of expected) {
+    const source = path.join(staged, relative);
     const target = path.join(packaged, relative);
     // Relative internal library links are valid; dependencies outside the
     // portable bundle (or absolute build-machine links) are not.
-    if ((fs.lstatSync(target).isSymbolicLink() && path.isAbsolute(fs.readlinkSync(target)))
-        || !fs.realpathSync(target).startsWith(fs.realpathSync(packaged) + path.sep)) {
-      throw new Error(`Packaged pilot resource links outside its bundle: ${relative}`);
+    for (const [root, file] of [[staged, source], [packaged, target]]) {
+      if ((fs.lstatSync(file).isSymbolicLink() && path.isAbsolute(fs.readlinkSync(file)))
+          || !fs.realpathSync(file).startsWith(fs.realpathSync(root) + path.sep)) {
+        throw new Error(`Packaged pilot resource links outside its bundle: ${relative}`);
+      }
     }
-    if (!fs.statSync(target).isFile()
-        || await digest(path.join(staged, relative)) !== await digest(path.join(packaged, relative))) {
+    const sourceLink = fs.lstatSync(source).isSymbolicLink();
+    const targetLink = fs.lstatSync(target).isSymbolicLink();
+    if (sourceLink !== targetLink || (sourceLink && fs.readlinkSync(source) !== fs.readlinkSync(target))) {
+      throw new Error(`Packaged pilot resource differs from its staged link: ${relative}`);
+    }
+    // Framework directory aliases are inventory leaves. Their real targets are
+    // traversed separately, so every underlying file still receives a hash check.
+    if (sourceLink && fs.statSync(source).isDirectory() && fs.statSync(target).isDirectory()) continue;
+    if (!fs.statSync(source).isFile() || !fs.statSync(target).isFile()
+        || await digest(source) !== await digest(target)) {
       throw new Error(`Packaged pilot resource differs from its staged file: ${relative}`);
     }
   }

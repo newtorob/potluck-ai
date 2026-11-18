@@ -37,6 +37,10 @@ def validate(root: Path, pin: dict) -> dict:
                 arches = subprocess.check_output(['lipo', '-archs', str(path)], text=True, timeout=15).split()
                 if 'arm64' not in arches:
                     raise ValueError('Pilot engine must support arm64.')
+                linked = subprocess.check_output(['otool', '-L', str(path)], text=True, timeout=15)
+                dependencies = [line.strip().split(' (', 1)[0] for line in linked.splitlines()[1:] if line.strip()]
+                if any(not dep.startswith(('/usr/lib/', '/System/Library/')) for dep in dependencies):
+                    raise ValueError('Pilot native engine must not depend on build-machine libraries.')
         hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
     # Run only the harmless version command, never a model or inference probe.
     env = {k: v for k, v in os.environ.items() if not k.startswith(('LLAMA_', 'GGML_', 'LD_', 'DYLD_'))}
@@ -47,3 +51,23 @@ def validate(root: Path, pin: dict) -> dict:
     return {'version': 'company-brain-pilot-build-v1', 'platform': system, 'machine': machine,
             'backend': expected, 'engine_commit': pin['commit'], 'files': hashes,
             'model_weights_included': False}
+
+
+def finalize(root: Path, pin: dict, build_input: dict) -> dict:
+    """Require exact engine bytes after freezing, with repeated launch checks."""
+    original = build_input.get('files', {})
+    resources = ('manifest.json', 'LICENSE', 'llama-server', 'rpc-server')
+    if set(original) != set(resources):
+        raise ValueError('Frozen pilot resource inventory differs from its build input.')
+    # Establish identity before executing even a harmless version/help probe.
+    for name in resources:
+        path = root / name
+        if (path.is_symlink() or not path.is_file()
+                or hashlib.sha256(path.read_bytes()).hexdigest() != original[name]):
+            raise ValueError('Frozen pilot resources differ from their validated build input.')
+    frozen = validate(root, pin)
+    if any(build_input.get(key) != frozen[key] for key in frozen if key != 'files'):
+        raise ValueError('Frozen pilot platform or engine differs from its build input.')
+    if original != frozen['files']:
+        raise ValueError('Frozen pilot resources differ from their validated build input.')
+    return {**frozen, 'build_input_files': dict(original)}

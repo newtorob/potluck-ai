@@ -28,7 +28,13 @@ if split_bundle.is_dir():
     datas += [(str(split_bundle / 'manifest.json'), 'split-engine'),
               (str(split_bundle / 'LICENSE'), 'split-engine')]
     suffix = '.exe' if sys.platform == 'win32' else ''
-    binaries += [(str(split_bundle / (name + suffix)), 'split-engine') for name in ('llama-server', 'rpc-server')]
+    engines = [(str(split_bundle / (name + suffix)), 'split-engine') for name in ('llama-server', 'rpc-server')]
+    if os.environ.get('POTLUCK_COMPANY_BRAIN_PILOT_BUILD') == '1':
+        # These standalone engines have only validated system dependencies.
+        # Copy exact bytes; Mach-O rewriting would sever their input hashes.
+        pilot_engines = engines
+    else:
+        binaries += engines
 hiddenimports = [
     'aiosqlite',
     'aiosqlite.core',
@@ -130,6 +136,10 @@ a = Analysis(
     optimize=0,
     module_collection_mode={'transformers': 'py'},
 )
+if os.environ.get('POTLUCK_COMPANY_BRAIN_PILOT_BUILD') == '1':
+    # Analysis reclassifies executable inputs as binaries. Add validated static
+    # engines afterwards so COLLECT preserves bytes and execute permission.
+    a.datas += [(f'{dest}/{Path(source).name}', source, 'DATA') for source, dest in pilot_engines]
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -158,3 +168,9 @@ coll = COLLECT(
     upx_exclude=[],
     name='potluck-local',
 )
+
+if os.environ.get('POTLUCK_COMPANY_BRAIN_PILOT_BUILD') == '1':
+    # Keep an exact build-input binding as well as checking the frozen engines.
+    frozen_root = Path(DISTPATH) / 'potluck-local' / '_internal'
+    frozen_marker = guard['finalize'](frozen_root / 'split-engine', pin, marker)
+    (frozen_root / 'company-brain-pilot-build.json').write_text(json.dumps(frozen_marker, sort_keys=True))

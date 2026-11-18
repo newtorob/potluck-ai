@@ -79,9 +79,28 @@ Answer review, correction, outcome and export use the existing investigation
 endpoints. Reviewer names remain local audit labels, not verified company roles.
 Use a separate data directory and a non-8321 loopback port for an isolated pilot.
 
+### Unresolved clauses (explicit V34 opt-in)
+
+`reviewed_answer_version: "v34"` adds a required `unresolved` list to each
+proposal and review part. Fragments must be exact, uniquely occurring substrings
+of that part's request, in question order without overlap. The server binds
+their character ranges; it does not generate a replacement question or claim
+the model found every missing fact. An unresolved clause prevents a Supported
+verdict. Conflicting evidence retains its existing priority, with unresolved
+clauses still visible. A final Unknown must identify an unresolved clause and
+retain the existing selected-source scope basis.
+
+The answer names what was not established by the selected reviewed statements
+before presenting the known facts and their complete conditions and citations.
+Its readable view keeps this notice and known evidence visible; full statements,
+exact excerpts and the original draft remain expandable. Corrections, reopen
+and export replay the V34 bindings. Existing saved V32/V33 answers and caller
+defaults are unchanged. This opt-in is awaiting fresh native qualification;
+valid structure and source binding do not establish answer correctness.
+
 ## Readable fixed-part answers
 
-V32 and V33 answers have a deterministic readable view in the desktop and Markdown export.
+V32, V33 and explicitly selected V34 answers have a deterministic readable view in the desktop and Markdown export.
 Identical leading paragraphs from the same source revision are shown once, with
 the evidence groups they apply to. Standalone table rows become labelled fields
 only when the exact row has unambiguous headers in its cited source. Missing or
@@ -342,7 +361,7 @@ jump to the controls, select Accept, Correct or Reject, and enter a reviewer
 label and reason. No decision or reviewer is selected for you. Saving a review
 does not approve source knowledge or establish a real-world outcome.
 
-For the ordinary V32/V33 single-answer path, Correct lets you edit the text and
+For the ordinary V32/V33 and opt-in V34 single-answer path, Correct lets you edit the text and
 verdict while retaining the existing question and source references. Complex
 answers, calculations and changes to selected sources remain in **Advanced
 investigation**. The server validates the correction and current source scope.
@@ -359,3 +378,22 @@ submitting again. If sources are unavailable, review/export is disabled until
 the source folders are checked and the answer reopened. Reviewer names are
 local labels, not authenticated company roles. No review time, usefulness or
 actual outcome is inferred.
+
+
+### Private pilot resource verification
+
+Opt-in pilot builds validate the pinned standalone engine before Analysis, then
+copy those exact executables after Analysis so PyInstaller does not rewrite their
+Mach-O identity. A post-collection check requires every original engine/resource
+hash before running architecture, system-dependency and version/help probes
+again. The marker retains both input and frozen hashes; a different executable
+cannot pass by retaining the same manifest. Ordinary builds keep their existing
+engine handling.
+
+The after-pack check compares the complete external Python/MCP inventory and
+file hashes. Relative framework directory aliases are allowed only when both
+staged and packaged links match and resolve inside their respective bundles.
+Their underlying files remain independently hash checked. Absolute or escaping
+links, changed target bytes, missing resources and lost executable permissions
+are refused. These are packaging checks, not proof of answer quality, signing,
+notarization or external-company acceptance.

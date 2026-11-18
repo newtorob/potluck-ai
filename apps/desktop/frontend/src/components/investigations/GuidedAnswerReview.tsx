@@ -13,7 +13,7 @@ export function canCorrectGuided(i: Investigation): boolean {
   const q = i.brief.questions ?? [],
     a = i.brief.answers ?? [];
   return (
-    ['fixed-part-selection-v32', 'fixed-part-selection-v33'].includes(
+    ['fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34'].includes(
       String(i.provenance?.presentation_mode),
     ) &&
     [

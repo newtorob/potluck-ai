@@ -79,3 +79,8 @@ No model is needed to review sources or saved answers. Ready means the native
 profile and exact 8K context were checked, not answer correctness. Errors preserve
 entries and explain Refresh setup/Models recovery. Detailed hash/resources stay
 expandable; unsupported platforms and insufficient memory stay actionable.
+
+For explicitly selected unresolved-clause answers, retain the scoped notice above
+the known source text. Use the existing text and evidence disclosures; no new
+status color or compact layout may hide conditions or citations. Unknown identifies
+a model-assessed gap within the selected statements, not company-wide absence.

@@ -23,6 +23,14 @@ async function fixture(name: string) {
   }
   return dir;
 }
+async function framework(dir: string) {
+  const root = join(dir, 'potluck-local/_internal/Python.framework');
+  await mkdir(join(root, 'Versions/3.11/Resources'), { recursive: true });
+  await writeFile(join(root, 'Versions/3.11/Resources/Info.plist'), 'framework metadata');
+  await symlink('3.11', join(root, 'Versions/Current'));
+  await symlink('Versions/Current/Resources', join(root, 'Resources'));
+  return root;
+}
 describe('packaged pilot resource integrity', () => {
   it('accepts exact external resources including loose Python sources', async () => {
     await expect(check.verifyResources(await fixture('stage'), await fixture('package'))).resolves.toBeUndefined();
@@ -51,5 +59,19 @@ describe('packaged pilot resource integrity', () => {
   it('rejects an empty staged tree so empty-to-empty cannot pass', async () => {
     const a = join(root, 'a'); const b = join(root, 'b'); await mkdir(a); await mkdir(b);
     await expect(check.verifyResources(a, b)).rejects.toThrow('missing or incomplete');
+  });
+  it('accepts matching internal framework directory aliases without skipping target bytes', async () => {
+    const stage = await fixture('stage'); const packaged = await fixture('package');
+    await framework(stage); const target = await framework(packaged);
+    await expect(check.verifyResources(stage, packaged)).resolves.toBeUndefined();
+    await writeFile(join(target, 'Versions/3.11/Resources/Info.plist'), 'changed framework metadata');
+    await expect(check.verifyResources(stage, packaged)).rejects.toThrow('differs');
+  });
+  it('rejects a framework directory alias escaping the portable bundle', async () => {
+    const stage = await fixture('stage'); const packaged = await fixture('package');
+    const original = await framework(stage); const target = await framework(packaged);
+    await rm(join(target, 'Resources'));
+    await symlink(join(original, 'Versions/3.11/Resources'), join(target, 'Resources'));
+    await expect(check.verifyResources(stage, packaged)).rejects.toThrow('links outside');
   });
 });
