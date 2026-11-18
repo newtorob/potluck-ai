@@ -873,6 +873,130 @@ describe('guided saved-answer review and handoff', () => {
       api.reviewInvestigation.mock.calls[0]![1].corrected_brief.answers[0].snippet_ids,
     ).toEqual([]);
   });
+  it('links only valid selected correction excerpts and keeps original accessible', async () => {
+    const citation = 'claim:c1';
+    const original = {
+      ...structuredClone(result),
+      evidence: [
+        {
+          kind: 'reviewed_claim',
+          citation_id: citation,
+          content: 'Approval required unless incident response applies.',
+        },
+        { kind: 'reviewed_claim', citation_id: 'duplicate', content: 'Approval required' },
+        { kind: 'reviewed_claim', citation_id: 'duplicate', content: 'Approval required' },
+        { kind: 'reviewed_claim', citation_id: 'other', content: 'Approval required' },
+      ],
+      brief: {
+        ...structuredClone(result.brief),
+        answers: [{ ...result.brief.answers[0]!, text: 'Original cached draft.' }],
+      },
+    };
+    const corrected = {
+      question_id: 'R1',
+      status: 'supported',
+      text: 'Corrected current prose.',
+      snippet_ids: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'],
+      source_excerpts: [
+        { snippet_id: 'S1', citation_id: citation, quote: 'Approval required' },
+        { snippet_id: 'S2', citation_id: citation, quote: 'incident response' },
+        { snippet_id: 'S3', citation_id: 'unknown', quote: 'Approval required' },
+        { snippet_id: 'S4', citation_id: citation, quote: 'Not in evidence' },
+        { snippet_id: 'S5', citation_id: 'duplicate', quote: 'Approval required' },
+        { snippet_id: 'S6', citation_id: citation, quote: '  ' },
+        { snippet_id: 'not-selected', citation_id: 'other', quote: 'Approval required' },
+      ],
+    };
+    const saved = {
+      ...original,
+      status: 'reviewed',
+      review: {
+        decision: 'correct',
+        reviewer: 'Test reviewer',
+        reason: 'Checked',
+        corrected_brief: { ...original.brief, answers: [corrected] },
+      },
+    };
+    await openReviewAnswer(saved as unknown as typeof result);
+    expect(screen.getByText('Corrected current prose.')).toBeVisible();
+    expect(within(screen.getByLabelText('Answer sources')).getAllByRole('link')).toHaveLength(1);
+    fireEvent.click(within(screen.getByLabelText('Answer sources')).getByRole('link'));
+    const evidencePanel = within(screen.getByRole('region', { name: 'Full supplied evidence' }));
+    expect(
+      evidencePanel.getByText('Approval required unless incident response applies.'),
+    ).toBeVisible();
+    expect(screen.getByText('Original cached draft.')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Original draft before correction'));
+    expect(screen.getByText('Original cached draft.')).toBeVisible();
+  });
+  it('does not fabricate correction links for missing, unselected or invalid evidence', async () => {
+    const original = {
+      ...structuredClone(result),
+      evidence: [
+        { kind: 'reviewed_claim', citation_id: 'dup', content: 'exact quote' },
+        { kind: 'reviewed_claim', citation_id: 'dup', content: 'exact quote' },
+        { kind: 'source', citation_id: 'wrong', content: 'exact quote' },
+      ],
+    };
+    const corrected = {
+      question_id: 'R1',
+      status: 'supported',
+      text: 'Correction with no valid source.',
+      snippet_ids: ['s1', 's2', 's3', 's4'],
+      source_excerpts: [
+        { snippet_id: 's1', citation_id: 'dup', quote: 'exact quote' },
+        { snippet_id: 's2', citation_id: 'unknown', quote: 'exact quote' },
+        { snippet_id: 's3', citation_id: 'wrong', quote: 'exact quote' },
+        { snippet_id: 's4', citation_id: 'dup', quote: '' },
+        { snippet_id: 'not-selected', citation_id: 'wrong', quote: 'exact quote' },
+      ],
+    };
+    const saved = {
+      ...original,
+      status: 'reviewed',
+      review: {
+        decision: 'correct',
+        reviewer: 'Test reviewer',
+        reason: 'Checked',
+        corrected_brief: { ...original.brief, answers: [corrected] },
+      },
+    };
+    await openReviewAnswer(saved as unknown as typeof result);
+    expect(screen.getByText('Correction with no valid source.')).toBeVisible();
+    expect(screen.queryByLabelText('Answer sources')).not.toBeInTheDocument();
+  });
+  it.each([
+    ['absent excerpts', undefined, ['s1']],
+    ['null excerpt', [null], ['s1']],
+    ['non-string quote', [{ snippet_id: 's1', citation_id: 'claim:c1', quote: 7 }], ['s1']],
+    ['non-string citation', [{ snippet_id: 's1', citation_id: 7, quote: 'exact quote' }], ['s1']],
+    ['no selected ids', [{ snippet_id: 's1', citation_id: 'claim:c1', quote: 'exact quote' }], []],
+  ])('does not link %s', async (_name, excerpts, selected) => {
+    const original = {
+      ...structuredClone(result),
+      evidence: [{ kind: 'reviewed_claim', citation_id: 'claim:c1', content: 'exact quote' }],
+    };
+    const corrected = {
+      question_id: 'R1',
+      status: 'supported',
+      text: 'No linked source.',
+      snippet_ids: selected,
+      ...(excerpts === undefined ? {} : { source_excerpts: excerpts }),
+    };
+    const saved = {
+      ...original,
+      status: 'reviewed',
+      review: {
+        decision: 'correct',
+        reviewer: 'Test reviewer',
+        reason: 'Checked',
+        corrected_brief: { ...original.brief, answers: [corrected] },
+      },
+    };
+    await openReviewAnswer(saved as unknown as typeof result);
+    expect(screen.getByText('No linked source.')).toBeVisible();
+    expect(screen.queryByLabelText('Answer sources')).not.toBeInTheDocument();
+  });
   it('preserves the answer on export failure and returns the exact canonical Markdown', async () => {
     await openReviewAnswer();
     api.exportInvestigation

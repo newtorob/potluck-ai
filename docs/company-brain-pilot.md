@@ -346,8 +346,10 @@ For the ordinary V32/V33 single-answer path, Correct lets you edit the text and
 verdict while retaining the existing question and source references. Complex
 answers, calculations and changes to selected sources remain in **Advanced
 investigation**. The server validates the correction and current source scope.
-The corrected text becomes the current reading; **Original draft before
-correction** retains the original answer and citations.
+The corrected text becomes the current reading, with linked sources bound to
+its saved excerpts. **Original draft before correction** retains the original
+answer and citations. Missing or mismatched excerpt bindings do not create
+source links.
 
 **Export Markdown** returns the canonical handoff, including the saved review
 and evidence. Its read-only text can be copied or selected manually. Exporting

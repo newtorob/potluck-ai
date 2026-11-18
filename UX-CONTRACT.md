@@ -43,8 +43,11 @@ export routes remain authoritative for current bindings and draft transitions.
 
 Decision, reviewer and reason start empty. A simple V32/V33 correction preserves
 the original question and snippet IDs; the server rebuilds exact source excerpts.
-Current corrected text and expandable original are both available. A review
-does not approve knowledge or record an actual outcome.
+Current corrected text and expandable original are both available. Corrected
+guided answers show deduplicated source links only for selected excerpts whose
+exact quotes bind to one supplied reviewed statement. Missing or ambiguous
+bindings never manufacture links. A review does not approve knowledge or record
+an actual outcome.
 
 Failures preserve fields and the displayed answer. An uncertain write performs
 one same-scope GET; a confirmed saved review is shown without a repeated POST.

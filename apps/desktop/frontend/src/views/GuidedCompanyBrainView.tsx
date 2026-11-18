@@ -27,6 +27,44 @@ import { useModelStore } from '@/stores/modelStore';
 import type { Investigation, SourceCollection } from '@/types/investigations';
 import type { PilotClaim, PilotSourceDraft } from '@/types/companyBrainPilot';
 
+function correctedAnswerCitations(
+  answer: NonNullable<Investigation['brief']['answers']>[number],
+  evidence: Investigation['evidence'],
+): string[] {
+  if (
+    answer.passage_presentation ||
+    !Array.isArray(answer.snippet_ids) ||
+    !Array.isArray(answer.source_excerpts)
+  )
+    return [];
+  const selected = new Set(
+    answer.snippet_ids.filter((id): id is string => typeof id === 'string' && !!id.trim()),
+  );
+  const citations = new Set<string>();
+  for (const excerpt of answer.source_excerpts) {
+    if (
+      !excerpt ||
+      typeof excerpt.snippet_id !== 'string' ||
+      !selected.has(excerpt.snippet_id) ||
+      typeof excerpt.citation_id !== 'string' ||
+      !excerpt.citation_id.trim() ||
+      typeof excerpt.quote !== 'string' ||
+      !excerpt.quote.trim()
+    )
+      continue;
+    const matches = evidence.filter((row) => row.citation_id === excerpt.citation_id);
+    if (
+      matches.length !== 1 ||
+      matches[0]?.kind !== 'reviewed_claim' ||
+      typeof matches[0].content !== 'string' ||
+      !matches[0].content.includes(excerpt.quote)
+    )
+      continue;
+    citations.add(excerpt.citation_id);
+  }
+  return [...citations];
+}
+
 function sameSource(claim: PilotClaim, draft: PilotSourceDraft): boolean {
   const preview = draft.preview;
   return (
@@ -1282,6 +1320,18 @@ export function GuidedCompanyBrainView({
                     outline={answer.answer_outlines?.[a.question_id]}
                     sourceLink={sourceLink}
                   />
+                  {answer.review?.corrected_brief &&
+                    (() => {
+                      const citations = correctedAnswerCitations(a, answer.evidence);
+                      return citations.length ? (
+                        <div className="flex flex-wrap gap-3 text-xs" aria-label="Answer sources">
+                          <span>Answer sources:</span>
+                          {citations.map((citation) => (
+                            <span key={citation}>{sourceLink(citation)}</span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                 </div>
               ))}
               {answer.review?.corrected_brief && (
