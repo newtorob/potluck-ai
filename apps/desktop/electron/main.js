@@ -702,6 +702,14 @@ ipcMain.handle('select-directory', async (_event) => {
   return result.filePaths[0];
 });
 
+ipcMain.handle('select-pilot-model-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [{ name: 'Company Brain model', extensions: ['gguf'] }],
+  });
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+
 ipcMain.handle('show-notification', (_event, title, body) => {
   if (Notification.isSupported()) {
     const notif = new Notification({ title: String(title), body: String(body) });

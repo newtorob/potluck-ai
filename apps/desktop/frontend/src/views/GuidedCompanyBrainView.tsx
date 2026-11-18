@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ViewHeader } from '@/components/layout/ViewHeader';
+import { CompanyBrainPilotSetup } from '@/components/investigations/CompanyBrainPilotSetup';
 import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
 import {
   GuidedAnswerReview,
@@ -92,7 +93,7 @@ function failure(error: unknown): string {
   if (/collections_unavailable|ready and recent/i.test(message))
     return 'Scan every selected folder successfully before continuing.';
   if (/model|profile/i.test(message))
-    return 'Check the loaded local model in Models, then refresh this workspace. This flow requires the supported Qwen3.8 27B native profile.';
+    return 'Check Local model setup, then refresh this workspace. This flow requires the supported Qwen3.8 27B native profile.';
   return 'Could not complete this action. Your question is kept. Open Workspace and folders, check its sources, then try again.';
 }
 
@@ -137,7 +138,10 @@ export function GuidedCompanyBrainView({
   const [recent, setRecent] = useState<Investigation[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState('');
-  const [busy, setBusy] = useState('');
+  const [operationBusy, setBusy] = useState('');
+  const [setupBusy, setSetupBusy] = useState(false);
+  const setupLock = useRef(false);
+  const busy = operationBusy || (setupBusy ? 'Updating local model setup…' : '');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [unavailableReview, setUnavailableReview] = useState('');
@@ -242,7 +246,7 @@ export function GuidedCompanyBrainView({
     setTruncated(data.truncated);
   }
   async function run(label: string, action: (ticket: number) => Promise<void>) {
-    if (lock.current) return;
+    if (lock.current || setupLock.current) return;
     lock.current = true;
     const ticket = epoch.current;
     setBusy(label);
@@ -691,9 +695,9 @@ export function GuidedCompanyBrainView({
                     : health.modelRestore?.status === 'loading'
                       ? `Restoring ${health.modelRestore.model_id ?? 'the saved model'}…`
                       : health.modelRestore?.status === 'failed' && !health.modelLoaded
-                        ? 'Startup restore failed. Open Models to check or load the model.'
+                        ? 'Startup restore failed. Check Local model setup below or open Models.'
                         : !health.modelLoaded
-                          ? 'No model loaded. You can review sources now; load a model before asking for an answer.'
+                          ? 'No model loaded. Review sources now, or use Local model setup below before asking.'
                           : selectedModelLoaded
                             ? `Loaded: ${health.activeModelId}.`
                             : `Loaded: ${health.activeModelId ?? 'unknown'}. Choose this model in Workspace and folders, or refresh the workspace to update the choices.`}
@@ -722,6 +726,29 @@ export function GuidedCompanyBrainView({
               profile, checked again when asking. Nothing is loaded, scanned or approved
               automatically here.
             </p>
+            <CompanyBrainPilotSetup
+              disabled={!!operationBusy || !connected}
+              onBusyChange={(value) => {
+                setupLock.current = value;
+                if (alive.current) setSetupBusy(value);
+              }}
+              onModelChange={(id) => {
+                if (!alive.current) return;
+                setConfirmation('');
+                if (id && id !== model) {
+                  setModel(id);
+                  setAnswer(null);
+                  if (loaded) remember(loaded, ids, id);
+                }
+                health.refresh();
+                void fetchModels().catch(() => {
+                  if (alive.current)
+                    setNotice(
+                      'Model setup changed. Refresh the workspace to update its model choices.',
+                    );
+                });
+              }}
+            />
           </section>
           <details
             ref={workspaceDetails}
@@ -901,8 +928,8 @@ export function GuidedCompanyBrainView({
                     >
                       Open Models
                     </Link>{' '}
-                    to load it, then refresh this workspace. Potluck never switches or loads a model
-                    here.
+                    manages other models. Use Local model setup above to import and explicitly
+                    prepare the supplied pilot model for this session.
                   </p>
                 </>
               )}

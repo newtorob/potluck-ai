@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('potluck', {
    *   if they cancelled.
    */
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  selectPilotModelFile: () => ipcRenderer.invoke('select-pilot-model-file'),
 
   /**
    * Shows a native desktop notification.

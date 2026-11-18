@@ -113,3 +113,50 @@ make dogfood               # rebuild, replace /Applications/Potluck AI.app, prin
 ```
 
 `make installer-bundle` stages the sidecars on its own if you only want to check the bundle step.
+
+## Company Brain pilot builds (private qualification)
+
+The normal Company Brain desktop view includes **Local model setup**. Pilot users
+need no Python, development checkout, shell loader or investigation harness:
+
+1. On first launch, choose **Skip, I’ll pick later** in general model setup,
+   then **Use on this machine**. Open **Workspace → Company Brain**. Choose the separately supplied GGUF with **Choose model
+   file**, confirm the local copy and click **Import model**. The app checks the
+   exact byte size and SHA-256 before committing a new file. It never replaces a
+   different existing file, uploads weights or downloads a substitute.
+2. Check readiness. This pilot requires a native Apple Silicon macOS or x86-64
+   Linux build. It checks available RAM against a conservative estimate of about
+   20.3 GiB, plus local space for a 14.3 GiB copy and safety margin. A machine with
+   32 GiB or more physical RAM is a practical starting point; available RAM is
+   checked again before loading. Actual speed depends on the CPU. Windows can
+   still review sources and saved answers, but cannot prepare this native pilot.
+3. Explicitly confirm **Prepare model**. Preparation replaces the current model
+   for this session, uses the pinned native engine, CPU inference and 8,192-token
+   context, and verifies the model/template/rendering profile without generation.
+   Saved backend, startup model and normal chat preferences are not changed.
+4. Open a workspace, choose a Markdown folder, consent to its scan, ask a
+   question, and review the proposed complete source statements and question
+   setup before generating. Review the answer/citations, then accept, correct or
+   reject it and export Markdown. Source approval and answer review remain
+   separate. **End model session** unloads only the active pilot model; source
+   review and saved answers remain available.
+
+Weights are **not part of the installer**. The pilot coordinator must provide the
+qualified `qwen3.8-27b-iq4-xs` GGUF (15,321,491,168 bytes; SHA-256
+`96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3`).
+No verified public download URL for these exact bytes is configured. Other files
+with the same quantization/model name are not interchangeable. A failed load may
+have released the previous model; refresh setup and use Models to recover.
+
+For maintainers, set `POTLUCK_COMPANY_BRAIN_PILOT_BUILD=1` during both PyInstaller
+and Electron packaging. The spec invokes `pilot_bundle_check.py` before Analysis,
+requires the matching engine manifest, both native binaries and license, checks
+architecture/dependencies and runs only `llama-server --version`. Linux pilot
+builds require the CPU engine; macOS pilot builds require the Metal engine (the
+pilot session still requests zero GPU layers). The resulting resource-hash marker
+is rechecked by Electron's `beforePack` hook. Ordinary builds retain their
+existing optional-engine behavior. Build with the existing local engine source
+and dependencies; do not enable publication or replace an installed app when
+creating a private review candidate. Signing, clean-machine installation and
+platform certification remain separate gates; passing a source test is not an
+installer qualification or company-role/access-control claim.

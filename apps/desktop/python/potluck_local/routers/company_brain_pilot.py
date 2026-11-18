@@ -21,6 +21,53 @@ from potluck_local.routers.investigations import _error
 
 router = APIRouter(prefix='/company-brain/pilot', tags=['company-brain-pilot'])
 
+class ModelImport(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    source_path: StrictStr = Field(min_length=1, max_length=4096)
+    import_confirmed: StrictBool
+
+class ModelPrepare(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    prepare_confirmed: StrictBool
+    expected_active_model: StrictStr | None = Field(max_length=128)
+
+class ModelUnload(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_active_model: StrictStr | None = Field(max_length=128)
+
+@router.get('/model-setup')
+async def model_setup_status() -> dict:
+    from potluck_local.services import company_brain_model_setup as setup
+    return await setup.status()
+
+@router.post('/model-setup/import')
+async def import_pilot_model(body: ModelImport) -> dict:
+    from potluck_local.services import company_brain_model_setup as setup
+    if not body.import_confirmed:
+        raise HTTPException(400, 'Confirm the local model copy before importing.')
+    try:
+        return await setup.import_model(body.source_path)
+    except setup.PilotSetupError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+@router.post('/model-setup/prepare')
+async def prepare_pilot_model(body: ModelPrepare) -> dict:
+    from potluck_local.services import company_brain_model_setup as setup
+    if not body.prepare_confirmed:
+        raise HTTPException(400, 'Confirm the session model replacement before preparing.')
+    try:
+        return await setup.prepare(body.expected_active_model)
+    except setup.PilotSetupError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+@router.post('/model-setup/unload')
+async def unload_pilot_model(body: ModelUnload) -> dict:
+    from potluck_local.services import company_brain_model_setup as setup
+    try:
+        return await setup.unload(body.expected_active_model)
+    except setup.PilotSetupError as exc:
+        raise HTTPException(409, str(exc)) from None
+
 class Request(BaseModel):
     model_config = ConfigDict(extra='forbid')
     workspace: str = Field(min_length=1, max_length=256)

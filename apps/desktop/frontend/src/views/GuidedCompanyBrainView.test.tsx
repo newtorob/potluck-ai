@@ -5,6 +5,10 @@ import { GuidedCompanyBrainView } from './GuidedCompanyBrainView';
 import { useCompanyBrainWorkspaceStore } from '@/stores/companyBrainWorkspaceStore';
 import type { PilotClaim } from '@/types/companyBrainPilot';
 const api = vi.hoisted(() => ({
+  companyBrainModelSetup: vi.fn().mockResolvedValue(null),
+  importCompanyBrainModel: vi.fn(),
+  prepareCompanyBrainModel: vi.fn(),
+  unloadCompanyBrainModel: vi.fn(),
   sourceCollections: vi.fn(),
   selectDirectory: vi.fn(),
   investigations: vi.fn(),
@@ -147,6 +151,7 @@ async function confirm() {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  api.companyBrainModelSetup.mockResolvedValue(pilotSetup());
   approved = [];
   proposed = [];
   useCompanyBrainWorkspaceStore.setState({
@@ -184,6 +189,97 @@ beforeEach(() => {
   api.investigation.mockResolvedValue(result);
   api.scanPilotCollection.mockResolvedValue(report);
 });
+function pilotSetup(overrides: Record<string, unknown> = {}) {
+  return {
+    version: 'company-brain-model-setup-v1',
+    model: {
+      id: 'pilot',
+      name: 'Pilot',
+      sha256: 'abc',
+      size_bytes: 100,
+      context_tokens: 8192,
+      backend: 'llama-server',
+    },
+    platform_supported: true,
+    installed: true,
+    artifact_verified: true,
+    ready: false,
+    can_import: false,
+    can_prepare: true,
+    can_unload: false,
+    active_model: 'loaded-model',
+    issues: [],
+    resources: {
+      estimated_ram_bytes: 100,
+      available_ram_bytes: 200,
+      required_disk_bytes: 0,
+      disk_free_bytes: 200,
+    },
+    warnings: [],
+    ...overrides,
+  };
+}
+
+describe('guided pilot setup integration', () => {
+  it('checks setup passively without importing or preparing', async () => {
+    api.companyBrainModelSetup.mockResolvedValue(pilotSetup());
+    mount();
+    await screen.findByText('Model imported; not ready');
+    expect(api.companyBrainModelSetup).toHaveBeenCalledTimes(1);
+    expect(api.importCompanyBrainModel).not.toHaveBeenCalled();
+    expect(api.prepareCompanyBrainModel).not.toHaveBeenCalled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('blocks source and question actions during prepare and selects only a ready result', async () => {
+    api.companyBrainModelSetup.mockResolvedValue(pilotSetup());
+    let resolve!: (value: unknown) => void;
+    api.prepareCompanyBrainModel.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    mount();
+    await screen.findByText('Model imported; not ready');
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who approves?' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /prepare this model/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare model' }));
+    expect(screen.getByLabelText('Your question')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Review sources for this question' })).toBeDisabled();
+    expect(api.pilotSetupDrafts).not.toHaveBeenCalled();
+    expect(api.prepareCompanyBrainModel).toHaveBeenCalledWith({
+      prepare_confirmed: true,
+      expected_active_model: 'loaded-model',
+    });
+    resolve(
+      pilotSetup({ ready: true, active_model: 'pilot', can_prepare: false, can_unload: true }),
+    );
+    await screen.findByText('Ready for local questions');
+    expect(useCompanyBrainWorkspaceStore.getState().saved?.modelSlug).toBe('pilot');
+    expect(api.fetchModels).toHaveBeenCalled();
+  });
+  it('keeps a saved answer and review available after unload and requires reconfirmation', async () => {
+    api.companyBrainModelSetup.mockResolvedValue(
+      pilotSetup({ ready: true, active_model: 'pilot', can_prepare: false, can_unload: true }),
+    );
+    api.unloadCompanyBrainModel.mockResolvedValue(pilotSetup({ active_model: null }));
+    await openReviewAnswer();
+    expect(screen.getByRole('region', { name: 'Review and handoff' })).toBeVisible();
+    const reconfirm = screen.getByRole('checkbox', { name: 'I reviewed these question parts.' });
+    if (!(reconfirm as HTMLInputElement).checked) fireEvent.click(reconfirm);
+    expect(screen.getByRole('button', { name: 'Get answer' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'End model session' }));
+    await waitFor(() =>
+      expect(api.unloadCompanyBrainModel).toHaveBeenCalledWith({ expected_active_model: 'pilot' }),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled());
+    expect(screen.getByRole('region', { name: 'Your answer' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Review and handoff' })).toBeVisible();
+  });
+});
+
 describe('guided Company Brain', () => {
   it('proposes a compound question without manual part edits and sends the unchanged original only after review', async () => {
     approved = [claim];
@@ -378,7 +474,7 @@ describe('guided Company Brain', () => {
     api.health.mockResolvedValue({ model_loaded: false, active_model_id: null });
     mount();
     await question();
-    expect(screen.getByText(/No model loaded. You can review sources now/)).toBeInTheDocument();
+    expect(screen.getByText(/No model loaded. Review sources now/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Approve document for answers' }));
     await screen.findByRole('button', { name: 'Already reviewed' });
     await confirm();

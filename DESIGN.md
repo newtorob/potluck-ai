@@ -67,3 +67,15 @@ Use semantic buttons and links, visible keyboard focus, named inputs, text error
 - Don't promise model quality, speed, anonymity, or compatibility without evidence.
 - Don't silently turn on remote routing, compute contribution, or model downloads.
 - Don't let a new entry path weaken server authorization or the existing update policy.
+
+### Company Brain pilot preparation
+
+The existing guided Company Brain readiness panel owns a Local model setup
+section: passive platform/engine/resources check, native GGUF picker, explicit
+copy consent, exact artifact check, then explicit session model replacement.
+Preparation never changes saved runtime/startup settings. Busy setup owns the
+same source/question mutation fence; old answers remain reviewable after unload.
+No model is needed to review sources or saved answers. Ready means the native
+profile and exact 8K context were checked, not answer correctness. Errors preserve
+entries and explain Refresh setup/Models recovery. Detailed hash/resources stay
+expandable; unsupported platforms and insufficient memory stay actionable.

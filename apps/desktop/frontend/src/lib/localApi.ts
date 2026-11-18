@@ -1,4 +1,4 @@
-import type { PilotClaim, PilotEvidence, PilotContextPreview, PilotSetupDraft } from '@/types/companyBrainPilot';
+import type { PilotClaim, PilotEvidence, PilotContextPreview, PilotSetupDraft, PilotModelSetup } from '@/types/companyBrainPilot';
 import type { Brief, CalculationPreview, CalculationReviewInput, CollectionScanReport, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
@@ -774,6 +774,52 @@ function investigationQuery(scope: InvestigationScope): string {
 }
 
 export const localApi = {
+  companyBrainModelSetup(): Promise<PilotModelSetup> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/pilot/model-setup`, {}, 20_000).then(
+      handleResponse<PilotModelSetup>,
+    );
+  },
+  importCompanyBrainModel(input: {
+    source_path: string;
+    import_confirmed: true;
+  }): Promise<PilotModelSetup> {
+    return timedFetch(
+      `${LOCAL_BASE}/company-brain/pilot/model-setup/import`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+      600_000,
+    ).then(handleResponse<PilotModelSetup>);
+  },
+  prepareCompanyBrainModel(input: {
+    prepare_confirmed: true;
+    expected_active_model: string | null;
+  }): Promise<PilotModelSetup> {
+    return timedFetch(
+      `${LOCAL_BASE}/company-brain/pilot/model-setup/prepare`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+      600_000,
+    ).then(handleResponse<PilotModelSetup>);
+  },
+  unloadCompanyBrainModel(input: {
+    expected_active_model: string | null;
+  }): Promise<PilotModelSetup> {
+    return timedFetch(
+      `${LOCAL_BASE}/company-brain/pilot/model-setup/unload`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+      30_000,
+    ).then(handleResponse<PilotModelSetup>);
+  },
   registerPilotCollection(input: { workspace: string; name: string; folder: string; scan_confirmed: true }): Promise<{ collection_id: string }> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/collections`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),

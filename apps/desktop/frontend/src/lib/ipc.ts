@@ -46,6 +46,7 @@ interface PotluckBridge {
     node: string;
   };
   selectDirectory: () => Promise<string | null>;
+  selectPilotModelFile?: () => Promise<string | null>;
   showNotification: (title: string, body: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
   onDeepLink?: (callback: (url: string) => void) => () => void;
@@ -93,6 +94,10 @@ export const ipc = {
   /** Open a native directory picker; returns the selected path or null */
   async selectDirectory(): Promise<string | null> {
     return getBridge()?.selectDirectory() ?? null;
+  },
+
+  async selectPilotModelFile(): Promise<string | null> {
+    return getBridge()?.selectPilotModelFile?.() ?? null;
   },
 
   /** Show a native OS notification */

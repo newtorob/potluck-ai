@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import importlib.util
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -11,6 +13,17 @@ datas += [('potluck_local/data/split-engine.json', 'potluck_local/data')]
 datas += [('potluck_local/data/model-recipes.json', 'potluck_local/data')]
 binaries = []
 split_bundle = Path(SPECPATH) / 'native' / 'split'
+# Ordinary builds keep their existing optional-engine behavior. Pilot builds
+# fail before Analysis if native resources, platform or dependencies are wrong.
+if os.environ.get('POTLUCK_COMPANY_BRAIN_PILOT_BUILD') == '1':
+    import runpy
+    guard = runpy.run_path(str(Path(SPECPATH) / 'pilot_bundle_check.py'))
+    pin = json.loads((Path(SPECPATH) / 'potluck_local/data/split-engine.json').read_text())
+    marker = guard['validate'](split_bundle, pin)
+    marker_path = Path(workpath) / 'company-brain-pilot-build.json'
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(json.dumps(marker, sort_keys=True))
+    datas += [(str(marker_path), '.')]
 if split_bundle.is_dir():
     datas += [(str(split_bundle / 'manifest.json'), 'split-engine'),
               (str(split_bundle / 'LICENSE'), 'split-engine')]

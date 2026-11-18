@@ -417,3 +417,20 @@ evidence, corrections and exports retain their existing ownership and guards.
 ## Guided answer reading
 
 Guided `FocusedSourceAnswer` retains supported source context visibly open by default; the user may collapse it. A single-part unknown may use the concise view only after exact request, verdict, source ranges, snippets and original text are bound; declared dependencies or request-wide safeguards prevent this concise layout. All other cases keep the complete existing view. The exact original and scope evidence remain available in a disclosure, and current corrected text takes precedence over a stale prior presentation. Other callers keep the default presentation.
+
+## Company Brain local pilot setup
+
+- Entry: Company Brain > Workspace readiness > Local model setup, not a new view.
+- Initial check is read-only. Import, replacement and unloading are explicit;
+  native file selection and confirmations never imply source-policy approval.
+- Import commits only the exact supplied artifact atomically; no upload,
+  automatic download, overwrite or saved model/routing preference mutation.
+- During setup mutations, folder/question/review writes are disabled. A changed
+  active model invalidates replacement consent; the server rechecks the expected
+  active model under its lifecycle gate. Cancellation drains the owned operation.
+- Confirmed preparation selects the model and refreshes health; asking still
+  requires recent sources, approved statements and question confirmation.
+- Unloading keeps saved answers and source review; it invalidates ask confirmation.
+- Unsupported platform, engine, memory, disk and artifact states cannot claim
+  readiness. Model/resource details are expandable. Failed actions retain entries
+  and require an explicit retry; setup never silently retries a model mutation.
