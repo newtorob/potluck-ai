@@ -104,6 +104,7 @@ export interface Investigation {
   retrieval_notices?: string[];
   created_at: string;
   provenance?: {
+    presentation_mode?: string;
     schema_version?: number;
     question_origin?: 'explicit' | 'planned';
     snippet_catalog?: SourceExcerpt[];

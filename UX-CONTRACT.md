@@ -32,6 +32,27 @@ passage text, ordering or context placement changes, and missing/ambiguous
 metadata retains the existing block. Additional context remains open. Legacy,
 unknown and stale-answer behavior and original/exported data stay unchanged.
 
+## Guided answer review and handoff
+
+`GuidedAnswerReview` owns explicit review inputs and canonical Markdown handoff
+for the ordinary saved-answer flow. The existing Advanced review remains the
+variant for source selection, multiple answers and calculations.
+`GuidedCompanyBrainView` owns authenticated transport, exact scope/answer binding,
+duplicate action exclusion and late-response protection. The backend review and
+export routes remain authoritative for current bindings and draft transitions.
+
+Decision, reviewer and reason start empty. A simple V32/V33 correction preserves
+the original question and snippet IDs; the server rebuilds exact source excerpts.
+Current corrected text and expandable original are both available. A review
+does not approve knowledge or record an actual outcome.
+
+Failures preserve fields and the displayed answer. An uncertain write performs
+one same-scope GET; a confirmed saved review is shown without a repeated POST.
+Unavailable sources disable further review/export and explain recovery. The
+canonical export stays read-only; clipboard errors offer manual selection. A
+scope/answer/unmount change cannot apply an old reply to a new view. No default
+acceptance, actor authentication, human timing or usefulness is implied.
+
 ## Product rules and evidence
 
 | Rule | Source |

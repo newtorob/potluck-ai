@@ -332,3 +332,28 @@ context stays open; full evidence and the original answer remain expandable.
 These headings organize source text and do not establish factual correctness or
 current policy. Saved answers, exports, model requests and source approvals are
 unchanged.
+
+
+### Review and hand off a guided answer
+
+Open a saved question from **Recent questions**. No model needs to be loaded to
+review or export an existing answer. Choose **Review and export this answer** to
+jump to the controls, select Accept, Correct or Reject, and enter a reviewer
+label and reason. No decision or reviewer is selected for you. Saving a review
+does not approve source knowledge or establish a real-world outcome.
+
+For the ordinary V32/V33 single-answer path, Correct lets you edit the text and
+verdict while retaining the existing question and source references. Complex
+answers, calculations and changes to selected sources remain in **Advanced
+investigation**. The server validates the correction and current source scope.
+The corrected text becomes the current reading; **Original draft before
+correction** retains the original answer and citations.
+
+**Export Markdown** returns the canonical handoff, including the saved review
+and evidence. Its read-only text can be copied or selected manually. Exporting
+a draft does not accept it. Review/export errors keep entered work. After an
+uncertain write, the app checks the saved record once rather than automatically
+submitting again. If sources are unavailable, review/export is disabled until
+the source folders are checked and the answer reopened. Reviewer names are
+local labels, not authenticated company roles. No review time, usefulness or
+actual outcome is inferred.

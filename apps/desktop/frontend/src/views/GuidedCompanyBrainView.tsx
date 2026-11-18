@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
+import {
+  GuidedAnswerReview,
+  type GuidedReviewInput,
+} from '@/components/investigations/GuidedAnswerReview';
 import {
   SuppliedEvidencePanel,
   type SuppliedEvidencePanelHandle,
@@ -98,6 +102,8 @@ export function GuidedCompanyBrainView({
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [unavailableReview, setUnavailableReview] = useState('');
+  const reviewId = useId();
   const alive = useRef(true);
   const epoch = useRef(0);
   const lock = useRef(false);
@@ -111,6 +117,10 @@ export function GuidedCompanyBrainView({
   const workspaceDetails = useRef<HTMLDetailsElement>(null);
   const scope = { workspace: loaded, collection_ids: ids };
   const scopeKey = JSON.stringify([loaded, [...ids].sort()]);
+  const answerContext = useRef({ scopeKey, id: answer?.id });
+  answerContext.current = { scopeKey, id: answer?.id };
+  const effectiveBrief = answer?.review?.corrected_brief ?? answer?.brief;
+  const reviewKey = answer ? `${scopeKey}:${answer.id}` : '';
   const ready =
     loaded === workspace.trim() &&
     ids.length > 0 &&
@@ -467,6 +477,90 @@ export function GuidedCompanyBrainView({
       setRecent((previous) => [result, ...previous.filter((i) => i.id !== result.id)]);
       requestAnimationFrame(() => answerSection.current?.focus());
     });
+  }
+  function updateSavedAnswer(item: Investigation) {
+    setAnswer(item);
+    setUnavailableReview('');
+    setRecent((previous) => [item, ...previous.filter((row) => row.id !== item.id)]);
+  }
+  function unavailable(error: unknown) {
+    return (
+      error instanceof Error && /\b(403|404)\b|unavailable|stale|freshness/i.test(error.message)
+    );
+  }
+  async function savedAnswerAction<T>(
+    action: (target: Investigation, selected: typeof scope) => Promise<T>,
+    reconcile = false,
+    onSuccess?: (result: T) => void,
+  ): Promise<T | undefined> {
+    if (!answer || lock.current || unavailableReview === reviewKey)
+      throw new Error('This answer is not available for review. Reopen it from Recent questions.');
+    const target = structuredClone(answer);
+    const selected = { workspace: loaded, collection_ids: [...ids] };
+    const key = scopeKey;
+    const ticket = epoch.current;
+    const active = () =>
+      current(ticket) &&
+      answerContext.current.scopeKey === key &&
+      answerContext.current.id === target.id;
+    if (
+      target.workspace !== selected.workspace ||
+      JSON.stringify([...target.collection_ids].sort()) !==
+        JSON.stringify([...selected.collection_ids].sort())
+    )
+      throw new Error('The selected folders changed. Reopen the answer.');
+    lock.current = true;
+    setBusy(reconcile ? 'Saving your answer review…' : 'Preparing Markdown…');
+    setNotice('');
+    try {
+      const result = await action(target, selected);
+      if (!active())
+        throw new Error(
+          'The answer or workspace changed. Reopen the saved answer to check its state.',
+        );
+      onSuccess?.(result);
+      return result;
+    } catch (error) {
+      if (reconcile && active()) {
+        try {
+          const savedRecord = await localApi.investigation(target.id, selected);
+          if (active() && savedRecord.review && savedRecord.status !== 'draft') {
+            updateSavedAnswer(savedRecord);
+            setNotice('A review is saved. Showing the confirmed record.');
+            return undefined;
+          }
+        } catch (readError) {
+          if (active() && unavailable(readError)) setUnavailableReview(`${key}:${target.id}`);
+        }
+      }
+      if (active() && unavailable(error)) setUnavailableReview(`${key}:${target.id}`);
+      throw new Error(
+        'Could not complete this action. Your entries are kept. Check the connection and source folders, then reopen the saved answer if needed.',
+      );
+    } finally {
+      if (current(ticket)) {
+        lock.current = false;
+        setBusy('');
+      }
+    }
+  }
+  async function reviewSavedAnswer(input: GuidedReviewInput) {
+    await savedAnswerAction(
+      (target, selected) =>
+        localApi.reviewInvestigation(target.id, { ...selected, ...structuredClone(input) }),
+      true,
+      (result) => {
+        updateSavedAnswer(result);
+        setNotice('Answer review saved. You can export the reviewed handoff below.');
+      },
+    );
+  }
+  async function exportSavedAnswer() {
+    const result = await savedAnswerAction((target, selected) =>
+      localApi.exportInvestigation(target.id, selected),
+    );
+    if (!result) throw new Error('Reopen the saved answer before exporting.');
+    return result.markdown;
   }
   const sourceLink = (citation: string) => (
     <a
@@ -1147,10 +1241,29 @@ export function GuidedCompanyBrainView({
               )}
               <p className="text-sm font-medium">{answer.issue}</p>
               <p className="text-xs text-muted-foreground">
-                Draft for review. A supported status is a model claim, not verified correctness.
-                Unknown means the selected evidence does not establish an answer.
+                {answer.review
+                  ? 'A local review is recorded. The original evidence is retained; a review does not establish the real-world outcome.'
+                  : 'Draft for review. A supported status is a model claim, not verified correctness. Unknown means the selected evidence does not establish an answer.'}
               </p>
-              {answer.brief.answers?.map((a) => (
+              <a
+                className="inline-block underline hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                href={`#${reviewId}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  const panel = document.getElementById(reviewId);
+                  panel?.focus();
+                  panel?.scrollIntoView({ block: 'start' });
+                }}
+              >
+                Review and export this answer
+              </a>
+              {unavailableReview === reviewKey && (
+                <p role="alert" className="text-sm text-destructive">
+                  This answer is no longer available from the selected sources. Your review entries
+                  are kept. Check and scan the folders, then reopen the answer before reviewing.
+                </p>
+              )}
+              {effectiveBrief?.answers?.map((a) => (
                 <div key={a.question_id} className="space-y-3">
                   <p className="text-sm font-medium">
                     {a.status === 'supported'
@@ -1171,19 +1284,42 @@ export function GuidedCompanyBrainView({
                   />
                 </div>
               ))}
+              {answer.review?.corrected_brief && (
+                <details className="rounded-md border border-border p-4">
+                  <summary className="cursor-pointer font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring">
+                    Original draft before correction
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    {answer.brief.answers?.map((original) => (
+                      <FocusedSourceAnswer
+                        key={original.question_id}
+                        guidedReading
+                        question={answer.issue}
+                        answer={original}
+                        evidence={answer.evidence}
+                        readable={answer.readable_answers?.[original.question_id]}
+                        outline={answer.answer_outlines?.[original.question_id]}
+                        sourceLink={sourceLink}
+                      />
+                    ))}
+                  </div>
+                </details>
+              )}
               <SuppliedEvidencePanel
                 key={answer.id}
                 ref={suppliedEvidence}
                 answerId={answer.id}
                 evidence={answer.evidence}
               />
-              <button
-                className={button}
-                disabled={!!busy}
-                onClick={() => onAdvanced(question, answer?.id)}
-              >
-                Review, correct or record an outcome in Advanced investigations
-              </button>
+              <GuidedAnswerReview
+                key={`${reviewKey}:${answer.status}`}
+                anchorId={reviewId}
+                investigation={answer}
+                disabled={!!busy || unavailableReview === reviewKey}
+                onReview={reviewSavedAnswer}
+                onExport={exportSavedAnswer}
+                onAdvanced={() => onAdvanced(answer.issue, answer.id)}
+              />
             </section>
           )}
           <section
@@ -1216,7 +1352,7 @@ export function GuidedCompanyBrainView({
                         void run('Opening saved answer…', async (ticket) => {
                           const data = await localApi.investigation(item.id, scope);
                           if (current(ticket)) {
-                            setAnswer(data);
+                            updateSavedAnswer(data);
                             requestAnimationFrame(() => answerSection.current?.focus());
                           }
                         });

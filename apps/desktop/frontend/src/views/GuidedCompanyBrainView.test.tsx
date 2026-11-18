@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
   approvePilotClaim: vi.fn(),
   supersedePilotClaim: vi.fn(),
   askReviewedPilot: vi.fn(),
+  reviewInvestigation: vi.fn(),
+  exportInvestigation: vi.fn(),
   scanPilotCollection: vi.fn(),
   registerPilotCollection: vi.fn(),
   fetchModels: vi.fn().mockResolvedValue(undefined),
@@ -747,4 +749,173 @@ it('selects a native folder without granting scan consent and resets consent on 
   expect(consent).not.toBeChecked();
   expect(api.registerPilotCollection).not.toHaveBeenCalled();
   expect(api.scanPilotCollection).not.toHaveBeenCalled();
+});
+
+async function openReviewAnswer(value = result) {
+  approved = [claim];
+  api.askReviewedPilot.mockResolvedValue(value);
+  const view = mount();
+  await question();
+  await confirm();
+  fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
+  await screen.findByRole('region', { name: 'Review and handoff' });
+  return view;
+}
+function fillReview(decision = 'accept') {
+  const panel = within(screen.getByRole('region', { name: 'Review and handoff' }));
+  fireEvent.change(panel.getByLabelText('Decision'), { target: { value: decision } });
+  fireEvent.change(panel.getByLabelText('Reviewer name'), { target: { value: 'Test reviewer' } });
+  fireEvent.change(panel.getByLabelText('Reason'), {
+    target: { value: 'Checked conditions and source references.' },
+  });
+  return panel;
+}
+function reviewed(value = result, decision = 'accept') {
+  return {
+    ...structuredClone(value),
+    status: 'reviewed',
+    review: {
+      decision,
+      reviewer: 'Test reviewer',
+      reason: 'Checked conditions and source references.',
+    },
+  };
+}
+describe('guided saved-answer review and handoff', () => {
+  it('keeps failed review entries and reconciles by GET without repeating the POST', async () => {
+    await openReviewAnswer();
+    api.reviewInvestigation.mockRejectedValue(new Error('503 connection uncertain'));
+    api.investigation.mockResolvedValue(structuredClone(result));
+    const panel = fillReview();
+    fireEvent.click(panel.getByRole('button', { name: 'Save review' }));
+    await screen.findByText(/Could not complete this action. Your entries are kept/);
+    expect(api.reviewInvestigation).toHaveBeenCalledTimes(1);
+    expect(api.investigation).toHaveBeenLastCalledWith('answer1', {
+      workspace: 'w',
+      collection_ids: ['c1'],
+    });
+    expect(panel.getByLabelText('Reviewer name')).toHaveValue('Test reviewer');
+    expect(panel.getByLabelText('Reason')).toHaveValue('Checked conditions and source references.');
+    expect(screen.getByRole('region', { name: 'Your answer' })).toBeVisible();
+  });
+  it('confirms an already committed review after a lost response, with no automatic second write', async () => {
+    await openReviewAnswer();
+    api.reviewInvestigation.mockRejectedValue(new Error('response lost'));
+    api.investigation.mockResolvedValue(reviewed());
+    const panel = fillReview();
+    fireEvent.click(panel.getByRole('button', { name: 'Save review' }));
+    await screen.findByText('Recorded decision: accept');
+    expect(api.reviewInvestigation).toHaveBeenCalledTimes(1);
+    expect(api.investigation).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Save review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(api.askReviewedPilot).toHaveBeenCalledTimes(1);
+  });
+  it('blocks duplicate review activation and binds the saved write to the exact scope', async () => {
+    await openReviewAnswer();
+    let resolve!: (value: unknown) => void;
+    api.reviewInvestigation.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const panel = fillReview('reject');
+    const save = panel.getByRole('button', { name: 'Save review' });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    expect(api.reviewInvestigation).toHaveBeenCalledTimes(1);
+    expect(api.reviewInvestigation).toHaveBeenCalledWith('answer1', {
+      workspace: 'w',
+      collection_ids: ['c1'],
+      decision: 'reject',
+      reviewer: 'Test reviewer',
+      reason: 'Checked conditions and source references.',
+    });
+    resolve(reviewed(result, 'reject'));
+    await screen.findByText('Recorded decision: reject');
+  });
+  it('shows the current correction and keeps the untouched original behind its own disclosure', async () => {
+    const editable = {
+      ...structuredClone(result),
+      provenance: { presentation_mode: 'fixed-part-selection-v33' },
+      brief: {
+        ...structuredClone(result.brief),
+        questions: [{ id: 'R1', text: result.issue }],
+        model_uncertainties: [],
+        answers: [
+          {
+            question_id: 'R1',
+            status: 'unknown' as const,
+            text: 'Original cached draft.',
+            snippet_ids: [],
+          },
+        ],
+      },
+    };
+    await openReviewAnswer(editable);
+    api.reviewInvestigation.mockImplementation(async (_id, input) => ({
+      ...editable,
+      status: 'reviewed',
+      review: { ...input },
+    }));
+    const panel = fillReview('correct');
+    fireEvent.change(panel.getByLabelText('Corrected answer'), {
+      target: { value: 'Current correction with the original scope retained.' },
+    });
+    fireEvent.click(panel.getByRole('button', { name: 'Save review' }));
+    await screen.findByText('Recorded decision: correct');
+    expect(screen.getByText('Current correction with the original scope retained.')).toBeVisible();
+    expect(screen.getByText('Original cached draft.')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Original draft before correction'));
+    expect(screen.getByText('Original cached draft.')).toBeVisible();
+    expect(
+      api.reviewInvestigation.mock.calls[0]![1].corrected_brief.answers[0].snippet_ids,
+    ).toEqual([]);
+  });
+  it('preserves the answer on export failure and returns the exact canonical Markdown', async () => {
+    await openReviewAnswer();
+    api.exportInvestigation
+      .mockRejectedValueOnce(new Error('unreachable'))
+      .mockResolvedValueOnce({ markdown: '# Exact canonical handoff\nwith original references' });
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    await screen.findByText(/Could not complete this action. Your entries are kept/);
+    expect(screen.getByRole('region', { name: 'Your answer' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    expect(await screen.findByLabelText('Exported Markdown')).toHaveValue(
+      '# Exact canonical handoff\nwith original references',
+    );
+    expect(api.exportInvestigation).toHaveBeenLastCalledWith('answer1', {
+      workspace: 'w',
+      collection_ids: ['c1'],
+    });
+    expect(api.reviewInvestigation).not.toHaveBeenCalled();
+  });
+  it('keeps entries but disables review/export after current sources become unavailable', async () => {
+    await openReviewAnswer();
+    api.reviewInvestigation.mockRejectedValue(new Error('404 unavailable'));
+    api.investigation.mockRejectedValue(new Error('404 unavailable'));
+    const panel = fillReview();
+    fireEvent.click(panel.getByRole('button', { name: 'Save review' }));
+    await screen.findByText(/This answer is no longer available from the selected sources/);
+    expect(panel.getByLabelText('Reason')).toHaveValue('Checked conditions and source references.');
+    expect(panel.getByRole('button', { name: 'Save review' })).toBeDisabled();
+    expect(panel.getByRole('button', { name: 'Export Markdown' })).toBeDisabled();
+  });
+  it('ignores a review reply after the view has unmounted', async () => {
+    const view = await openReviewAnswer();
+    let resolve!: (value: unknown) => void;
+    api.reviewInvestigation.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    fireEvent.click(fillReview().getByRole('button', { name: 'Save review' }));
+    view.unmount();
+    resolve(reviewed());
+    mount();
+    await screen.findByRole('checkbox', { name: /Docs/ });
+    expect(screen.queryByText('Recorded decision: accept')).not.toBeInTheDocument();
+  });
 });
