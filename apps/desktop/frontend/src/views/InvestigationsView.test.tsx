@@ -519,6 +519,8 @@ describe('InvestigationsView', () => {
     };
     const item = {
       id: 'i1',
+      workspace: 'w',
+      collection_ids: ['c1'],
       issue: 'Failure',
       status: 'draft',
       model_slug: 'local-model',
@@ -601,9 +603,16 @@ describe('InvestigationsView', () => {
       ),
     );
     expect(await screen.findByText('Corrected')).toBeInTheDocument();
+    expect(screen.getByLabelText('Outcome')).toHaveValue('');
+    expect(screen.getByLabelText('Reviewer name')).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Outcome notes'), { target: { value: 'Done' } });
-    expect(screen.getByRole('button', { name: 'Save outcome' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Result'), { target: { value: 'resolved' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save outcome' }));
+    expect(api.recordInvestigationOutcome).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Outcome')).toHaveFocus();
+    fireEvent.change(screen.getByLabelText('Outcome'), { target: { value: 'resolved' } });
+    fireEvent.change(screen.getByLabelText('Reviewer name'), {
+      target: { value: 'Outcome observer' },
+    });
     expect(screen.getByRole('button', { name: 'Save outcome' })).toBeEnabled();
   });
 

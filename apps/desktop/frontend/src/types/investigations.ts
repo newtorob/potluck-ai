@@ -106,6 +106,7 @@ export interface Investigation {
   collection_ids: string[];
   issue: string;
   model_slug: string;
+  model_sha?: string;
   status: 'draft' | 'reviewed' | 'invalidated';
   brief: Brief;
   readable_answers?: Record<string, ReadableAnswer>;

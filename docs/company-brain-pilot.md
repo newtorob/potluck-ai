@@ -543,3 +543,32 @@ Source review records a reviewer and reason. Delegated assistant source review
 can be recorded, so the provenance describes a source-review record rather than
 claiming that a person reviewed the answer. A saved-answer decision remains a
 separate explicit action.
+
+## Record feedback in the guided view
+
+After reviewing a saved answer, use **4. Record what happened**. Choose an outcome,
+enter the observer's name and notes, then **Save outcome**. These fields start
+empty. The name is a local audit label. The outcome describes an observation and
+is separate from accepting, correcting or rejecting the answer. It can be recorded
+once; saved observations are read-only. This uses the same scoped, current-source
+outcome endpoint as Advanced investigations and needs no loaded model.
+
+If a save response is lost, the application checks the saved record once before
+offering recovery. It shows an actually recorded outcome without repeating the
+write. If none is confirmed, entries remain available. Reopen the answer or check
+and scan its folders when sources become unavailable. A saved review by itself
+does not mean an outcome was recorded.
+
+With a review and outcome recorded, inspect the supplied sources and acknowledge
+**I reviewed the recorded outcome and supplied sources for this proposal**. Choose
+**Prepare evaluation proposal**, inspect its read-only JSON and then explicitly
+**Download evaluation proposal**. This is a reference to the same local answer,
+review, outcome, sources and model. It does not contain the source documents, a
+scoring rubric or a passing score. An evaluation still needs independently reviewed
+criteria before being run; rejected answers can be useful negative cases. Changing
+the answer or source context invalidates the preview and acknowledgement.
+
+Recording feedback and preparing a proposal never approve knowledge, train a model,
+run an evaluation or call the answer model. Advanced retains its separate knowledge
+proposal and evaluation tools. Workspace labels and typed names remain local-owner
+scope, not multi-user authentication or authorization.

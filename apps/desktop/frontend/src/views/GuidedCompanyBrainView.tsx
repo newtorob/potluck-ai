@@ -4,6 +4,11 @@ import { ViewHeader } from '@/components/layout/ViewHeader';
 import { CompanyBrainPilotSetup } from '@/components/investigations/CompanyBrainPilotSetup';
 import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
 import {
+  InvestigationOutcomeForm,
+  type OutcomeInput,
+} from '@/components/investigations/InvestigationOutcomeForm';
+import { GuidedEvaluationProposal } from '@/components/investigations/GuidedEvaluationProposal';
+import {
   GuidedAnswerReview,
   type GuidedReviewInput,
 } from '@/components/investigations/GuidedAnswerReview';
@@ -108,7 +113,19 @@ export function GuidedCompanyBrainView({
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
   reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42' | 'v43';
+  reviewedAnswerVersion?:
+    | 'v32'
+    | 'v33'
+    | 'v34'
+    | 'v35'
+    | 'v36'
+    | 'v37'
+    | 'v38'
+    | 'v39'
+    | 'v40'
+    | 'v41'
+    | 'v42'
+    | 'v43';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);
@@ -540,10 +557,11 @@ export function GuidedCompanyBrainView({
   }
   async function savedAnswerAction<T>(
     action: (target: Investigation, selected: typeof scope) => Promise<T>,
-    reconcile = false,
+    reconcile: false | 'review' | 'outcome' = false,
     onSuccess?: (result: T) => void,
+    label = 'Preparing Markdown…',
   ): Promise<T | undefined> {
-    if (!answer || lock.current || unavailableReview === reviewKey)
+    if (!answer || lock.current || setupLock.current || unavailableReview === reviewKey)
       throw new Error('This answer is not available for review. Reopen it from Recent questions.');
     const target = structuredClone(answer);
     const selected = { workspace: loaded, collection_ids: [...ids] };
@@ -560,7 +578,7 @@ export function GuidedCompanyBrainView({
     )
       throw new Error('The selected folders changed. Reopen the answer.');
     lock.current = true;
-    setBusy(reconcile ? 'Saving your answer review…' : 'Preparing Markdown…');
+    setBusy(reconcile === 'review' ? 'Saving your answer review…' : label);
     setNotice('');
     try {
       const result = await action(target, selected);
@@ -574,9 +592,21 @@ export function GuidedCompanyBrainView({
       if (reconcile && active()) {
         try {
           const savedRecord = await localApi.investigation(target.id, selected);
-          if (active() && savedRecord.review && savedRecord.status !== 'draft') {
+          if (
+            active() &&
+            savedRecord.id === target.id &&
+            savedRecord.workspace === selected.workspace &&
+            JSON.stringify([...savedRecord.collection_ids].sort()) ===
+              JSON.stringify([...selected.collection_ids].sort()) &&
+            savedRecord.status === 'reviewed' &&
+            (reconcile === 'outcome' ? savedRecord.outcome : savedRecord.review)
+          ) {
             updateSavedAnswer(savedRecord);
-            setNotice('A review is saved. Showing the confirmed record.');
+            setNotice(
+              reconcile === 'outcome'
+                ? 'An outcome is recorded. Showing the saved record.'
+                : 'A review is saved. Showing the confirmed record.',
+            );
             return undefined;
           }
         } catch (readError) {
@@ -598,12 +628,57 @@ export function GuidedCompanyBrainView({
     await savedAnswerAction(
       (target, selected) =>
         localApi.reviewInvestigation(target.id, { ...selected, ...structuredClone(input) }),
-      true,
+      'review',
       (result) => {
         updateSavedAnswer(result);
-        setNotice('Answer review saved. You can export the reviewed handoff below.');
+        setNotice('Answer review saved. Export the handoff or record what happened next.');
       },
     );
+  }
+  async function recordSavedOutcome(input: OutcomeInput) {
+    await savedAnswerAction(
+      async (target, selected) => {
+        if (target.status !== 'reviewed' || !target.review || target.outcome)
+          throw new Error('Reopen a reviewed answer without an outcome before saving.');
+        const record = await localApi.recordInvestigationOutcome(target.id, {
+          ...selected,
+          ...structuredClone(input),
+        });
+        if (
+          record.id !== target.id ||
+          record.workspace !== selected.workspace ||
+          JSON.stringify([...record.collection_ids].sort()) !==
+            JSON.stringify([...selected.collection_ids].sort()) ||
+          record.status !== 'reviewed' ||
+          !record.outcome
+        )
+          throw new Error('The outcome response does not match the saved answer. Reopen it.');
+        return record;
+      },
+      'outcome',
+      (record) => {
+        updateSavedAnswer(record);
+        setNotice('Outcome saved. You can prepare an evaluation proposal below.');
+      },
+      'Saving actual outcome…',
+    );
+  }
+  async function prepareSavedEvaluation() {
+    const result = await savedAnswerAction(
+      (target, selected) => {
+        if (target.status !== 'reviewed' || !target.review || !target.outcome)
+          throw new Error(
+            'Review this answer and record what happened before preparing a proposal.',
+          );
+        return localApi.evaluationCase(target.id, selected);
+      },
+      false,
+      undefined,
+      'Preparing evaluation proposal…',
+    );
+    if (!result)
+      throw new Error('Reopen this saved answer before preparing an evaluation proposal.');
+    return result;
   }
   async function exportSavedAnswer() {
     const result = await savedAnswerAction((target, selected) =>
@@ -1336,8 +1411,8 @@ export function GuidedCompanyBrainView({
               </a>
               {unavailableReview === reviewKey && (
                 <p role="alert" className="text-sm text-destructive">
-                  This answer is no longer available from the selected sources. Your review entries
-                  are kept. Check and scan the folders, then reopen the answer before reviewing.
+                  This answer is no longer available from the selected sources. Your entries are
+                  kept. Check and scan the folders, then reopen the answer before reviewing.
                 </p>
               )}
               {effectiveBrief?.answers?.map((a) => (
@@ -1401,7 +1476,7 @@ export function GuidedCompanyBrainView({
                 evidence={answer.evidence}
               />
               <GuidedAnswerReview
-                key={`${reviewKey}:${answer.status}`}
+                key={reviewKey + ':' + answer.status + ':' + JSON.stringify(answer.outcome)}
                 anchorId={reviewId}
                 investigation={answer}
                 disabled={!!busy || unavailableReview === reviewKey}
@@ -1409,6 +1484,23 @@ export function GuidedCompanyBrainView({
                 onExport={exportSavedAnswer}
                 onAdvanced={() => onAdvanced(answer.issue, answer.id)}
               />
+              {answer.status === 'reviewed' && answer.review && (
+                <InvestigationOutcomeForm
+                  key={reviewKey + ':outcome'}
+                  investigation={answer}
+                  heading="4. Record what happened"
+                  disabled={!!busy || unavailableReview === reviewKey}
+                  onSave={recordSavedOutcome}
+                />
+              )}
+              {answer.status === 'reviewed' && answer.review && answer.outcome && (
+                <GuidedEvaluationProposal
+                  key={reviewKey + ':evaluation'}
+                  investigation={answer}
+                  disabled={!!busy || unavailableReview === reviewKey}
+                  onPrepare={prepareSavedEvaluation}
+                />
+              )}
             </section>
           )}
           <section

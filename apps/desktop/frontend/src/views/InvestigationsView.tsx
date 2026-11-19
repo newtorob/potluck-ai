@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FocusedSourceAnswer } from '@/components/investigations/FocusedSourceAnswer';
+import {
+  InvestigationOutcomeForm,
+  type OutcomeInput,
+} from '@/components/investigations/InvestigationOutcomeForm';
 import { PilotKnowledge } from '@/components/investigations/PilotKnowledge';
 import {
   QuestionPartsEditor,
@@ -127,8 +131,6 @@ export function InvestigationsView({
   }
   const [reviewer, setReviewer] = useState('');
   const [reason, setReason] = useState('');
-  const [result, setResult] = useState<'' | 'resolved' | 'unresolved' | 'inconclusive'>('');
-  const [notes, setNotes] = useState('');
   const [claimKey, setClaimKey] = useState('');
   const [claimContent, setClaimContent] = useState('');
   const [claimCitations, setClaimCitations] = useState<string[]>([]);
@@ -140,6 +142,82 @@ export function InvestigationsView({
   const [citationsOpen, setCitationsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scope = { workspace: loadedWorkspace, collection_ids: selected };
+  const feedbackIdentity = JSON.stringify([loadedWorkspace, [...selected].sort(), current?.id]);
+  const feedbackContext = useRef({ identity: feedbackIdentity, generation: 0 });
+  if (feedbackContext.current.identity !== feedbackIdentity)
+    feedbackContext.current = {
+      identity: feedbackIdentity,
+      generation: feedbackContext.current.generation + 1,
+    };
+  const feedbackAlive = useRef(true);
+  useEffect(() => {
+    feedbackAlive.current = true;
+    return () => {
+      feedbackAlive.current = false;
+    };
+  }, []);
+  async function saveActualOutcome(input: OutcomeInput) {
+    if (!current || inFlight.current || busy)
+      throw new Error('Wait for the current action, then reopen this answer.');
+    const target = structuredClone(current);
+    const selectedScope = { workspace: loadedWorkspace, collection_ids: [...selected] };
+    const generation = feedbackContext.current.generation;
+    const active = () =>
+      feedbackAlive.current &&
+      feedbackContext.current.identity === feedbackIdentity &&
+      feedbackContext.current.generation === generation;
+    const matches = (item: Investigation) =>
+      item.id === target.id &&
+      item.workspace === selectedScope.workspace &&
+      JSON.stringify([...item.collection_ids].sort()) ===
+        JSON.stringify([...selectedScope.collection_ids].sort()) &&
+      item.status === 'reviewed' &&
+      !!item.outcome;
+    if (
+      target.status !== 'reviewed' ||
+      !target.review ||
+      target.outcome ||
+      target.workspace !== selectedScope.workspace ||
+      JSON.stringify([...target.collection_ids].sort()) !==
+        JSON.stringify([...selectedScope.collection_ids].sort())
+    )
+      throw new Error(
+        'Reopen a reviewed answer in its original folder selection before saving an outcome.',
+      );
+    inFlight.current = true;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const item = await localApi.recordInvestigationOutcome(target.id, {
+        ...selectedScope,
+        ...input,
+      });
+      if (!active() || !matches(item))
+        throw new Error('The answer changed. Reopen it to check its outcome.');
+      show(item);
+      setNotice('Outcome saved.');
+    } catch {
+      if (active()) {
+        try {
+          const item = await localApi.investigation(target.id, selectedScope);
+          if (active() && matches(item)) {
+            show(item);
+            setNotice('An outcome is recorded. Showing the saved record.');
+            return;
+          }
+        } catch {
+          /* Keep entries and require an explicit recovery action. */
+        }
+      }
+      throw new Error(
+        'Could not confirm the outcome. Your entries are kept. Check the connection and source folders, then reopen the saved answer.',
+      );
+    } finally {
+      inFlight.current = false;
+      if (feedbackAlive.current) setBusy(false);
+    }
+  }
   function protectWorkspaceChoice() {
     if (workspaceEdited.current) return;
     workspaceEdited.current = true;
@@ -359,8 +437,6 @@ export function InvestigationsView({
     });
     setDecision('accept');
     setReason('');
-    setNotes('');
-    setResult('');
     setClaimKey('');
     setClaimContent('');
     setClaimCitations([]);
@@ -2140,62 +2216,12 @@ export function InvestigationsView({
                   </p>
                 )}
               </div>
-              <div className="border-t border-border pt-4 space-y-3">
-                <h3 className="font-medium">Record actual outcome</h3>
-                <label className="block text-sm">
-                  Result
-                  <select
-                    className={field}
-                    value={result}
-                    onChange={(e) => setResult(e.target.value as typeof result)}
-                  >
-                    <option value="">Choose an outcome</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="unresolved">Unresolved</option>
-                    <option value="inconclusive">Inconclusive</option>
-                  </select>
-                </label>
-                <label className="block text-sm">
-                  Outcome notes
-                  <textarea
-                    className={`${field} resize-none`}
-                    rows={3}
-                    maxLength={4000}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </label>
-                <button
-                  className={button}
-                  disabled={
-                    busy ||
-                    current.status !== 'reviewed' ||
-                    !!current.outcome ||
-                    !reviewer.trim() ||
-                    !notes.trim() ||
-                    !result
-                  }
-                  onClick={() =>
-                    void run(async () => {
-                      const item = await localApi.recordInvestigationOutcome(current.id, {
-                        ...scope,
-                        reviewer,
-                        result: result || 'inconclusive',
-                        notes,
-                      });
-                      show(item);
-                      setNotice('Outcome saved.');
-                    })
-                  }
-                >
-                  Save outcome
-                </button>
-                {current.outcome && (
-                  <p className="text-sm">
-                    Outcome: {current.outcome.result} · {current.outcome.notes}
-                  </p>
-                )}
-              </div>
+              <InvestigationOutcomeForm
+                key={feedbackIdentity}
+                investigation={current}
+                disabled={busy}
+                onSave={saveActualOutcome}
+              />
               {current.status === 'reviewed' && current.outcome && (
                 <div className="border-t border-border pt-4 space-y-3">
                   <h3 className="font-medium">Propose reuse</h3>

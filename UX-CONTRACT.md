@@ -484,3 +484,38 @@ The canonical map for these Company Brain controls is:
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 | --- | --- | --- | --- | --- |
 | Select/Listbox | `GuidedCompanyBrainView`, `GuidedAnswerReview` | This guided-workflow contract | Native operating-system popup | Frontend workflow tests and installed-pilot keyboard checks |
+
+## Recorded outcomes and guided evaluation proposals
+
+`InvestigationOutcomeForm` owns actual-outcome fields in Guided and Advanced
+investigations. Outcome, reviewer and notes start empty, independently of the
+answer review. Its native OS select is intentional; Hearth investigation controls
+own labels, focus, loading, disabled and validation states. The server's
+`record_outcome` owns reviewed/current-source and append-only enforcement. Saved
+observations are read-only. A recorded resolution is the observer's statement,
+not automated verification or authenticated company-role evidence.
+
+The parent views own exact workspace, collection-set and saved-answer transport,
+exclusive dispatch and late-response protection. An uncertain write performs one
+same-scope GET, accepts only that target's actually recorded outcome, and never
+repeats the POST automatically. An existing review alone cannot confirm an outcome.
+Recoverable failures retain entries; source unavailability explains reopen/scan
+recovery. The guided handoff resets cached Markdown after a newly recorded outcome.
+
+`GuidedEvaluationProposal` is the guided preview variant of the existing evaluation
+reference API. Saved review plus outcome and an explicit acknowledgement precede
+preparation. The returned reference must exactly match the current investigation,
+workspace, collection set, supplied citation set, review decision, outcome result,
+model identity and proposed status. Rejected answers can be proposed as negative
+cases; acceptance is never inferred. Changed context resets consent and preview.
+Read-only JSON and explicit local download retain the actual reference. No scoring
+rubric, expected answer, evaluation run, knowledge approval or training is created.
+Advanced retains its existing direct-download variant and separate knowledge
+proposal flow; server source/privacy/authority checks remain final for both.
+
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+| --- | --- | --- | --- | --- |
+| Form | `InvestigationOutcomeForm` | `investigations.record_outcome` | Guided step heading / Advanced heading; read-only after save | Component lifecycle tests and parent save/reconciliation tests |
+| Select/Listbox | `InvestigationOutcomeForm` | Actual outcome enum from outcome API | Native OS popup | Component validation and actual keyboard selection checks |
+| Feedback CRUD | Guided and Advanced parent views | Scoped outcome API and read-only reconciliation | Append-only observation; no auto retry | Lost response, stale context and exact target tests |
+| Evaluation preview | `GuidedEvaluationProposal` | `investigation_evaluation.propose_evaluation_case` | Guided inspect/export; Advanced direct download | Binding/tamper/stale response tests and isolated real backend walkthrough |

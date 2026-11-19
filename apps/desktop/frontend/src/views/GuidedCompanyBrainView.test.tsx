@@ -21,6 +21,8 @@ const api = vi.hoisted(() => ({
   supersedePilotClaim: vi.fn(),
   askReviewedPilot: vi.fn(),
   reviewInvestigation: vi.fn(),
+  recordInvestigationOutcome: vi.fn(),
+  evaluationCase: vi.fn(),
   exportInvestigation: vi.fn(),
   scanPilotCollection: vi.fn(),
   registerPilotCollection: vi.fn(),
@@ -1170,5 +1172,132 @@ describe('guided saved-answer review and handoff', () => {
     mount();
     await screen.findByRole('checkbox', { name: /Docs/ });
     expect(screen.queryByText('Recorded decision: accept')).not.toBeInTheDocument();
+  });
+});
+
+describe('guided recorded outcomes and evaluation proposals', () => {
+  function feedbackAnswer() {
+    return { ...reviewed(), model_sha: 'a'.repeat(64) };
+  }
+  const observed = {
+    reviewer: 'Observer',
+    result: 'inconclusive',
+    notes: 'Test observation only; no deployment was performed.',
+  };
+  async function reopen(
+    item: Omit<ReturnType<typeof feedbackAnswer>, 'outcome'> & {
+      outcome: typeof observed | null;
+    } = feedbackAnswer(),
+  ) {
+    api.investigations.mockResolvedValue({ investigations: [item] });
+    api.investigation.mockResolvedValue(item);
+    const view = mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Who approves\?.*reviewed/ }));
+    await screen.findByRole('heading', { name: '4. Record what happened' });
+    return { view, item };
+  }
+  function fillOutcome() {
+    const panel = within(screen.getByRole('region', { name: '4. Record what happened' }));
+    fireEvent.change(panel.getByLabelText('Outcome'), { target: { value: observed.result } });
+    fireEvent.change(panel.getByLabelText('Reviewer name'), {
+      target: { value: observed.reviewer },
+    });
+    fireEvent.change(panel.getByLabelText('Outcome notes'), { target: { value: observed.notes } });
+    return panel;
+  }
+  it('saves one explicit observed outcome under exact scope without inference and refreshes the handoff', async () => {
+    const { item } = await reopen();
+    api.exportInvestigation
+      .mockResolvedValueOnce({ markdown: 'Before outcome export' })
+      .mockResolvedValueOnce({ markdown: 'After outcome export' });
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    await screen.findByDisplayValue('Before outcome export');
+    api.recordInvestigationOutcome.mockImplementation(async (_id, input) => ({
+      ...item,
+      outcome: { ...input },
+    }));
+    const panel = fillOutcome();
+    const save = panel.getByRole('button', { name: 'Save outcome' });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await screen.findByText('Recorded outcome: inconclusive');
+    expect(api.recordInvestigationOutcome).toHaveBeenCalledTimes(1);
+    expect(api.recordInvestigationOutcome).toHaveBeenCalledWith('answer1', {
+      workspace: 'w',
+      collection_ids: ['c1'],
+      ...observed,
+    });
+    expect(screen.queryByDisplayValue('Before outcome export')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    await screen.findByDisplayValue('After outcome export');
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
+    expect(api.evaluationCase).not.toHaveBeenCalled();
+    expect(screen.getByRole('region', { name: 'Your answer' })).toHaveTextContent(
+      result.brief.answers[0]!.text,
+    );
+  });
+  it('does not confuse an already saved review with a committed outcome after a lost response', async () => {
+    const { item } = await reopen();
+    api.recordInvestigationOutcome.mockRejectedValue(new Error('Response lost'));
+    api.investigation.mockResolvedValue(item);
+    const panel = fillOutcome();
+    fireEvent.click(panel.getByRole('button', { name: 'Save outcome' }));
+    await screen.findByText(/Could not complete this action. Your entries are kept/);
+    expect(panel.getByLabelText('Outcome notes')).toHaveValue(observed.notes);
+    expect(screen.queryByText('Recorded outcome: inconclusive')).not.toBeInTheDocument();
+    expect(api.investigation).toHaveBeenCalledTimes(2);
+    expect(api.recordInvestigationOutcome).toHaveBeenCalledTimes(1);
+  });
+  it('reconciles one actually committed outcome by GET without repeating the POST', async () => {
+    const { item } = await reopen();
+    api.recordInvestigationOutcome.mockRejectedValue(new Error('Response lost'));
+    api.investigation.mockResolvedValue({ ...item, outcome: observed });
+    const panel = fillOutcome();
+    fireEvent.click(panel.getByRole('button', { name: 'Save outcome' }));
+    await screen.findByText('Recorded outcome: inconclusive');
+    expect(api.recordInvestigationOutcome).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Save outcome' })).not.toBeInTheDocument();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+  });
+  it('refuses an outcome response and reconciliation from a different scope', async () => {
+    const { item } = await reopen();
+    const wrong = { ...item, workspace: 'another-team', outcome: observed };
+    api.recordInvestigationOutcome.mockResolvedValue(wrong);
+    api.investigation.mockResolvedValue(wrong);
+    const panel = fillOutcome();
+    fireEvent.click(panel.getByRole('button', { name: 'Save outcome' }));
+    await screen.findByText(/Your entries are kept/);
+    expect(panel.getByLabelText('Outcome notes')).toHaveValue(observed.notes);
+    expect(screen.queryByText('Recorded outcome: inconclusive')).not.toBeInTheDocument();
+  });
+  it('prepares a reference only after recorded outcome and acknowledgement, without scoring or knowledge approval', async () => {
+    const item = { ...feedbackAnswer(), outcome: observed };
+    await reopen(item);
+    const data = {
+      investigation_id: item.id,
+      workspace: 'w',
+      collection_ids: ['c1'],
+      citation_ids: [],
+      review_decision: 'accept',
+      outcome_result: 'inconclusive',
+      model_slug: 'loaded-model',
+      model_sha: item.model_sha,
+      status: 'proposed',
+    };
+    api.evaluationCase.mockResolvedValue(data);
+    const panel = within(screen.getByRole('region', { name: 'Evaluation proposal' }));
+    expect(panel.getByRole('button', { name: 'Prepare evaluation proposal' })).toBeDisabled();
+    fireEvent.click(panel.getByRole('checkbox'));
+    fireEvent.click(panel.getByRole('button', { name: 'Prepare evaluation proposal' }));
+    await panel.findByRole('link', { name: 'Download evaluation proposal' });
+    expect(api.evaluationCase).toHaveBeenCalledWith('answer1', {
+      workspace: 'w',
+      collection_ids: ['c1'],
+    });
+    expect(api.recordInvestigationOutcome).not.toHaveBeenCalled();
+    expect(api.askReviewedPilot).not.toHaveBeenCalled();
+    expect(api.proposePilotClaim).not.toHaveBeenCalled();
+    expect(api.approvePilotClaim).not.toHaveBeenCalled();
   });
 });
