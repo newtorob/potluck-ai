@@ -253,6 +253,7 @@ describe('guided pilot setup integration', () => {
       prepare_confirmed: true,
       expected_active_model: 'loaded-model',
     });
+    api.health.mockResolvedValue({ model_loaded: true, active_model_id: 'pilot' });
     resolve(
       pilotSetup({ ready: true, active_model: 'pilot', can_prepare: false, can_unload: true }),
     );
@@ -262,7 +263,12 @@ describe('guided pilot setup integration', () => {
   });
   it('keeps a saved answer and review available after unload and requires reconfirmation', async () => {
     api.companyBrainModelSetup.mockResolvedValue(
-      pilotSetup({ ready: true, active_model: 'pilot', can_prepare: false, can_unload: true }),
+      pilotSetup({
+        ready: true,
+        active_model: 'loaded-model',
+        can_prepare: false,
+        can_unload: true,
+      }),
     );
     api.unloadCompanyBrainModel.mockResolvedValue(pilotSetup({ active_model: null }));
     await openReviewAnswer();
@@ -272,7 +278,9 @@ describe('guided pilot setup integration', () => {
     expect(screen.getByRole('button', { name: 'Get answer' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'End model session' }));
     await waitFor(() =>
-      expect(api.unloadCompanyBrainModel).toHaveBeenCalledWith({ expected_active_model: 'pilot' }),
+      expect(api.unloadCompanyBrainModel).toHaveBeenCalledWith({
+        expected_active_model: 'loaded-model',
+      }),
     );
     await waitFor(() => expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled());
     expect(screen.getByRole('region', { name: 'Your answer' })).toBeVisible();
@@ -860,6 +868,28 @@ async function openReviewAnswer(value = result) {
   await screen.findByRole('region', { name: 'Review and handoff' });
   return view;
 }
+it.each(['inference_failed', 'generation_timeout'])(
+  'keeps the question and gives model recovery for %s without retrying',
+  async (code) => {
+    approved = [claim];
+    api.askReviewedPilot.mockRejectedValueOnce(
+      new Error(`[localApi] 400: ${code}: No investigation was saved.`),
+    );
+    mount();
+    await question();
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'The local model could not finish this answer. No answer was saved.',
+    );
+    expect(alert).toHaveTextContent('Refresh Local model setup');
+    expect(alert).not.toHaveTextContent('check its sources');
+    expect(screen.getByLabelText('Your question')).toHaveValue('Who approves?');
+    expect(api.askReviewedPilot).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('region', { name: 'Review and handoff' })).not.toBeInTheDocument();
+  },
+);
 function fillReview(decision = 'accept') {
   const panel = within(screen.getByRole('region', { name: 'Review and handoff' }));
   fireEvent.change(panel.getByLabelText('Decision'), { target: { value: decision } });

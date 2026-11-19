@@ -11,14 +11,19 @@ function bytes(value: number | null): string {
 /** Explicit, session-only setup; source review and saved answers do not depend on it. */
 export function CompanyBrainPilotSetup({
   disabled = false,
+  activeModelId,
+  connectionState,
   onModelChange,
   onBusyChange,
 }: {
   disabled?: boolean;
+  activeModelId?: string | null;
+  connectionState?: 'checking' | 'offline' | 'connected';
   onModelChange: (modelId: string | null) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const id = useId();
+  const runtimeUnavailable = connectionState === 'checking' || connectionState === 'offline';
   const [setup, setSetup] = useState<PilotModelSetup | null>(null);
   const [path, setPath] = useState('');
   const [importConsent, setImportConsent] = useState(false);
@@ -74,7 +79,7 @@ export function CompanyBrainPilotSetup({
     completed?: (result: PilotModelSetup) => void,
     mutation = true,
   ) {
-    if (lock.current || disabled || busy) return;
+    if (lock.current || disabled || busy || (mutation && runtimeUnavailable)) return;
     lock.current = true;
     if (mutation) setExternalBusy(true);
     const current = ++generation.current;
@@ -120,7 +125,12 @@ export function CompanyBrainPilotSetup({
       if (alive.current && generation.current === current) setBusy(null);
     }
   }
-  const unavailable = disabled || !!busy;
+  const unavailable = disabled || !!busy || runtimeUnavailable;
+  const modelStateChanged =
+    setup !== null && activeModelId !== undefined && setup.active_model !== activeModelId;
+  useEffect(() => {
+    setPrepareConsent(false);
+  }, [activeModelId, connectionState]);
   return (
     <section
       aria-label="Company Brain model setup"
@@ -150,14 +160,26 @@ export function CompanyBrainPilotSetup({
       {setup && (
         <div className="space-y-4">
           <p className="text-sm font-medium">
-            {setup.ready
-              ? 'Ready for local questions'
-              : setup.installed
-                ? setup.artifact_verified
-                  ? 'Model imported; not ready'
-                  : 'Model file present; preparation verifies it'
-                : 'Model file needed'}
+            {connectionState === 'checking'
+              ? 'Checking local engine'
+              : connectionState === 'offline'
+                ? 'Local engine offline; check connection'
+                : modelStateChanged
+                  ? 'Model state changed; refresh setup'
+                  : setup.ready
+                    ? 'Ready for local questions'
+                    : setup.installed
+                      ? setup.artifact_verified
+                        ? 'Model imported; not ready'
+                        : 'Model file present; preparation verifies it'
+                      : 'Model file needed'}
           </p>
+          {modelStateChanged && (
+            <p role="status" className="text-sm">
+              The loaded model changed since the last check. Refresh setup before preparing or
+              ending a model session.
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             This pilot uses CPU inference and an 8K context for this session. Preparation may take
             time and requires available memory. Answers still need review; CPU speed depends on the
@@ -254,7 +276,7 @@ export function CompanyBrainPilotSetup({
             </fieldset>
           )}
           <fieldset
-            disabled={unavailable || !setup.can_prepare}
+            disabled={unavailable || modelStateChanged || !setup.can_prepare}
             className="space-y-3 disabled:opacity-60"
           >
             <legend className="text-sm font-medium">Prepare for this session</legend>
@@ -300,7 +322,7 @@ export function CompanyBrainPilotSetup({
             <button
               type="button"
               className={button}
-              disabled={unavailable}
+              disabled={unavailable || modelStateChanged}
               onClick={() =>
                 void action(
                   'Ending model session',
@@ -320,7 +342,7 @@ export function CompanyBrainPilotSetup({
       <button
         type="button"
         className={button}
-        disabled={unavailable}
+        disabled={disabled || !!busy}
         onClick={() =>
           void action('Checking setup', () => localApi.companyBrainModelSetup(), undefined, false)
         }

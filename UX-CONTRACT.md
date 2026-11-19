@@ -451,6 +451,12 @@ Guided `FocusedSourceAnswer` retains supported source context visibly open by de
 - Confirmed preparation selects the model and refreshes health; asking still
   requires recent sources, approved statements and question confirmation.
 - Unloading keeps saved answers and source review; it invalidates ask confirmation.
+- The current health model ID invalidates cached setup readiness and replacement consent
+  when the loaded model changes. Refresh setup remains available to reconcile before
+  preparation or unloading; a passive check never starts a model operation.
+- Completing an answer attempt refreshes runtime health. Known inference failures and
+  generation timeouts explain that no answer was saved and point to Local model setup,
+  while keeping the original question. They do not diagnose source freshness as the cause.
 - Unsupported platform, engine, memory, disk and artifact states cannot claim
   readiness. Model/resource details are expandable. Failed actions retain entries
   and require an explicit retry; setup never silently retries a model mutation.

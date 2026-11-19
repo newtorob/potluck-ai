@@ -224,6 +224,8 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
         assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v38'
         assert client.post(path, json={**body, 'reviewed_answer_version': 'v39'}, headers=headers).status_code == 200
         assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v39'
+        assert client.post(path, json={**body, 'reviewed_answer_version': 'v40'}, headers=headers).status_code == 200
+        assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v40'
         assert client.post(path, json={**body, 'reviewed_answer_version': 'v0'}, headers=headers).status_code == 422
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7'}, headers=headers).status_code == 422
 
@@ -322,7 +324,7 @@ def test_http_collection_reports_are_scoped_and_survive_restart(tmp_path, monkey
     assert reopened.get('/company-brain/collections', params={'workspace': 'w'}).status_code == 401
 
 
-@pytest.mark.parametrize('mode', ['fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39'])
+@pytest.mark.parametrize('mode', ['fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40'])
 def test_typed_findings_refuse_model_outline_before_runtime_access(monkeypatch, mode):
     from potluck_local.services import investigations as inv
     def forbid():
@@ -337,7 +339,7 @@ def test_typed_findings_refuse_model_outline_before_runtime_access(monkeypatch, 
     assert 'Turn off answer organization' in error.detail
 
 
-@pytest.mark.parametrize('mode', ['fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39'])
+@pytest.mark.parametrize('mode', ['fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40'])
 def test_typed_findings_are_ineligible_for_the_independent_model_outline(mode):
     from potluck_local.services import investigation_answer_outlines as outlines
     with pytest.raises(ValueError, match='Ineligible outline answer'):

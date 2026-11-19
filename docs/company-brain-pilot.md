@@ -498,3 +498,25 @@ The explicit V39 experiment uses one shared 330-second generation deadline,
 within the desktop's existing six-minute request limit. Prior versions retain
 their 240-second deadline. The three-call/1280-output-token cap, model profile,
 conditions and citation checks stay fixed; timeout still saves no answer.
+
+Explicit `reviewed_answer_version: "v40"` compacts the three model inputs.
+Literal question partitioning receives the exact whole question and ordered
+confirmed parts, without source documents. The typed proposal and bound-kind
+audit still receive every complete reviewed source unit in order; each clause
+references one exact parent-part map, with shared qualifiers retained. All three
+new input receipts bind their actual messages, schemas and complete source input.
+Original-layout exports identify source visibility separately for every stage.
+
+V40 keeps V39's instructions, output schemas,256/512/512caps, shared330-second
+deadline and existing native transport limit. It adds no outline call or retry.
+One consumed real-document selector diagnostic completed on owned hardware;
+broader frozen regressions, fresh cases and a matching packaged desktop pilot
+remain required. This is an opt-in candidate, not production qualification.
+Company Brain remains V33 by default and the direct pilot API remains V32.
+
+After an answer attempt the desktop rechecks runtime health. Known inference
+failures explain that no answer was saved and direct recovery to Local model
+setup while preserving the question. A changed model, failed connection or
+pending health check cannot keep the setup panel labelled Ready. Replacement
+consent clears; preparation and ending a stale session stay disabled. Refresh
+setup remains a passive check and never starts inference.

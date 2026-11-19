@@ -546,7 +546,7 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
             lines += ['## Model questions (unverified)'] + ['- ' + escape(x) for x in brief['model_uncertainties']] + ['']
         if provenance.get('input_budget'):
             budget = provenance['input_budget']
-            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39'):
+            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40'):
                 lines += ['## Measured model input']
                 for stage in budget['stages']:
                     lines += ['Stage: ' + escape(stage['stage']),
@@ -558,10 +558,17 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                     'Input tokens: ' + escape(budget['input_tokens']),
                     'Reserved output tokens: ' + escape(budget['output_tokens']),
                     'Context capacity: ' + escape(budget['context_tokens'])]
-            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39'):
-                first_stage = budget['stages'][0]
-                lines += ['Presented reviewed claim IDs: ' + escape(', '.join(first_stage['model_visible_claim_ids']) or 'none'),
-                          'Source visibility: ' + escape(first_stage['support_visibility'])]
+            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40'):
+                if budget['version'] == 'fixed-part-compact-bound-kind-audit-v40':
+                    for stage in budget['stages']:
+                        lines += ['Presented reviewed claim IDs (' + escape(stage['stage']) + '): ' +
+                                  escape(', '.join(stage['model_visible_claim_ids']) or 'none'),
+                                  'Source visibility (' + escape(stage['stage']) + '): ' +
+                                  escape(stage['support_visibility'])]
+                else:
+                    first_stage = budget['stages'][0]
+                    lines += ['Presented reviewed claim IDs: ' + escape(', '.join(first_stage['model_visible_claim_ids']) or 'none'),
+                              'Source visibility: ' + escape(first_stage['support_visibility'])]
             elif budget.get('version') in ('reviewed-claim-whole-v1', 'fixed-part-single-review-v23', 'fixed-part-single-review-v24', 'fixed-part-single-review-v25', 'fixed-part-single-review-v26', 'fixed-part-single-review-v27'):
                 lines += ['Presented reviewed claim IDs: ' + escape(', '.join(budget['model_visible_claim_ids']) or 'none'),
                           'Source visibility: ' + escape(budget['support_visibility'])]

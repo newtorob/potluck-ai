@@ -22,6 +22,7 @@ export function canCorrectGuided(i: Investigation): boolean {
       'fixed-part-selection-v37',
       'fixed-part-selection-v38',
       'fixed-part-selection-v39',
+      'fixed-part-selection-v40',
     ].includes(String(i.provenance?.presentation_mode)) &&
     [
       i.brief.facts,

@@ -81,7 +81,7 @@ it('requests a direct current source draft with the explicit workspace and selec
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
-it.each(['v37', 'v38', 'v39'] as const)(
+it.each(['v37', 'v38', 'v39', 'v40'] as const)(
   'keeps %s on exact source presentation without changing earlier organization defaults',
   async (version) => {
     const input = {

@@ -86,6 +86,8 @@ function priorSource(claims: PilotClaim[], draft: PilotSourceDraft): PilotClaim 
 }
 function failure(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
+  if (/\b(generation_timeout|inference_failed)\b/.test(message))
+    return 'The local model could not finish this answer. No answer was saved. Your question is kept. Refresh Local model setup and prepare the model again if it stopped.';
   if (/Multiple reviewed/.test(message))
     return 'Several reviewed statements depend on this document. Open Advanced investigations to review their replacement together.';
   if (/404|unavailable|stale/i.test(message))
@@ -106,7 +108,7 @@ export function GuidedCompanyBrainView({
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
   reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39';
+  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);
@@ -503,24 +505,28 @@ export function GuidedCompanyBrainView({
     if (!canAsk) return;
     setConfirmation('');
     setAnswer(null);
-    await run('Preparing your answer…', async (ticket) => {
-      const result = await localApi.askReviewedPilot({
-        ...scope,
-        question: question.trim(),
-        model_slug: model,
-        pilot_confirmed: true,
-        question_parts: parts,
-        question_parts_confirmed: true,
-        ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
-        ...(reviewedAnswerVersion !== 'v32'
-          ? { reviewed_answer_version: reviewedAnswerVersion }
-          : {}),
+    try {
+      await run('Preparing your answer…', async (ticket) => {
+        const result = await localApi.askReviewedPilot({
+          ...scope,
+          question: question.trim(),
+          model_slug: model,
+          pilot_confirmed: true,
+          question_parts: parts,
+          question_parts_confirmed: true,
+          ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
+          ...(reviewedAnswerVersion !== 'v32'
+            ? { reviewed_answer_version: reviewedAnswerVersion }
+            : {}),
+        });
+        if (!current(ticket)) return;
+        setAnswer(result);
+        setRecent((previous) => [result, ...previous.filter((i) => i.id !== result.id)]);
+        requestAnimationFrame(() => answerSection.current?.focus());
       });
-      if (!current(ticket)) return;
-      setAnswer(result);
-      setRecent((previous) => [result, ...previous.filter((i) => i.id !== result.id)]);
-      requestAnimationFrame(() => answerSection.current?.focus());
-    });
+    } finally {
+      if (alive.current) health.refresh();
+    }
   }
   function updateSavedAnswer(item: Investigation) {
     setAnswer(item);
@@ -729,7 +735,11 @@ export function GuidedCompanyBrainView({
               automatically here.
             </p>
             <CompanyBrainPilotSetup
-              disabled={!!operationBusy || !connected}
+              disabled={!!operationBusy}
+              connectionState={
+                health.hasChecked ? (health.sidecarUp ? 'connected' : 'offline') : 'checking'
+              }
+              activeModelId={health.modelLoaded ? health.activeModelId : null}
               onBusyChange={(value) => {
                 setupLock.current = value;
                 if (alive.current) setSetupBusy(value);

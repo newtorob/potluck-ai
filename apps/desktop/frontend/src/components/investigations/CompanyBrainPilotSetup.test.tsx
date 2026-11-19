@@ -56,6 +56,92 @@ async function enterImport() {
   fireEvent.click(screen.getByRole('checkbox', { name: /Copy this supplied file/ }));
 }
 describe('CompanyBrainPilotSetup', () => {
+  it.each(['checking', 'offline'] as const)(
+    'does not show cached Ready while health is %s',
+    async (connectionState) => {
+      const ready = state({
+        installed: true,
+        artifact_verified: true,
+        ready: true,
+        active_model: 'pilot',
+        can_prepare: true,
+        can_unload: true,
+      });
+      api.companyBrainModelSetup.mockResolvedValue(ready);
+      const onModelChange = vi.fn();
+      const view = render(
+        <CompanyBrainPilotSetup
+          connectionState="connected"
+          activeModelId="pilot"
+          onModelChange={onModelChange}
+        />,
+      );
+      await screen.findByText('Ready for local questions');
+      fireEvent.click(screen.getByRole('checkbox', { name: /I want to prepare/ }));
+      view.rerender(
+        <CompanyBrainPilotSetup
+          connectionState={connectionState}
+          activeModelId="pilot"
+          onModelChange={onModelChange}
+        />,
+      );
+      expect(screen.queryByText('Ready for local questions')).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          connectionState === 'checking'
+            ? 'Checking local engine'
+            : 'Local engine offline; check connection',
+        ),
+      ).toBeVisible();
+      expect(screen.getByRole('checkbox', { name: /I want to prepare/ })).not.toBeChecked();
+      expect(screen.getByRole('button', { name: 'Prepare model' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'End model session' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Refresh setup' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh setup' }));
+      await waitFor(() => expect(api.companyBrainModelSetup).toHaveBeenCalledTimes(2));
+      expect(api.prepareCompanyBrainModel).not.toHaveBeenCalled();
+      expect(api.unloadCompanyBrainModel).not.toHaveBeenCalled();
+      expect(onModelChange).not.toHaveBeenCalled();
+    },
+  );
+  it('invalidates stale readiness and consent after the runtime unloads, then reconciles on refresh', async () => {
+    api.companyBrainModelSetup.mockResolvedValueOnce(
+      state({
+        installed: true,
+        artifact_verified: true,
+        ready: true,
+        active_model: 'pilot',
+        can_prepare: true,
+        can_unload: true,
+      }),
+    );
+    const onModelChange = vi.fn();
+    const view = render(
+      <CompanyBrainPilotSetup activeModelId="pilot" onModelChange={onModelChange} />,
+    );
+    await screen.findByText('Ready for local questions');
+    const consent = screen.getByRole('checkbox', { name: /I want to prepare/ });
+    fireEvent.click(consent);
+    expect(consent).toBeChecked();
+    view.rerender(<CompanyBrainPilotSetup activeModelId={null} onModelChange={onModelChange} />);
+    expect(screen.queryByText('Ready for local questions')).not.toBeInTheDocument();
+    expect(screen.getByText('Model state changed; refresh setup')).toBeVisible();
+    expect(consent).not.toBeChecked();
+    expect(consent).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'End model session' })).toBeDisabled();
+    api.companyBrainModelSetup.mockResolvedValueOnce(
+      state({ installed: true, artifact_verified: true, can_prepare: true }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh setup' }));
+    await screen.findByText('Model imported; not ready');
+    expect(screen.queryByText('Model state changed; refresh setup')).not.toBeInTheDocument();
+    expect(consent).toBeEnabled();
+    expect(consent).not.toBeChecked();
+    expect(api.prepareCompanyBrainModel).not.toHaveBeenCalled();
+    expect(api.unloadCompanyBrainModel).not.toHaveBeenCalled();
+    expect(api.importCompanyBrainModel).not.toHaveBeenCalled();
+    expect(onModelChange).not.toHaveBeenCalled();
+  });
   it('only reads setup on mount and requires explicit import consent', async () => {
     mount();
     await screen.findByLabelText('Model file path');
