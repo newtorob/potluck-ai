@@ -99,3 +99,27 @@ separately frozen fresh controls and any bounded serial native assessment.
 Report supplied-plan accuracy and automatic-plan coverage separately. Preserve
 all earlier questions, failures and scores. Exact source rendering remains the
 canonical answer; concise presentation is a separate later view.
+
+
+## Experimental typed findings (V37)
+
+The explicit `reviewed_answer_version: "v37"` candidate partitions the confirmed
+question literally, proposes typed findings, then independently audits them.
+The three bounded calls reserve 256, 512 and 512 output tokens. Raw replies,
+source scope, clauses and stage receipts replay independently from application
+conversion. Literal coverage and valid source IDs do not prove answer correctness.
+
+Known rules retain exact source conditions and dependency closure. Missing world
+rules, permissions, actual totals or values remain Unknown with their literal
+clause and visible selected-source scope. A source-text-content finding can
+acknowledge whether the underlying requested value is established by the selected
+reviewed statements; this does not claim exhaustive company-wide absence or turn
+silence into prohibition. Those classifications remain unverified model judgments.
+
+Set `organize_answer: false`: V37 has no model-written outline or extra fourth call.
+The frontend helper supplies that value for explicit V37 requests; older caller
+defaults stay unchanged. A raw request for organization fails before inference
+with a recovery message. Saved originals, exact citations and full expandable
+evidence remain intact when a separate correction is reviewed. V37 is opt-in and
+unqualified until frozen consumed regressions and untouched cases pass, followed
+by matching private desktop and clean-environment checks. No default promotion.

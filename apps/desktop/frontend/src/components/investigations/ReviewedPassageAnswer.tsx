@@ -132,7 +132,8 @@ export function ReviewedPassageAnswer({
       presentation.version === 'fixed-part-selection-v33' ||
       presentation.version === 'fixed-part-selection-v34' ||
       presentation.version === 'fixed-part-selection-v35' ||
-      presentation.version === 'fixed-part-selection-v36') &&
+      presentation.version === 'fixed-part-selection-v36' ||
+      presentation.version === 'fixed-part-selection-v37') &&
     readable?.version === 'readable-source-groups-v1' &&
     readable.original_text === answer.text &&
     readable.original_status === answer.status &&
@@ -221,9 +222,11 @@ export function ReviewedPassageAnswer({
             {originals.map((item) => (
               <div key={String(item.citation_id)}>
                 <p className="text-xs font-medium">
-                  {String(item.claim_key || 'Reviewed statement')}
+                  {typeof item.claim_key === 'string' && item.claim_key
+                    ? item.claim_key
+                    : 'Reviewed statement'}
                 </p>
-                <AnswerMarkdown text={String(item.content || '')} />
+                <AnswerMarkdown text={typeof item.content === 'string' ? item.content : ''} />
                 <div className="text-xs">{sourceLink(String(item.citation_id))}</div>
               </div>
             ))}

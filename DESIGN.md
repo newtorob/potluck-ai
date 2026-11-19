@@ -84,3 +84,14 @@ For explicitly selected unresolved-clause answers, retain the scoped notice abov
 the known source text. Use the existing text and evidence disclosures; no new
 status color or compact layout may hide conditions or citations. Unknown identifies
 a model-assessed gap within the selected statements, not company-wide absence.
+
+
+### Experimental typed-findings presentation
+
+V37 is an explicit experimental option; Company Brain still defaults to V33 and
+the raw guided API to V32. Its helper disables model outline organization. Fixed
+source-content acknowledgements describe only the selected reviewed statements,
+with literal question clauses, while known rules keep exact conditions and
+citations. The readable projection retains those acknowledgements; original
+answers and full selected evidence stay expandable. Model classifications are
+unverified, and a separate reviewed correction takes display precedence.

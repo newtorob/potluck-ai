@@ -129,7 +129,7 @@ class AskReviewed(Scope):
     question_parts_confirmed: StrictBool
     organize_answer: StrictBool = False
     reviewed_evidence_version: Literal['v5', 'v6'] = 'v5'
-    reviewed_answer_version: Literal['v32', 'v33', 'v34', 'v35', 'v36'] = 'v32'
+    reviewed_answer_version: Literal['v32', 'v33', 'v34', 'v35', 'v36', 'v37'] = 'v32'
 
 def _pilot_error(exc: Exception) -> HTTPException:
     messages = {
@@ -138,6 +138,8 @@ def _pilot_error(exc: Exception) -> HTTPException:
         'Source citation unavailable': 'The source citation is unavailable or stale; scan and select evidence again.',
         'Use supersede to replace the current claim': 'An approved claim already uses this key; supersede it instead.',
         'Collection name required': 'Enter a collection name without leading or trailing whitespace.',
+        'Typed findings keep exact source presentation; set organize_answer to false':
+            'This experimental answer keeps the exact source wording. Turn off answer organization and retry.',
     }
     message = messages.get(str(exc)) if isinstance(exc, ValueError) else None
     return HTTPException(status_code=400, detail=message) if message else _error(exc)
