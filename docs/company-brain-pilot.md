@@ -102,6 +102,12 @@ valid structure and source binding do not establish answer correctness.
 
 ## Readable fixed-part answers
 
+The explicit experimental `reviewed_answer_version: "v35"` keeps the V34 wire,
+literal unresolved clauses and evidence guards. Its second call audits requested
+fact coverage before trimming redundant source units. V34 prompts and saved
+replays remain unchanged. V35 awaits its separate frozen qualification; the
+desktop caller, raw API and Advanced defaults remain unchanged.
+
 V32, V33 and explicitly selected V34 answers have a deterministic readable view in the desktop and Markdown export.
 Identical leading paragraphs from the same source revision are shown once, with
 the evidence groups they apply to. Standalone table rows become labelled fields

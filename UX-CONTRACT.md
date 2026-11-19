@@ -425,6 +425,10 @@ stay visible. Original drafts, full statements and exact excerpts remain availab
 V34 remains opt-in until native qualification; saved versions and defaults are
 unchanged.
 
+Explicit V35 callers use the same unresolved-clause display, correction and exact
+evidence owners. The independent coverage-first audit is versioned separately;
+it grants no source authority and does not change confirmation or caller defaults.
+
 Guided `FocusedSourceAnswer` retains supported source context visibly open by default; the user may collapse it. A single-part unknown may use the concise view only after exact request, verdict, source ranges, snippets and original text are bound; declared dependencies or request-wide safeguards prevent this concise layout. All other cases keep the complete existing view. The exact original and scope evidence remain available in a disclosure, and current corrected text takes precedence over a stale prior presentation. Other callers keep the default presentation.
 
 ## Company Brain local pilot setup

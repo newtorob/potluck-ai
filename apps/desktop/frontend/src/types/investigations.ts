@@ -52,7 +52,8 @@ export interface Brief {
         | 'reviewed-claim-selection-v14'
         | 'fixed-part-selection-v32'
         | 'fixed-part-selection-v33'
-        | 'fixed-part-selection-v34';
+        | 'fixed-part-selection-v34'
+        | 'fixed-part-selection-v35';
       lead?: string;
       answer: string;
       passages: Array<{

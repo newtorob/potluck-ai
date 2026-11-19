@@ -9,7 +9,7 @@ export function CompanyBrainView({
   reviewedAnswerVersion = 'v33',
 }: {
   reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34';
+  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35';
 } = {}) {
   const [params, setParams] = useSearchParams();
   const [handoff, setHandoff] = useState<{ question: string; answerId?: string }>({ question: '' });
