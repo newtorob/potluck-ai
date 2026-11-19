@@ -105,3 +105,13 @@ evidence references and exact source conditions. Actual unknown rules or values
 keep an explicit unresolved clause. V38 remains opt-in, without a model-written
 outline; Company Brain V33 and raw guided API V32 defaults remain unchanged.
 The current-source private pilot must pass fresh qualification before packaging.
+
+
+### Bound question audit in V39
+
+The audit keeps the inferred question type as an unverified binding instead of
+silently changing the question it answers. A mapping it cannot use yields a
+clear pre-save refusal and recovery action, without a false absence or conflict
+claim. Successful source yes/no answers keep literal polarity, selected-statement
+scope and exact evidence citations. Existing defaults remain V33/V32; explicit
+V39 opts out of model outlines and remains experimental pending qualification.

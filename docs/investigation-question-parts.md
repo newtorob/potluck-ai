@@ -147,3 +147,32 @@ helper opts out for explicit V38 requests, leaving prior caller defaults intact.
 V38 is opt-in and unqualified until its committed source, unchanged regression
 rubrics and untouched cases pass a separately frozen assessment. Matching
 desktop and clean-environment checks follow; no production promotion is implied.
+
+
+## Experimental bound-question audit (V39)
+
+V38 remains unqualified: its unverified proposal contained a redundant unused
+field, which strict validation rejected before the independent audit. Its native
+failure remains separate from passed local checks.
+
+Explicit `reviewed_answer_version: "v39"` admits structurally closed, source-bound
+unverified proposals, then binds their inferred question types for the selected
+decision audit. The audit can correct decisions and citations within that question
+or flag a mapping it cannot use; it cannot silently answer another proposition.
+The inferred types remain unverified and do not grant source or fact authority.
+The original whole question and literal parts stay unchanged.
+
+A mapping-unclear result refuses before save with a recovery message. It is not
+a claim that the source lacks a fact or that source evidence conflicts. Missing
+actual facts still produce scoped Unknown answers; incompatible same-property
+source alternatives retain priority. Fixed source-content Yes/No answers retain
+literal polarity, exact conditions, numbered citations and selected-statement scope.
+Raw proposals, derived type bindings, ignored fields and final native decisions
+replay separately. Corrections remain separate from immutable originals.
+
+The three calls retain256/512/512output budgets. The first two model input
+contracts remain V36 and V38; the selected-decision audit uses V39. Set
+`organize_answer: false`; the frontend helper does this for explicit V39 requests,
+leaving earlier defaults unchanged. No fourth outline call, runtime guard change
+or production promotion. Frozen regression/correction/fresh cases and matching
+desktop checks remain required before private pilot readiness.
