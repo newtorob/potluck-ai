@@ -108,6 +108,17 @@ fact coverage before trimming redundant source units. V34 prompts and saved
 replays remain unchanged. V35 awaits its separate frozen qualification; the
 desktop caller, raw API and Advanced defaults remain unchanged.
 
+The separate experimental V36 contract keeps each confirmed question part intact.
+Its first call proposes literal clause fragments. The server binds them in order,
+restoring only original punctuation and whitespace separators; the bound clauses
+must join to reproduce every original character. No omitted words are allowed.
+Its second call checks every clause against the supplied statements;
+the server derives the original part verdict and scoped unresolved clauses. The
+partition remains a model assessment, not verified semantic coverage. Both replies,
+partition equality, source closure and measured 256/512-token stage caps replay
+before saving, reopening, correcting or exporting. V36 remains opt-in pending its
+separate native qualification; earlier saved contracts and defaults are unchanged.
+
 V32, V33 and explicitly selected V34 answers have a deterministic readable view in the desktop and Markdown export.
 Identical leading paragraphs from the same source revision are shown once, with
 the evidence groups they apply to. Standalone table rows become labelled fields

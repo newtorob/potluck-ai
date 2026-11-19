@@ -429,6 +429,13 @@ Explicit V35 callers use the same unresolved-clause display, correction and exac
 evidence owners. The independent coverage-first audit is versioned separately;
 it grants no source authority and does not change confirmation or caller defaults.
 
+Explicit V36 callers keep the original confirmed whole-question parts. Internal
+literal clauses are unverified model proposals; they cannot omit or rewrite any
+original character. Their source audit derives the existing scoped unresolved
+display and retains full known evidence, conditions and citations. Existing
+correction/reopen/export controls remain authoritative; no new user setup step or
+automatic authority action is introduced.
+
 Guided `FocusedSourceAnswer` retains supported source context visibly open by default; the user may collapse it. A single-part unknown may use the concise view only after exact request, verdict, source ranges, snippets and original text are bound; declared dependencies or request-wide safeguards prevent this concise layout. All other cases keep the complete existing view. The exact original and scope evidence remain available in a disclosure, and current corrected text takes precedence over a stale prior presentation. Other callers keep the default presentation.
 
 ## Company Brain local pilot setup

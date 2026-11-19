@@ -46,7 +46,7 @@ def _digest(value: Any) -> str:
 
 def _inputs(question: str, answer: dict, evidence: list[dict]) -> tuple[list[dict], dict, list[str]]:
     if (not question.strip() or len(question) > 4000 or answer.get('status') != 'supported'
-            or (answer.get('passage_presentation') or {}).get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35')):
+            or (answer.get('passage_presentation') or {}).get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36')):
         raise ValueError('Ineligible outline answer')
     ids, excerpts = answer['snippet_ids'], answer['source_excerpts']
     if not ids or len(set(ids)) != len(ids) or len(excerpts) != len(ids):
