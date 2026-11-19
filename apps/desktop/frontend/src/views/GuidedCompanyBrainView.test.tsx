@@ -127,7 +127,7 @@ let approved: PilotClaim[] = [];
 let proposed: PilotClaim[] = [];
 function mount(
   reviewedEvidenceVersion: 'v5' | 'v6' = 'v5',
-  reviewedAnswerVersion: 'v32' | 'v33' = 'v32',
+  reviewedAnswerVersion: 'v32' | 'v33' | 'v34' = 'v32',
 ) {
   return render(
     <MemoryRouter>
@@ -367,15 +367,15 @@ describe('guided Company Brain', () => {
     expect(screen.getByRole('button', { name: 'Get answer' })).toBeDisabled();
     expect(api.askReviewedPilot).not.toHaveBeenCalled();
   });
-  it('sends observation scope version only when explicitly selected', async () => {
+  it.each(['v33', 'v34'] as const)('sends explicit answer version %s', async (version) => {
     approved = [claim];
-    mount('v5', 'v33');
+    mount('v5', version);
     await question();
     await confirm();
     fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
     await screen.findByRole('region', { name: 'Your answer' });
     expect(api.askReviewedPilot).toHaveBeenCalledWith(
-      expect.objectContaining({ reviewed_answer_version: 'v33' }),
+      expect.objectContaining({ reviewed_answer_version: version }),
     );
   });
   it('opts into whole-statement packing only when explicitly selected', async () => {

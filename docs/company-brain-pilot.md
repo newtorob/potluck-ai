@@ -95,7 +95,9 @@ before presenting the known facts and their complete conditions and citations.
 Its readable view keeps this notice and known evidence visible; full statements,
 exact excerpts and the original draft remain expandable. Corrections, reopen
 and export replay the V34 bindings. Existing saved V32/V33 answers and caller
-defaults are unchanged. This opt-in is awaiting fresh native qualification;
+defaults are unchanged. An explicit guided-view V34 option is forwarded to the
+same API contract; omitting the option retains the existing default. This opt-in
+is awaiting fresh native qualification;
 valid structure and source binding do not establish answer correctness.
 
 ## Readable fixed-part answers

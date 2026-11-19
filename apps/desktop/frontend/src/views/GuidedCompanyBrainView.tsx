@@ -512,7 +512,9 @@ export function GuidedCompanyBrainView({
         question_parts: parts,
         question_parts_confirmed: true,
         ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
-        ...(reviewedAnswerVersion === 'v33' ? { reviewed_answer_version: 'v33' as const } : {}),
+        ...(reviewedAnswerVersion !== 'v32'
+          ? { reviewed_answer_version: reviewedAnswerVersion }
+          : {}),
       });
       if (!current(ticket)) return;
       setAnswer(result);
