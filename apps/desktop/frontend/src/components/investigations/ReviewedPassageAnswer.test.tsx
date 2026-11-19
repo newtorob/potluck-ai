@@ -102,63 +102,80 @@ describe('ReviewedPassageAnswer', () => {
 });
 
 describe('Readable fixed-part answer', () => {
-  it('shows shared context and labelled fields while keeping the original closed and accessible', () => {
-    const value = answer(
-      'Draft context.\n\nDraft context.\n\n| Payload | 30 days after fulfilment | TODO |',
-    );
-    value.passage_presentation!.version = 'fixed-part-selection-v32';
-    const readable = {
-      version: 'readable-source-groups-v1' as const,
-      original_text: value.text,
-      original_status: value.status,
-      original_snippet_ids: value.snippet_ids,
-      shared_context: true,
-      source_groups: [{ evidence_id: '2', citation_id: 'claim:one' }],
-      markdown:
-        '### Shared source context\nDraft context.\n\n### Evidence 1\n- **Deadline:** 30 days after fulfilment\n- **Status:** TODO',
-    };
-    render(
-      <ReviewedPassageAnswer
-        answer={value}
-        readable={readable}
-        evidence={[]}
-        sourceLink={sourceLink}
-      />,
-    );
-    expect(screen.getByRole('heading', { name: 'Shared source context' })).toBeVisible();
-    expect(screen.getByText('Deadline:')).toBeVisible();
-    expect(screen.getByLabelText('Evidence citations')).toHaveTextContent('Evidence 2: Source 1');
-    expect(screen.getByText('30 days after fulfilment')).toBeVisible();
-    const summary = screen.getByText('Original generated answer');
-    expect(summary.closest('details')).not.toHaveAttribute('open');
-    fireEvent.click(summary);
-    expect(summary.closest('details')).toHaveAttribute('open');
-    expect(within(summary.closest('details')!).getByText(/Payload/)).toBeVisible();
-    expect(screen.getAllByRole('link', { name: 'Open claim:one' }).length).toBeGreaterThan(0);
-  });
+  it.each(['readable-source-groups-v1', 'readable-task-statements-v2'] as const)(
+    'shows %s projection while keeping original evidence accessible',
+    (version) => {
+      const value = answer(
+        'Draft context.\n\nDraft context.\n\n| Payload | 30 days after fulfilment | TODO |',
+      );
+      value.passage_presentation!.version = 'fixed-part-selection-v32';
+      const readable = {
+        version,
+        original_text: value.text,
+        original_status: value.status,
+        original_snippet_ids: value.snippet_ids,
+        shared_context: true,
+        source_groups: [{ evidence_id: '2', citation_id: 'claim:one' }],
+        markdown:
+          '### Shared source context\nDraft context.\n\n### Evidence 1\n- **Deadline:** 30 days after fulfilment\n- **Status:** TODO',
+      };
+      render(
+        <ReviewedPassageAnswer
+          answer={value}
+          readable={readable}
+          evidence={[
+            {
+              kind: 'reviewed_claim',
+              citation_id: 'claim:one',
+              content: 'Complete source statement.',
+            },
+          ]}
+          sourceLink={sourceLink}
+        />,
+      );
+      expect(screen.getByRole('heading', { name: 'Shared source context' })).toBeVisible();
+      expect(screen.getByText('Deadline:')).toBeVisible();
+      expect(screen.getByLabelText('Evidence citations')).toHaveTextContent('Evidence 2: Source 1');
+      expect(screen.getByText('30 days after fulfilment')).toBeVisible();
+      const summary = screen.getByText('Original generated answer');
+      expect(summary.closest('details')).not.toHaveAttribute('open');
+      fireEvent.click(summary);
+      expect(summary.closest('details')).toHaveAttribute('open');
+      expect(within(summary.closest('details')!).getByText(/Payload/)).toBeVisible();
+      const fullSource = screen.getByText('Full reviewed statements (1)');
+      fireEvent.click(fullSource);
+      expect(
+        within(fullSource.closest('details')!).getByText('Complete source statement.'),
+      ).toBeVisible();
+      expect(screen.getAllByRole('link', { name: 'Open claim:one' }).length).toBeGreaterThan(0);
+    },
+  );
 
-  it('ignores a projection from before a correction', () => {
-    const value = answer('Corrected condition: always require approval.');
-    value.passage_presentation!.version = 'fixed-part-selection-v32';
-    render(
-      <ReviewedPassageAnswer
-        answer={value}
-        evidence={[]}
-        sourceLink={sourceLink}
-        readable={{
-          version: 'readable-source-groups-v1',
-          original_text: 'Earlier draft',
-          original_status: value.status,
-          original_snippet_ids: value.snippet_ids,
-          shared_context: true,
-          markdown: 'Stale answer',
-        }}
-      />,
-    );
-    expect(screen.queryByText('Stale answer')).not.toBeInTheDocument();
-    expect(screen.queryByText('Original generated answer')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Corrected condition: always require approval.')[0]).toBeVisible();
-  });
+  it.each(['readable-source-groups-v1', 'readable-task-statements-v2'] as const)(
+    'ignores a stale %s projection',
+    (version) => {
+      const value = answer('Corrected condition: always require approval.');
+      value.passage_presentation!.version = 'fixed-part-selection-v32';
+      render(
+        <ReviewedPassageAnswer
+          answer={value}
+          evidence={[]}
+          sourceLink={sourceLink}
+          readable={{
+            version,
+            original_text: 'Earlier draft',
+            original_status: value.status,
+            original_snippet_ids: value.snippet_ids,
+            shared_context: true,
+            markdown: 'Stale answer',
+          }}
+        />,
+      );
+      expect(screen.queryByText('Stale answer')).not.toBeInTheDocument();
+      expect(screen.queryByText('Original generated answer')).not.toBeInTheDocument();
+      expect(screen.getAllByText('Corrected condition: always require approval.')[0]).toBeVisible();
+    },
+  );
 });
 
 it('keeps source metadata literal instead of turning it into a setext heading', () => {
@@ -193,7 +210,10 @@ it('keeps embedded metadata literal with source rules and citations around it', 
   expect(container.querySelector('pre')?.textContent?.trim()).toBe(metadata);
   expect(screen.getAllByRole('heading').map((h) => h.textContent)).toEqual(['Fix']);
   expect(screen.getByText('Share only if both stacks share the account limit.')).toBeVisible();
-  expect(screen.getByRole('link', { name: 'Source' })).toHaveAttribute('href', 'https://example.com/evidence');
+  expect(screen.getByRole('link', { name: 'Source' })).toHaveAttribute(
+    'href',
+    'https://example.com/evidence',
+  );
 });
 
 it('leaves metadata examples inside existing code fences as literal code', () => {
@@ -204,17 +224,30 @@ it('leaves metadata examples inside existing code fences as literal code', () =>
 });
 
 it('keeps a V34 unresolved clause explicit beside its conditions and citation', () => {
-  const text = 'Not established by the selected reviewed statements (model assessment; review required):\n- P1: what is the deadline?\n\nOnly approved members may book. Suspended members are excluded.';
+  const text =
+    'Not established by the selected reviewed statements (model assessment; review required):\n- P1: what is the deadline?\n\nOnly approved members may book. Suspended members are excluded.';
   const value: Answer = {
-    ...answer(text), status: 'unknown',
+    ...answer(text),
+    status: 'unknown',
     passage_presentation: {
-      version: 'fixed-part-selection-v34', answer: text,
-      passages: [{ unit_id: 'C1:whole', text: passage, citation_id: 'claim:one', snippet_ids: ['S1'] }],
+      version: 'fixed-part-selection-v34',
+      answer: text,
+      passages: [
+        { unit_id: 'C1:whole', text: passage, citation_id: 'claim:one', snippet_ids: ['S1'] },
+      ],
     },
   };
-  render(<ReviewedPassageAnswer answer={value} evidence={[{kind:'reviewed_claim',citation_id:'claim:one',content:passage}]} sourceLink={sourceLink} />);
+  render(
+    <ReviewedPassageAnswer
+      answer={value}
+      evidence={[{ kind: 'reviewed_claim', citation_id: 'claim:one', content: passage }]}
+      sourceLink={sourceLink}
+    />,
+  );
   expect(screen.getAllByText(/what is the deadline/)[0]).toBeVisible();
   expect(screen.getAllByText(passage)[0]).toBeVisible();
-  expect(screen.getAllByRole('link', {name:'Open claim:one'})[0]).toBeVisible();
-  expect(screen.getByText('Selected source passages (1)').closest('details')).not.toHaveAttribute('open');
+  expect(screen.getAllByRole('link', { name: 'Open claim:one' })[0]).toBeVisible();
+  expect(screen.getByText('Selected source passages (1)').closest('details')).not.toHaveAttribute(
+    'open',
+  );
 });

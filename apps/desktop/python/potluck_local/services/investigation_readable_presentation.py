@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 VERSION = 'readable-source-groups-v1'
+TASK_VERSION = 'readable-task-statements-v2'
 
 
 def cells(line: str) -> list[str] | None:
@@ -107,8 +108,64 @@ def _prefix(texts: list[str]) -> str:
     return prefix if all(text.startswith(prefix) and text[len(prefix):].strip() for text in texts) else ''
 
 
+def _task_layout(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: str,
+                 question: str | None, escape: Callable[[str], str]) -> dict[str, Any] | None:
+    """Preserve body order; relocate only proven administrative task metadata."""
+    from .investigation_readable_task_statement import project_task_statement
+
+    presentation = answer['passage_presentation']
+    parts = presentation.get('parts', [])
+    if (presentation.get('version') != 'fixed-part-selection-v43'
+            or answer['status'] != 'supported' or len(parts) != 1 or not question):
+        return None
+    part = parts[0]
+    if not isinstance(part, dict) or not isinstance(part.get('id'), str):
+        return None
+    markers = ', '.join('[' + group['id'] + ']' for group in groups)
+    expected = part.get('id', '') + ': ' + question + '\nEvidence: ' + markers
+    if (part.get('request') != question or part.get('verdict') != 'supported'
+            or prefix != expected):
+        return None
+    prepared = []
+    for group in groups:
+        if (not group['passage']['unit_id'].endswith(':whole')
+                or group['text'] != group['claim'].get('content')
+                or group['claim'].get('status') != 'approved'):
+            return None
+        value = project_task_statement(group['text'], group['claim']['sources'])
+        if value is None:
+            return None
+        prepared.append((group, value))
+    lines, metadata_lines, mappings = [], [], []
+    for group, value in prepared:
+        lines += ['### Evidence ' + group['id'], escape(value['source_header'].rstrip()),
+                  'Source task metadata (as recorded): `' + value['status_line'] + '`',
+                  escape(value['heading'])]
+        # Earlier prerequisites and later exceptions remain in their original
+        # source body order. No action extraction, summary or semantic rewrite.
+        lines += [_records(chunk['text'], group['claim']['sources'], escape)
+                  for chunk in value['body_chunks']]
+        # The strict helper excludes fence characters from metadata values.
+        # Keep the complete administrative block visible and verbatim.
+        metadata_lines += ['#### Evidence ' + group['id'] + ' source metadata (verbatim)',
+                           '```yaml\n' + value['metadata']['text'] + '\n```']
+        mappings.append({'evidence_id': group['id'], 'unit_id': group['passage']['unit_id'],
+                         'citation_id': group['passage']['citation_id'], 'shared_prefix_chars': 0,
+                         'original_sha256': value['original_sha256'],
+                         'task_statement_projection': {
+                             'version': value['version'], 'offset_unit': value['offset_unit'],
+                             'segments': [{key: row[key] for key in ('kind', 'start', 'end', 'citation_id')
+                                           if key in row} for row in value['segments']]}})
+    return {'version': TASK_VERSION, 'original_text': answer['text'],
+            'original_status': answer['status'],
+            'original_snippet_ids': deepcopy(answer['snippet_ids']),
+            'markdown': '\n\n'.join(lines + metadata_lines),
+            'shared_context': False, 'source_groups': mappings}
+
+
 def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
-            escape: Callable[[str], str] = lambda value: value) -> dict[str, Any] | None:
+            escape: Callable[[str], str] = lambda value: value,
+            question: str | None = None, allow_task_layout: bool = True) -> dict[str, Any] | None:
     presentation = answer.get('passage_presentation') or {}
     if presentation.get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43'):
         return None
@@ -132,6 +189,10 @@ def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
             return None
         used.add(passage['unit_id'])
         groups.append({'id': marker.group(1), 'text': body, 'passage': passage, 'claim': claim})
+    if allow_task_layout:
+        task = _task_layout(answer, groups, text[:markers[0].start()].rstrip(), question, escape)
+        if task is not None:
+            return task
     revisions = [{(s['collection_id'], s['document_id'], s['revision_id']) for s in g['claim']['sources']}
                  for g in groups]
     shared = (_prefix([g['text'] for g in groups]) if len(groups) > 1
@@ -159,8 +220,10 @@ def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
 def decorate(item: dict[str, Any]) -> dict[str, Any]:
     from . import investigation_answer_outlines as outlines
     result = {}
+    questions = {row['id']: row['text'] for row in (item.get('brief') or {}).get('questions', [])}
     for answer in (item.get('brief') or {}).get('answers', []):
-        value = project(answer, item.get('evidence', []))
+        value = project(answer, item.get('evidence', []), question=questions.get(answer['question_id']),
+                        allow_task_layout=(item.get('review') or {}).get('decision') != 'correct')
         if value:
             result[answer['question_id']] = value
     organized = outlines.project_item(item)
@@ -176,8 +239,10 @@ def export(item: dict[str, Any], escape: Callable[[str], str]) -> str | None:
     preserve_lines = lambda value: '\n'.join(escape(line) for line in value.splitlines())
     organized = outlines.project_item(item)
     projections = []
+    questions = {row['id']: row['text'] for row in (item.get('brief') or {}).get('questions', [])}
     for answer in answers:
-        value = project(answer, item.get('evidence', []), escape=preserve_lines)
+        value = project(answer, item.get('evidence', []), escape=preserve_lines,
+                        question=questions.get(answer['question_id']))
         if value is None and answer['question_id'] in organized:
             citations = list(dict.fromkeys(row['citation_id'] for row in answer['source_excerpts']))
             value = {'markdown': '', 'source_groups': [{'evidence_id': str(i), 'citation_id': citation}

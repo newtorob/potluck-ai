@@ -239,3 +239,18 @@ Experimental `fixed-part-selection-v30` gives the second planned source-selectio
 Experimental `fixed-part-selection-v31` uses a source proposal followed by explicit source-root drop/add edits and a separate final verdict. Both planned native replies and their distinct measured schemas are replay-bound. The applied selection is application-derived, not a third model reply. Declared source dependencies and wholly unknown scope anchors remain enforced. Edits and source citations do not prove relevance, factual completeness or presentation quality; review remains required. Two 256-token calls, opt-in and unqualified; defaults are unchanged.
 
 Experimental `fixed-part-selection-v32` uses two actual source-selection replies with the V28 model-input wire. Application contracts and replay remain V32. Necessity guidance is focused on requested precise values, wholly unknown selected-source scope, and explicit source references; full source catalogs and dependencies remain available. Both 256-token inputs, model-wire identity and review focuses are measured and replay-bound. Strict final validation remains; factual correctness and presentation need review. Opt-in and unqualified; defaults unchanged.
+
+### Readable task statements in the internal pilot
+
+The opt-in V43 answer path can display a strictly recognized task statement with
+its body first and its complete administrative frontmatter afterward. Source-body
+order, prerequisites, exceptions and citation bindings stay intact. The exact
+source status is labeled as recorded metadata, not a current-state assertion.
+Only headings proven to be repeated source-chunk wrappers and an exact duplicate
+single-question intro are compacted. Ambiguous sources, additional metadata,
+unknown/conflicting answers and corrections retain the existing presentation.
+
+This deterministic display does not run a model, summarize a policy or change the
+stored original answer, provenance, review or original-layout export. The readable
+response/export records the original source hash and reconstruction spans. Earlier
+answer contracts and the ordinary defaults keep their existing presentation.
