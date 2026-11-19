@@ -87,6 +87,56 @@ def test_v39_create_replay_correct_and_export(tmp_path, monkeypatch, source_cont
     asyncio.run(run())
 
 
+@pytest.mark.parametrize('version,stage_seconds,passes', [
+    ('v38', [125, 125, 50], False),
+    ('v39', [125, 125, 50], True),
+    ('v39', [170, 170, 50], False),
+])
+def test_shared_elapsed_deadline_reaches_audit_or_refuses_without_save(tmp_path, monkeypatch, version, stage_seconds, passes):
+    from types import SimpleNamespace
+
+    async def run():
+        path, scope, _, _, _ = await shared.setup(tmp_path, monkeypatch)
+        question = shared.QUESTION
+        plan = parts.prepare(question, [question], origin='fixture_supplied', request=question)
+        clock = [0.0]
+        monkeypatch.setattr(inv, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
+
+        class ElapsedRuntime(shared.FixedRuntime):
+            async def chat(self, messages, **kwargs):
+                self.calls.append(deepcopy((messages, kwargs)))
+                payload = json.loads(messages[1]['content'])
+                count = len(self.calls)
+                if count == 1:
+                    raw = {'parts': {'P1': [question]}}
+                else:
+                    uid = payload['sources'][0]['id']
+                    raw = {'F1': {'question_kind': 'substantive_rule_or_value',
+                                  'source_answer': 'not_applicable', 'substantive_finding': 'established', 'sources': [uid]}}
+                    if count == 3 and version == 'v39':
+                        raw = {'F1': {'decision': 'established', 'sources': [uid]}}
+                clock[0] += stage_seconds[count - 1]
+                return {'choices': [{'message': {'content': json.dumps(raw)}, 'finish_reason': 'stop'}]}
+
+        runtime = ElapsedRuntime()
+        monkeypatch.setattr(inv, 'get_runtime', lambda: runtime)
+        options = dict(template_version='investigation-v21', reviewed_operations=[{'request': question, 'operation': 'answer'}], evidence_selection='reviewed-current-v1', presentation_mode='fixed-part-selection-' + version, generation_profile='qwen3.8-27b-native-non-thinking', prompt_encoding='compact-calculation-v1', reliability_mode='bounded-evidence-v1', question_part_plan=plan)
+        if passes:
+            item = await inv.create_investigation(scope, question, 'Access', 'model', **options)
+            assert len(runtime.calls) == 3
+            assert item['provenance']['generation_settings']['timeout_seconds'] == 330
+            assert item['provenance']['elapsed_ms'] == 300000
+            assert item['provenance']['input_budget']['max_total_output_tokens'] == 1280
+            assert (await inv.get_investigation(scope, item['id']))['brief'] == item['brief']
+        else:
+            with pytest.raises(inv.InvestigationInferenceError) as caught:
+                await inv.create_investigation(scope, question, 'Access', 'model', **options)
+            assert caught.value.failure_category == 'shared_deadline_timeout'
+            assert len(runtime.calls) == 2
+            assert shared.counts(path) == (0, 0)
+    asyncio.run(run())
+
+
 def test_mapping_unclear_fails_without_saving(tmp_path, monkeypatch):
     async def run():
         path, scope, _, _, _ = await shared.setup(tmp_path, monkeypatch)

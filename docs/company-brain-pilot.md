@@ -493,3 +493,8 @@ contracts remain V36 and V38; the selected-decision audit uses V39. Set
 leaving earlier defaults unchanged. No fourth outline call, runtime guard change
 or production promotion. Frozen regression/correction/fresh cases and matching
 desktop checks remain required before private pilot readiness.
+
+The explicit V39 experiment uses one shared 330-second generation deadline,
+within the desktop's existing six-minute request limit. Prior versions retain
+their 240-second deadline. The three-call/1280-output-token cap, model profile,
+conditions and citation checks stay fixed; timeout still saves no answer.

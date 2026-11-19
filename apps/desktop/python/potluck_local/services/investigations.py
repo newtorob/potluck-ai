@@ -609,7 +609,9 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
             context.append(present(e))
     instruction = _INSTRUCTIONS[template_version]
     started = time.monotonic()
-    deadline = started + 240
+    # Leave response time within the desktop's bounded six-minute request.
+    generation_timeout_seconds = 330 if presentation_mode == 'fixed-part-selection-v39' else 240
+    deadline = started + generation_timeout_seconds
     cache_token = prompt_cache.request_is_local.set(False)
     question_origin = None
     snippet_catalog: list[dict[str, str]] = []
@@ -1267,7 +1269,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     provenance = {'schema_version': 2, 'retrieval_notices': retrieval_notices,
                   'template_version': template_version, 'citation_mapping': 'request-local aliases', 'retrieval_query': query,
                   'retrieval_version': 'unicode-word-overlap-v1', 'model_slug': model_slug,
-                  'model_sha256': sha, 'generation_settings': {'temperature': 0, 'max_tokens': 1600, 'timeout_seconds': 240},
+                  'model_sha256': sha, 'generation_settings': {'temperature': 0, 'max_tokens': 1600, 'timeout_seconds': generation_timeout_seconds},
                   'elapsed_ms': round((time.monotonic() - started) * 1000), 'created_at': created}
     if query_trace is not None:
         provenance['evidence_query'] = query_trace
