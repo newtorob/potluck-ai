@@ -440,3 +440,27 @@ with a recovery message. Saved originals, exact citations and full expandable
 evidence remain intact when a separate correction is reviewed. V37 is opt-in and
 unqualified until frozen consumed regressions and untouched cases pass, followed
 by matching private desktop and clean-environment checks. No default promotion.
+
+
+## Experimental direct source questions (V38)
+
+V37 remains unqualified: its first frozen phase passed, but a held-out case
+produced a misleading source-content acknowledgement despite retaining the source.
+The original failure and all earlier scores remain unchanged.
+
+Explicit `reviewed_answer_version: "v38"` separates direct yes/no answers about
+the supplied text from establishment findings for substantive rules, values,
+permissions, causes and events. This includes negative question wording. A
+source-content No is scoped to the selected reviewed statements; missing actual
+permission stays Unknown. Known conditions and citations remain exact source
+text, not a generated summary. An incompatible finding keeps priority.
+
+The three stages reserve256/512/512outputtokens. A supported string sentinel
+marks the unused decision field; the runtime schema guard is unchanged. All raw
+replies, typed decisions, derived conversions, source freshness and measured
+receipts replay separately. Corrections stay separate from immutable originals.
+Use `organize_answer: false`; no fourth model outline is supported. The frontend
+helper opts out for explicit V38 requests, leaving prior caller defaults intact.
+V38 is opt-in and unqualified until its committed source, unchanged regression
+rubrics and untouched cases pass a separately frozen assessment. Matching
+desktop and clean-environment checks follow; no production promotion is implied.

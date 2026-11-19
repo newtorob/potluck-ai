@@ -129,7 +129,7 @@ class AskReviewed(Scope):
     question_parts_confirmed: StrictBool
     organize_answer: StrictBool = False
     reviewed_evidence_version: Literal['v5', 'v6'] = 'v5'
-    reviewed_answer_version: Literal['v32', 'v33', 'v34', 'v35', 'v36', 'v37'] = 'v32'
+    reviewed_answer_version: Literal['v32', 'v33', 'v34', 'v35', 'v36', 'v37', 'v38'] = 'v32'
 
 def _pilot_error(exc: Exception) -> HTTPException:
     messages = {

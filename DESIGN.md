@@ -95,3 +95,13 @@ with literal question clauses, while known rules keep exact conditions and
 citations. The readable projection retains those acknowledgements; original
 answers and full selected evidence stay expandable. Model classifications are
 unverified, and a separate reviewed correction takes display precedence.
+
+
+### Direct source questions in experimental V38
+
+Fixed source yes/no acknowledgements answer the literal question, including
+negative phrasing, within selected reviewed statement scope. They retain numbered
+evidence references and exact source conditions. Actual unknown rules or values
+keep an explicit unresolved clause. V38 remains opt-in, without a model-written
+outline; Company Brain V33 and raw guided API V32 defaults remain unchanged.
+The current-source private pilot must pass fresh qualification before packaging.

@@ -81,23 +81,26 @@ it('requests a direct current source draft with the explicit workspace and selec
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
-it('keeps typed findings on exact source presentation without changing earlier organization defaults', async () => {
-  const input = {
-    workspace: 'workspace',
-    collection_ids: ['one'],
-    question: 'Which rule?',
-    model_slug: 'loaded-local-model',
-    pilot_confirmed: true as const,
-    question_parts: ['Which rule?'],
-    question_parts_confirmed: true as const,
-    reviewed_answer_version: 'v37' as const,
-  };
-  await localApi.askReviewedPilot(input);
-  expect(JSON.parse(String(fetchMock.mock.calls[0]![1].body))).toEqual({
-    ...input,
-    organize_answer: false,
-  });
-  await localApi.askReviewedPilot({ ...input, organize_answer: true });
-  expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body)).organize_answer).toBe(true);
-  expect(input).not.toHaveProperty('organize_answer');
-});
+it.each(['v37', 'v38'] as const)(
+  'keeps %s on exact source presentation without changing earlier organization defaults',
+  async (version) => {
+    const input = {
+      workspace: 'workspace',
+      collection_ids: ['one'],
+      question: 'Which rule?',
+      model_slug: 'loaded-local-model',
+      pilot_confirmed: true as const,
+      question_parts: ['Which rule?'],
+      question_parts_confirmed: true as const,
+      reviewed_answer_version: version,
+    };
+    await localApi.askReviewedPilot(input);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1].body))).toEqual({
+      ...input,
+      organize_answer: false,
+    });
+    await localApi.askReviewedPilot({ ...input, organize_answer: true });
+    expect(JSON.parse(String(fetchMock.mock.calls[1]![1].body)).organize_answer).toBe(true);
+    expect(input).not.toHaveProperty('organize_answer');
+  },
+);
