@@ -108,7 +108,7 @@ export function GuidedCompanyBrainView({
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
   reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42';
+  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42' | 'v43';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);

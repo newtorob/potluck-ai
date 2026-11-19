@@ -460,3 +460,27 @@ Guided `FocusedSourceAnswer` retains supported source context visibly open by de
 - Unsupported platform, engine, memory, disk and artifact states cannot claim
   readiness. Model/resource details are expandable. Failed actions retain entries
   and require an explicit retry; setup never silently retries a model mutation.
+
+## Experimental source-content answer forms
+
+Explicit V43 callers retain the same confirmation, source review, answer review,
+correction and export owners. A conservative question-only recognizer chooses
+the answer form for definite document-subject “specify” questions. It does not
+infer an answer, polarity, source completeness, permission or occurrence. The
+proposal and independent audit must both obey that form; the audit can change
+Yes to No or No to Yes. Unrecognized or ambiguous grammar stays unrestricted.
+Unclear mapping refuses before saving rather than becoming an absence claim.
+Exact literal clauses, derived forms, model decisions and evidence remain bound
+in replay. No new setup action or authority is implied. Defaults stay V33/V32.
+
+For this guided workflow, `GuidedCompanyBrainView` owns the native model select
+and `GuidedAnswerReview` owns the native review-decision select. Their operating
+system popup geometry and keyboard behavior are intentional desktop variants;
+the surrounding labels, disabled/busy states and mutation guards remain owned
+by the existing components. Version admission does not introduce a new select.
+
+The canonical map for these Company Brain controls is:
+
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+| --- | --- | --- | --- | --- |
+| Select/Listbox | `GuidedCompanyBrainView`, `GuidedAnswerReview` | This guided-workflow contract | Native operating-system popup | Frontend workflow tests and installed-pilot keyboard checks |

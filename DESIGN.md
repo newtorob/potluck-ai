@@ -115,3 +115,13 @@ clear pre-save refusal and recovery action, without a false absence or conflict
 claim. Successful source yes/no answers keep literal polarity, selected-statement
 scope and exact evidence citations. Existing defaults remain V33/V32; explicit
 V39 opts out of model outlines and remains experimental pending qualification.
+
+### Experimental source-content answer forms in V43
+
+V43 reuses the existing guided answer and evidence disclosures. For narrowly
+recognized questions about what a note specifies, the application selects a
+direct Yes/No answer form; the model still chooses the answer. This is not a
+truth or permission check. Ambiguous wording and actual permission or event
+questions retain the unrestricted decision contract. Exact conditions,
+exceptions, citations and selected-statement scope remain visible. Defaults
+stay V33/V32; V43 requires native qualification before a matching pilot build.

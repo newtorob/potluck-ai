@@ -138,7 +138,8 @@ export function ReviewedPassageAnswer({
       presentation.version === 'fixed-part-selection-v39' ||
       presentation.version === 'fixed-part-selection-v40' ||
       presentation.version === 'fixed-part-selection-v41' ||
-      presentation.version === 'fixed-part-selection-v42') &&
+      presentation.version === 'fixed-part-selection-v42' ||
+      presentation.version === 'fixed-part-selection-v43') &&
     readable?.version === 'readable-source-groups-v1' &&
     readable.original_text === answer.text &&
     readable.original_status === answer.status &&
