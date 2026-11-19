@@ -529,3 +529,17 @@ Permission for an unaddressed action or scope remains unestablished. Output
 schemas, complete exact source text, citations, call/token caps and timeouts
 remain unchanged. V41 is an unqualified opt-in candidate; a consumed diagnostic
 is not qualification. Defaults remain unchanged.
+
+Explicit `reviewed_answer_version: "v42"` uses a flat literal-decision proposal
+and independent audit. The audit answers the original literal questions without
+being constrained by a proposal's question-type guess. Direct yes/no answers,
+conditional rules, unresolved facts and conflicts retain complete exact source
+conditions and citations; unclear mappings refuse before saving. Raw stage
+outputs remain distinct from application-authored display. V42 is an unqualified
+candidate; the consumed prototype pass is not product qualification. Defaults,
+model profile, three call/output caps and timeouts remain unchanged.
+
+Source review records a reviewer and reason. Delegated assistant source review
+can be recorded, so the provenance describes a source-review record rather than
+claiming that a person reviewed the answer. A saved-answer decision remains a
+separate explicit action.
