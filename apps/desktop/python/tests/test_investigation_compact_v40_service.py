@@ -92,5 +92,3 @@ def test_v40_create_replay_correct_and_export(tmp_path, monkeypatch, source_cont
         assert reopened['review']['corrected_brief']['answers'][0]['text'] == corrected['answers'][0]['text']
         assert (await routes.export(item['id'], scope.workspace, list(scope.collection_ids)))['markdown']
     asyncio.run(run())
-
-
