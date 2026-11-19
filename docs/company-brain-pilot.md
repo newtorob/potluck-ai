@@ -520,3 +520,12 @@ setup while preserving the question. A changed model, failed connection or
 pending health check cannot keep the setup panel labelled Ready. Replacement
 consent clears; preparation and ending a stale session stay disabled. Refresh
 setup remains a passive check and never starts inference.
+
+Explicit `reviewed_answer_version: "v41"` retains V40's compact three-stage
+contract and clarifies the audit of conditional governing rules. An established
+rule can include prerequisites, restrictions and exceptions; this does not
+establish unconditional permission or that prerequisites actually occurred.
+Permission for an unaddressed action or scope remains unestablished. Output
+schemas, complete exact source text, citations, call/token caps and timeouts
+remain unchanged. V41 is an unqualified opt-in candidate; a consumed diagnostic
+is not qualification. Defaults remain unchanged.

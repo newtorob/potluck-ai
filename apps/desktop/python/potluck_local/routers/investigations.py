@@ -546,7 +546,7 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
             lines += ['## Model questions (unverified)'] + ['- ' + escape(x) for x in brief['model_uncertainties']] + ['']
         if provenance.get('input_budget'):
             budget = provenance['input_budget']
-            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40'):
+            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40','fixed-part-conditional-rule-audit-v41'):
                 lines += ['## Measured model input']
                 for stage in budget['stages']:
                     lines += ['Stage: ' + escape(stage['stage']),
@@ -558,8 +558,8 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                     'Input tokens: ' + escape(budget['input_tokens']),
                     'Reserved output tokens: ' + escape(budget['output_tokens']),
                     'Context capacity: ' + escape(budget['context_tokens'])]
-            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40'):
-                if budget['version'] == 'fixed-part-compact-bound-kind-audit-v40':
+            if budget.get('version') in ('fixed-part-necessity-review-v28','fixed-part-necessity-review-v29','fixed-part-necessity-review-v30','fixed-part-edit-review-v31','fixed-part-focused-review-v32','fixed-part-focused-review-v33','fixed-part-focused-review-v34','fixed-part-focused-review-v35','fixed-part-clause-review-v36','fixed-part-finding-audit-v37','fixed-part-source-answer-audit-v38','fixed-part-bound-kind-audit-v39','fixed-part-compact-bound-kind-audit-v40','fixed-part-conditional-rule-audit-v41'):
+                if budget['version'] in ('fixed-part-compact-bound-kind-audit-v40', 'fixed-part-conditional-rule-audit-v41'):
                     for stage in budget['stages']:
                         lines += ['Presented reviewed claim IDs (' + escape(stage['stage']) + '): ' +
                                   escape(', '.join(stage['model_visible_claim_ids']) or 'none'),

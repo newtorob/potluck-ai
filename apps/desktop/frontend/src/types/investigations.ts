@@ -58,7 +58,8 @@ export interface Brief {
         | 'fixed-part-selection-v37'
         | 'fixed-part-selection-v38'
         | 'fixed-part-selection-v39'
-        | 'fixed-part-selection-v40';
+        | 'fixed-part-selection-v40'
+        | 'fixed-part-selection-v41';
       lead?: string;
       answer: string;
       passages: Array<{
