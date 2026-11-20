@@ -51,3 +51,19 @@ def test_rejects_ambiguous_identity_and_content():
     changed[2]['content'] = changed[1]['content']
     assert project_task_statement(text, changed) is None
     assert project_task_statement(text + '\n\n' + sources[1]['content'], sources) is None
+
+
+def test_conditional_title_remains_in_proven_visible_heading():
+    text, sources = fixture()
+    title = 'Prepare kit after approval unless emergency work is authorized'
+    changed = deepcopy(sources)
+    changed[0]['content'] = changed[0]['content'].replace('title: Prepare kit', 'title: ' + title)
+    for source in changed[1:]:
+        source['heading'] = 'TASK-12 ' + title
+    complete = 'Document: Collection / Tasks/T.md\n\n' + '\n\n'.join(
+        (s['heading'] + '\n\n' if s['heading'] else '') + s['content'] for s in changed)
+    result = project_task_statement(complete, changed)
+    assert result is not None and result['heading'] == 'TASK-12 ' + title
+    assert ''.join(x['text'] for x in result['segments']) == complete
+    changed[1]['heading'] = 'TASK-12 Prepare kit'
+    assert project_task_statement(complete, changed) is None

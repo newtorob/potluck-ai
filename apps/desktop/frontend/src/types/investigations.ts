@@ -183,7 +183,7 @@ export interface Investigation {
   outcome: null | { reviewer: string; result: string; notes: string };
 }
 export interface ReadableAnswer {
-  version: 'readable-source-groups-v1' | 'readable-task-statements-v2';
+  version: 'readable-source-groups-v1' | 'readable-task-statements-v2' | 'readable-task-statements-v3';
   original_text: string;
   original_status: NonNullable<Brief['answers']>[number]['status'];
   original_snippet_ids: string[];

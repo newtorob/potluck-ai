@@ -248,7 +248,12 @@ order, prerequisites, exceptions and citation bindings stay intact. The exact
 source status is labeled as recorded metadata, not a current-state assertion.
 Only headings proven to be repeated source-chunk wrappers and an exact duplicate
 single-question intro are compacted. Ambiguous sources, additional metadata,
-unknown/conflicting answers and corrections retain the existing presentation.
+conflicting answers and corrections retain the existing presentation. A separately
+versioned display also accepts exact bound direct Yes/No acknowledgements and
+scoped unknown fragments for a single complete task. It keeps those decisions
+and the selected scope basis visible, while removing only the duplicate whole
+question. Unknown fragments do not hide the task body or become an assertion
+about unsupplied documents. Unrecognized or mismatched leads fall back unchanged.
 
 This deterministic display does not run a model, summarize a policy or change the
 stored original answer, provenance, review or original-layout export. The readable

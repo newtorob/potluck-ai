@@ -102,7 +102,7 @@ describe('ReviewedPassageAnswer', () => {
 });
 
 describe('Readable fixed-part answer', () => {
-  it.each(['readable-source-groups-v1', 'readable-task-statements-v2'] as const)(
+  it.each(['readable-source-groups-v1', 'readable-task-statements-v2', 'readable-task-statements-v3'] as const)(
     'shows %s projection while keeping original evidence accessible',
     (version) => {
       const value = answer(
@@ -151,7 +151,7 @@ describe('Readable fixed-part answer', () => {
     },
   );
 
-  it.each(['readable-source-groups-v1', 'readable-task-statements-v2'] as const)(
+  it.each(['readable-source-groups-v1', 'readable-task-statements-v2', 'readable-task-statements-v3'] as const)(
     'ignores a stale %s projection',
     (version) => {
       const value = answer('Corrected condition: always require approval.');

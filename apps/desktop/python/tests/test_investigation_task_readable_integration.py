@@ -76,3 +76,61 @@ def test_unknown_metadata_falls_back_without_hiding_a_condition():
     a['text'] = a['text'].replace(old, new); a['passage_presentation']['passages'][0]['text'] = new
     value = view.decorate(item)['readable_answers']['R1']
     assert value['version'] == view.VERSION and 'requires: signed approval' in value['markdown']
+
+
+def scoped_record(kind):
+    item = record(); a = item['brief']['answers'][0]; p = a['passage_presentation']
+    question = item['issue']; lead, body = a['text'].split('\n\n[1]\n', 1)
+    if kind == 'direct':
+        p['acknowledgements'] = [{'part_id': 'P1', 'answer': 'No', 'clause': question,
+                                  'source_unit_ids': ['C1:whole']}]
+        notice = 'Direct answers (selected reviewed statements; unverified):\n- No: ' + question + ' [1]'
+    else:
+        clause = 'before the kit can be used?'; start = question.index(clause)
+        p['unresolved_requests'] = [{'part_id': 'P1', 'text': clause,
+                                    'start': start, 'end': len(question)}]
+        a['status'] = p['parts'][0]['verdict'] = 'unknown'
+        lead = 'P1: ' + question + ' — Not established by the selected reviewed statements.\nScope basis: [1]'
+        notice = ('Not established by the selected reviewed statements (model assessment; review required):'
+                  '\n- P1: ' + clause)
+    a['text'] = notice + '\n\n' + lead + '\n\n[1]\n' + body
+    return item, notice
+
+
+@pytest.mark.parametrize('kind', ['direct', 'unknown'])
+def test_bound_decisions_stay_visible_beside_task_body_without_duplicate_intro(kind):
+    item, notice = scoped_record(kind); frozen = deepcopy(item)
+    a = item['brief']['answers'][0]
+    value = view.decorate(item)['readable_answers']['R1']; markdown = value['markdown']
+    assert value['version'] == view.TASK_SCOPED_VERSION
+    assert markdown.startswith(notice) and item == frozen
+    assert value['original_text'] == a['text'] and value['original_status'] == a['status']
+    assert markdown.count(item['issue']) == (1 if kind == 'direct' else 0)
+    assert markdown.index('Before use, obtain approval.') < markdown.index('**Fix.**')
+    assert markdown.index('Exception: wait when approval is unavailable.') < markdown.index('```yaml')
+    assert 'status: open' in markdown
+    if kind == 'unknown':
+        assert 'Scope basis: [1]' in markdown
+    exported = view.export(item, str)
+    assert notice in exported and a['text'] in exported
+    assert value['source_groups'][0]['citation_id'] == 'claim:1'
+
+
+@pytest.mark.parametrize('mutation', ['extra-prefix', 'wrong-clause', 'wrong-source', 'bad-span',
+                                      'bool-span', 'wrong-part', 'wrong-verdict', 'missing-scope'])
+def test_mismatched_scoped_decisions_fall_back_losslessly(mutation):
+    item, _ = scoped_record('direct' if mutation in ('wrong-clause', 'wrong-source') else 'unknown')
+    a = item['brief']['answers'][0]; p = a['passage_presentation']
+    if mutation == 'extra-prefix': a['text'] = 'Only if approval is signed.\n' + a['text']
+    elif mutation == 'wrong-clause': p['acknowledgements'][0]['clause'] = 'Different request'
+    elif mutation == 'wrong-source': p['acknowledgements'][0]['source_unit_ids'] = ['C9:whole']
+    elif mutation == 'bad-span': p['unresolved_requests'][0]['start'] += 1
+    elif mutation == 'bool-span': p['unresolved_requests'][0]['start'] = True
+    elif mutation == 'wrong-part': p['unresolved_requests'][0]['part_id'] = 'P2'
+    elif mutation == 'wrong-verdict': p['parts'][0]['verdict'] = 'supported'
+    elif mutation == 'missing-scope': a['text'] = a['text'].replace('Scope basis: [1]', 'Scope basis: [9]')
+    result = view.decorate(item)['readable_answers']['R1']
+    assert result['version'] == view.VERSION
+    assert result['original_text'] == a['text']
+    assert 'Before use, obtain approval.' in result['markdown']
+    assert 'Exception: wait when approval is unavailable.' in result['markdown']

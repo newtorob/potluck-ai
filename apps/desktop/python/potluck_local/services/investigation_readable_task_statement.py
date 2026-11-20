@@ -32,7 +32,10 @@ def _metadata(text):
                 return None
         else:
             value = raw
-        if not isinstance(value, str) or any(x in value.lower().split() for x in ('if', 'unless', 'before', 'after', 'until', 'when', 'required', 'except')):
+        # The exact title stays visible as the proven source heading. Other
+        # metadata cannot carry a condition that would move behind the body.
+        if not isinstance(value, str) or (key != 'title' and any(
+                x in value.lower().split() for x in ('if', 'unless', 'before', 'after', 'until', 'when', 'required', 'except'))):
             return None
         if key == 'tags':
             if value not in ('[]', '[task]'):

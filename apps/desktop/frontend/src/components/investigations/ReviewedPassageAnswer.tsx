@@ -141,7 +141,8 @@ export function ReviewedPassageAnswer({
       presentation.version === 'fixed-part-selection-v42' ||
       presentation.version === 'fixed-part-selection-v43') &&
     (readable?.version === 'readable-source-groups-v1' ||
-      readable?.version === 'readable-task-statements-v2') &&
+      readable?.version === 'readable-task-statements-v2' ||
+      readable?.version === 'readable-task-statements-v3') &&
     readable.original_text === answer.text &&
     readable.original_status === answer.status &&
     JSON.stringify(readable.original_snippet_ids) === JSON.stringify(answer.snippet_ids)

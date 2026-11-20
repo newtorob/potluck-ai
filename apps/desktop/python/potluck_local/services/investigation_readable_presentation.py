@@ -9,6 +9,7 @@ from typing import Any
 
 VERSION = 'readable-source-groups-v1'
 TASK_VERSION = 'readable-task-statements-v2'
+TASK_SCOPED_VERSION = 'readable-task-statements-v3'
 
 
 def cells(line: str) -> list[str] | None:
@@ -108,24 +109,81 @@ def _prefix(texts: list[str]) -> str:
     return prefix if all(text.startswith(prefix) and text[len(prefix):].strip() for text in texts) else ''
 
 
+def _task_intro(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: str,
+                question: str) -> tuple[str, str] | None:
+    """Compact only a fully reconstructed single-part lead; keep scoped decisions."""
+    presentation = answer['passage_presentation']
+    parts = presentation.get('parts', [])
+    if len(parts) != 1 or not isinstance(parts[0], dict):
+        return None
+    part = parts[0]
+    pid, status = part.get('id'), answer['status']
+    if (not isinstance(pid, str) or not pid or part.get('request') != question
+            or status not in ('supported', 'unknown') or part.get('verdict') != status):
+        return None
+    markers = ', '.join('[' + group['id'] + ']' for group in groups)
+    lead = pid + ': ' + question
+    lead += (' — Not established by the selected reviewed statements.\nScope basis: '
+             if status == 'unknown' else '\nEvidence: ') + markers
+    blocks = []
+    acknowledgements = presentation.get('acknowledgements', [])
+    unresolved = presentation.get('unresolved_requests', [])
+    if not isinstance(acknowledgements, list) or not isinstance(unresolved, list):
+        return None
+    if acknowledgements:
+        numbers = {g['passage']['unit_id']: g['id'] for g in groups}
+        lines = ['Direct answers (selected reviewed statements; unverified):']
+        for row in acknowledgements:
+            if (not isinstance(row, dict) or row.get('part_id') != pid
+                    or row.get('answer') not in ('Yes', 'No')
+                    or not isinstance(row.get('clause'), str) or not row['clause'].strip()
+                    or row['clause'] not in question
+                    or not isinstance(row.get('source_unit_ids'), list)
+                    or not row['source_unit_ids']
+                    or any(not isinstance(uid, str) or uid not in numbers
+                           for uid in row['source_unit_ids'])):
+                return None
+            refs = list(dict.fromkeys(numbers[uid] for uid in row['source_unit_ids']))
+            lines.append('- ' + row['answer'] + ': ' + row['clause'] + ' '
+                         + ' '.join('[' + ref + ']' for ref in refs))
+        blocks.append('\n'.join(lines))
+    if unresolved:
+        lines = ['Not established by the selected reviewed statements (model assessment; review required):']
+        for row in unresolved:
+            if not isinstance(row, dict):
+                return None
+            start, end = row.get('start'), row.get('end')
+            if (row.get('part_id') != pid or type(start) is not int or type(end) is not int
+                    or not 0 <= start < end <= len(question)
+                    or row.get('text') != question[start:end]):
+                return None
+            lines.append('- ' + pid + ': ' + row['text'])
+        blocks.append('\n'.join(lines))
+    if status == 'unknown' and not unresolved:
+        return None
+    if prefix != '\n\n'.join([*blocks, lead]):
+        return None
+    if not blocks:
+        return TASK_VERSION, ''
+    # A missing detail remains scoped to the exact request fragment and its
+    # selected evidence, rather than hiding the task's known instructions.
+    if status == 'unknown':
+        blocks.append('Scope basis: ' + markers)
+    return TASK_SCOPED_VERSION, '\n\n'.join(blocks)
+
+
 def _task_layout(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: str,
                  question: str | None, escape: Callable[[str], str]) -> dict[str, Any] | None:
     """Preserve body order; relocate only proven administrative task metadata."""
     from .investigation_readable_task_statement import project_task_statement
 
     presentation = answer['passage_presentation']
-    parts = presentation.get('parts', [])
-    if (presentation.get('version') != 'fixed-part-selection-v43'
-            or answer['status'] != 'supported' or len(parts) != 1 or not question):
+    if presentation.get('version') != 'fixed-part-selection-v43' or not question:
         return None
-    part = parts[0]
-    if not isinstance(part, dict) or not isinstance(part.get('id'), str):
+    intro = _task_intro(answer, groups, prefix, question)
+    if intro is None:
         return None
-    markers = ', '.join('[' + group['id'] + ']' for group in groups)
-    expected = part.get('id', '') + ': ' + question + '\nEvidence: ' + markers
-    if (part.get('request') != question or part.get('verdict') != 'supported'
-            or prefix != expected):
-        return None
+    version, scoped = intro
     prepared = []
     for group in groups:
         if (not group['passage']['unit_id'].endswith(':whole')
@@ -136,7 +194,7 @@ def _task_layout(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: s
         if value is None:
             return None
         prepared.append((group, value))
-    lines, metadata_lines, mappings = [], [], []
+    lines, metadata_lines, mappings = ([escape(scoped)] if scoped else []), [], []
     for group, value in prepared:
         lines += ['### Evidence ' + group['id'], escape(value['source_header'].rstrip()),
                   'Source task metadata (as recorded): `' + value['status_line'] + '`',
@@ -156,7 +214,7 @@ def _task_layout(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: s
                              'version': value['version'], 'offset_unit': value['offset_unit'],
                              'segments': [{key: row[key] for key in ('kind', 'start', 'end', 'citation_id')
                                            if key in row} for row in value['segments']]}})
-    return {'version': TASK_VERSION, 'original_text': answer['text'],
+    return {'version': version, 'original_text': answer['text'],
             'original_status': answer['status'],
             'original_snippet_ids': deepcopy(answer['snippet_ids']),
             'markdown': '\n\n'.join(lines + metadata_lines),
