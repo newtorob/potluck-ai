@@ -836,7 +836,7 @@ export const localApi = {
     }).then(handleResponse<PilotEvidence>);
   },
 
-  pilotSetupDrafts(input: InvestigationScope & { question: string; suggestion_version?: 'legacy' | 'document-topics-v1' | 'document-topics-v2' | 'document-topics-v3' | 'document-topics-v4' }): Promise<PilotSetupDraft> {
+  pilotSetupDrafts(input: InvestigationScope & { question: string; suggestion_version?: 'legacy' | 'document-topics-v1' | 'document-topics-v2' | 'document-topics-v3' | 'document-topics-v4' | 'all-selected-documents-v1' }): Promise<PilotSetupDraft> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/setup-drafts`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<PilotSetupDraft>);
@@ -879,7 +879,7 @@ export const localApi = {
     }, 360_000).then(handleResponse<Investigation>);
   },
 
-  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true; organize_answer?: boolean; reviewed_evidence_version?: 'v5' | 'v6'; reviewed_answer_version?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42' | 'v43' }): Promise<Investigation> {
+  askReviewedPilot(input: InvestigationScope & { question: string; model_slug: string; pilot_confirmed: true; question_parts: string[]; question_parts_confirmed: true; organize_answer?: boolean; reviewed_evidence_version?: 'v5' | 'v6' | 'v7'; reviewed_answer_version?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42' | 'v43' }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/pilot/ask-reviewed`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, organize_answer: input.organize_answer ?? (input.reviewed_answer_version !== 'v37' && input.reviewed_answer_version !== 'v38' && input.reviewed_answer_version !== 'v39' && input.reviewed_answer_version !== 'v40' && input.reviewed_answer_version !== 'v41' && input.reviewed_answer_version !== 'v42' && input.reviewed_answer_version !== 'v43') }),
     }, 360_000).then(handleResponse<Investigation>);

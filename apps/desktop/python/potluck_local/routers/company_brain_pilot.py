@@ -102,7 +102,7 @@ class ContextPreview(Scope):
 
 class SetupDraft(Scope):
     question: StrictStr = Field(min_length=1, max_length=500)
-    suggestion_version: Literal['legacy', 'document-topics-v1', 'document-topics-v2', 'document-topics-v3', 'document-topics-v4'] = 'legacy'
+    suggestion_version: Literal['legacy', 'document-topics-v1', 'document-topics-v2', 'document-topics-v3', 'document-topics-v4', 'all-selected-documents-v1'] = 'legacy'
 
 class SourceDraft(Scope):
     collection_id: StrictStr = Field(min_length=1, max_length=128)
@@ -128,7 +128,7 @@ class AskReviewed(Scope):
     question_parts: list[StrictStr] = Field(min_length=1, max_length=6)
     question_parts_confirmed: StrictBool
     organize_answer: StrictBool = False
-    reviewed_evidence_version: Literal['v5', 'v6'] = 'v5'
+    reviewed_evidence_version: Literal['v5', 'v6', 'v7'] = 'v5'
     reviewed_answer_version: Literal['v32', 'v33', 'v34', 'v35', 'v36', 'v37', 'v38', 'v39', 'v40', 'v41', 'v42', 'v43'] = 'v32'
 
 def _pilot_error(exc: Exception) -> HTTPException:
@@ -143,6 +143,9 @@ def _pilot_error(exc: Exception) -> HTTPException:
             'This experimental answer keeps the exact source wording. Turn off answer organization and retry.',
     }
     message = messages.get(str(exc)) if isinstance(exc, ValueError) else None
+    from potluck_local.services.investigation_reviewed_collection_v7 import REFUSAL
+    if isinstance(exc, ValueError) and str(exc).endswith(REFUSAL):
+        message = str(exc)
     return HTTPException(status_code=400, detail=message) if message else _error(exc)
 
 async def _start() -> None:

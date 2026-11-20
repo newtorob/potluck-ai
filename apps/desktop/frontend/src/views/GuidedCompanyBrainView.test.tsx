@@ -128,7 +128,7 @@ const result = {
 let approved: PilotClaim[] = [];
 let proposed: PilotClaim[] = [];
 function mount(
-  reviewedEvidenceVersion: 'v5' | 'v6' = 'v5',
+  reviewedEvidenceVersion: 'v5' | 'v6' | 'v7' = 'v5',
   reviewedAnswerVersion: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' = 'v32',
 ) {
   return render(
@@ -1300,4 +1300,60 @@ describe('guided recorded outcomes and evaluation proposals', () => {
     expect(api.proposePilotClaim).not.toHaveBeenCalled();
     expect(api.approvePilotClaim).not.toHaveBeenCalled();
   });
+});
+
+it('uses the complete selected-document source review and request only for v7', async () => {
+  approved = [claim];
+  mount('v7');
+  await question();
+  expect(api.pilotSetupDrafts).toHaveBeenCalledWith(
+    expect.objectContaining({ suggestion_version: 'all-selected-documents-v1' }),
+  );
+  await confirm();
+  fireEvent.click(screen.getByRole('button', { name: 'Get answer' }));
+  await screen.findByRole('region', { name: 'Your answer' });
+  expect(api.askReviewedPilot).toHaveBeenCalledWith(
+    expect.objectContaining({ reviewed_evidence_version: 'v7' }),
+  );
+});
+
+it('shows all supplied document scope with inspectable sources on a saved answer', async () => {
+  api.investigations.mockResolvedValue({ investigations: [{ ...result, id: 'saved-coverage' }] });
+  api.investigation.mockResolvedValue({
+    ...result,
+    id: 'saved-coverage',
+    provenance: {
+      document_coverage: {
+        version: 'complete-selected-documents-v1',
+        selected_documents: 2,
+        supplied_documents: 2,
+        omitted_documents: 0,
+        documents: [
+          {
+            collection_id: 'c1',
+            id: 'd1',
+            relative_path: 'policy.md',
+            claim_citation_id: 'claim:one',
+            revision_id: 'r1',
+          },
+          {
+            collection_id: 'c1',
+            id: 'd2',
+            relative_path: 'other.md',
+            claim_citation_id: 'claim:two',
+            revision_id: 'r2',
+          },
+        ],
+        scope: 'Selected indexed documents',
+        assessment: 'Interpretation needs review',
+      },
+    },
+  });
+  mount();
+  fireEvent.click(await screen.findByRole('button', { name: /Who approves.*draft/i }));
+  const summary = await screen.findByText('2 of 2 selected documents supplied');
+  fireEvent.click(summary);
+  expect(screen.getByText(/Folder exclusions still apply/)).toBeVisible();
+  expect(screen.getByText(/other.md:/)).toBeVisible();
+  expect(api.askReviewedPilot).not.toHaveBeenCalled();
 });

@@ -519,3 +519,19 @@ proposal flow; server source/privacy/authority checks remain final for both.
 | Select/Listbox | `InvestigationOutcomeForm` | Actual outcome enum from outcome API | Native OS popup | Component validation and actual keyboard selection checks |
 | Feedback CRUD | Guided and Advanced parent views | Scoped outcome API and read-only reconciliation | Append-only observation; no auto retry | Lost response, stale context and exact target tests |
 | Evaluation preview | `GuidedEvaluationProposal` | `investigation_evaluation.propose_evaluation_case` | Guided inspect/export; Advanced direct download | Binding/tamper/stale response tests and isolated real backend walkthrough |
+
+## Complete selected-document input
+
+The opt-in V7 Company Brain pilot reuses the existing source cards and explicit
+review controls for every indexed document in the selected folders. No source is
+approved by preparing suggestions. The server refuses incomplete, stale or
+over-budget sets before inference, and binds full document/revision coverage to
+the saved answer. An unchanged rescan renews freshness without changing logical
+evidence. Guided answers show a native disclosure listing all supplied documents
+with the existing source links. The count describes input coverage, not model
+verification or company-wide absence. Older answer contracts and defaults remain
+unchanged until qualification. No new tokens, form or selection owners.
+
+The explicit `coverage=complete` Company Brain preview selects V7 evidence and
+V43 answers together, preserving that selection through Advanced navigation.
+The ordinary route retains V6/V33 until qualification and promotion.

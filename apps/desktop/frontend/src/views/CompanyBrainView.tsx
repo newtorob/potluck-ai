@@ -8,16 +8,32 @@ export function CompanyBrainView({
   reviewedEvidenceVersion = 'v6',
   reviewedAnswerVersion = 'v33',
 }: {
-  reviewedEvidenceVersion?: 'v5' | 'v6';
-  reviewedAnswerVersion?: 'v32' | 'v33' | 'v34' | 'v35' | 'v36' | 'v37' | 'v38' | 'v39' | 'v40' | 'v41' | 'v42' | 'v43';
+  reviewedEvidenceVersion?: 'v5' | 'v6' | 'v7';
+  reviewedAnswerVersion?:
+    | 'v32'
+    | 'v33'
+    | 'v34'
+    | 'v35'
+    | 'v36'
+    | 'v37'
+    | 'v38'
+    | 'v39'
+    | 'v40'
+    | 'v41'
+    | 'v42'
+    | 'v43';
 } = {}) {
   const [params, setParams] = useSearchParams();
+  const completeDocuments = params.get('coverage') === 'complete';
   const [handoff, setHandoff] = useState<{ question: string; answerId?: string }>({ question: '' });
   if (params.get('mode') === 'advanced')
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="border-b border-border px-6 py-2">
-          <button className={button} onClick={() => setParams({})}>
+          <button
+            className={button}
+            onClick={() => setParams(completeDocuments ? { coverage: 'complete' } : {})}
+          >
             Back to Company Brain
           </button>
         </div>
@@ -31,12 +47,14 @@ export function CompanyBrainView({
     );
   return (
     <GuidedCompanyBrainView
-      reviewedEvidenceVersion={reviewedEvidenceVersion}
-      reviewedAnswerVersion={reviewedAnswerVersion}
+      reviewedEvidenceVersion={completeDocuments ? 'v7' : reviewedEvidenceVersion}
+      reviewedAnswerVersion={completeDocuments ? 'v43' : reviewedAnswerVersion}
       initialQuestion={handoff.question}
       onAdvanced={(question, answerId) => {
         setHandoff(answerId ? { question, answerId } : { question });
-        setParams({ mode: 'advanced' });
+        setParams(
+          completeDocuments ? { mode: 'advanced', coverage: 'complete' } : { mode: 'advanced' },
+        );
       }}
     />
   );

@@ -454,7 +454,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         raise ValueError('Automatic organization requires fixed-part selection v32')
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
-    if evidence_selection is not None and (evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6')
+    if evidence_selection is not None and (evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6', 'reviewed-collection-v7')
                                            or template_version != 'investigation-v21'):
         raise ValueError('Unsupported evidence selection')
     if prompt_encoding is not None and (prompt_encoding != investigation_prompt_encoding.COMPACT
@@ -476,7 +476,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     if presentation_mode in ('fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43') and question_part_plan is None:
         raise ValueError('Fixed-part selection requires an explicit question-part plan')
     claim_selection_mode = presentation_mode in ('reviewed-claim-selection-v1', 'reviewed-claim-selection-v2', 'reviewed-claim-selection-v3', 'reviewed-claim-selection-v4', 'reviewed-claim-selection-v5', 'reviewed-claim-selection-v6', 'reviewed-claim-selection-v7', 'reviewed-claim-selection-v8', 'reviewed-claim-selection-v9', 'reviewed-claim-selection-v10', 'reviewed-claim-selection-v11', 'reviewed-claim-selection-v12', 'reviewed-claim-selection-v13', 'reviewed-claim-selection-v14', 'reviewed-claim-selection-v15', 'reviewed-claim-selection-v16', 'fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43')
-    if claim_selection_mode and (template_version != 'investigation-v21' or evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6')
+    if claim_selection_mode and (template_version != 'investigation-v21' or evidence_selection not in ('reviewed-current-v1', 'reviewed-collection-v1', 'reviewed-collection-v2', 'reviewed-collection-v3', 'reviewed-collection-v4', 'reviewed-collection-v5', 'reviewed-collection-v6', 'reviewed-collection-v7')
                                  or reviewed_operations is None or formula_mode is not None):
         raise ValueError('Unsupported reviewed claim selection options')
     if presentation_mode in ('reviewed-claim-selection-v7', 'reviewed-claim-selection-v8', 'reviewed-claim-selection-v9', 'reviewed-claim-selection-v10', 'reviewed-claim-selection-v11', 'reviewed-claim-selection-v12', 'reviewed-claim-selection-v13', 'reviewed-claim-selection-v14', 'reviewed-claim-selection-v15', 'reviewed-claim-selection-v16', 'fixed-part-selection-v1', 'fixed-part-selection-v2', 'fixed-part-selection-v3', 'fixed-part-selection-v4', 'fixed-part-selection-v5', 'fixed-part-selection-v6', 'fixed-part-selection-v7', 'fixed-part-selection-v8', 'fixed-part-selection-v9', 'fixed-part-selection-v10', 'fixed-part-selection-v11', 'fixed-part-selection-v12', 'fixed-part-selection-v13', 'fixed-part-selection-v14', 'fixed-part-selection-v15', 'fixed-part-selection-v16', 'fixed-part-selection-v17', 'fixed-part-selection-v18', 'fixed-part-selection-v19', 'fixed-part-selection-v20', 'fixed-part-selection-v21', 'fixed-part-selection-v22', 'fixed-part-selection-v23', 'fixed-part-selection-v24', 'fixed-part-selection-v25', 'fixed-part-selection-v26', 'fixed-part-selection-v27', 'fixed-part-selection-v28', 'fixed-part-selection-v29', 'fixed-part-selection-v30', 'fixed-part-selection-v31', 'fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43') and reliability_mode != input_budget.VERSION:
@@ -542,7 +542,9 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     reviewed_receipt = None
     if evidence_selection is not None:
         from . import investigation_reviewed_evidence as reviewed_evidence
-        if evidence_selection == 'reviewed-collection-v6':
+        if evidence_selection == 'reviewed-collection-v7':
+            from . import investigation_reviewed_collection_v7 as reviewed_selector
+        elif evidence_selection == 'reviewed-collection-v6':
             from . import investigation_reviewed_collection_v6 as reviewed_selector
         elif evidence_selection == 'reviewed-collection-v5':
             from . import investigation_reviewed_collection_v5 as reviewed_selector
@@ -562,7 +564,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         result = (await lookup_evidence(scope, query, 10, retrieval_version='v2')
               if template_version in ('investigation-v11', 'investigation-v12', 'investigation-v13', 'investigation-v14', 'investigation-v15', 'investigation-v16', 'investigation-v17', 'investigation-v18', 'investigation-v19', 'investigation-v20', 'investigation-v21') else await lookup_evidence(scope, query, 10))
     async with aiosqlite.connect(get_memory_db_path()) as db:
-        if snapshot != await _snapshot(db, scope):
+        if evidence_selection != 'reviewed-collection-v7' and snapshot != await _snapshot(db, scope):
             raise ValueError('Evidence changed during investigation')
     if result['scope_status']['ready'] != len(scope.collection_ids):
         raise ValueError('All selected collections must be ready and recent')
@@ -1299,6 +1301,8 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     if template_version in ('investigation-v11', 'investigation-v12', 'investigation-v13', 'investigation-v14', 'investigation-v15', 'investigation-v16', 'investigation-v17', 'investigation-v18', 'investigation-v19', 'investigation-v20', 'investigation-v21'):
         provenance.update({'retrieval_version': result['retrieval_version'], 'retrieval_trace': result['retrieval_trace'],
                            'snippet_trace': snippet_trace, 'answer_coverage': coverage_trace})
+    if evidence_selection == 'reviewed-collection-v7':
+        provenance['document_coverage'] = deepcopy(result['retrieval_trace']['document_coverage'])
     if evidence_selection == 'reviewed-collection-v6':
         provenance['reviewed_selection'] = {
             'version': 'whole-claim-snippet-budget-v1',
@@ -1439,9 +1443,12 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         await db.execute('BEGIN IMMEDIATE')
         await ensure_schema(db)
         if reviewed_receipt is not None:
-            if reviewed_receipt != await reviewed_selector.prepare_in_transaction(db, scope, query):
+            current_receipt = await reviewed_selector.prepare_in_transaction(db, scope, query)
+            equal = (reviewed_selector._logical(reviewed_receipt) == reviewed_selector._logical(current_receipt)
+                     if evidence_selection == 'reviewed-collection-v7' else reviewed_receipt == current_receipt)
+            if not equal:
                 raise ValueError('Reviewed evidence changed during investigation')
-        if (snapshot != await _snapshot(db, scope)
+        if ((evidence_selection != 'reviewed-collection-v7' and snapshot != await _snapshot(db, scope))
                 or not await _bindings_valid(db, refs, scope)):
             raise ValueError('Evidence changed during investigation')
         await _validate_v15_current(db, scope, original)
@@ -1463,6 +1470,8 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                 await investigation_question_part_contracts.persist_in_transaction(db, scope, iid, question_part_plan)
         await db.executemany('INSERT INTO investigation_bindings VALUES (?,?,?,?,?,?)',
                              [(iid, *ref) for ref in refs])
+        if evidence_selection == 'reviewed-collection-v7':
+            await reviewed_selector.persist_in_transaction(db, iid, reviewed_receipt)
         await db.commit()
     return await get_investigation(scope, iid)
 
@@ -1650,6 +1659,8 @@ def _validate_v15_original(item: dict[str, Any]) -> None:
 async def _validate_v15_current(db: aiosqlite.Connection, scope: EvidenceScope,
                                 item: dict[str, Any]) -> None:
     _validate_v15_original(item)
+    from . import investigation_reviewed_collection_v7 as document_coverage
+    await document_coverage.validate_in_transaction(db, scope, item)
     from . import investigation_reviewed_unit_plans
     await investigation_reviewed_unit_plans.validate_in_transaction(db, scope, item)
     from . import investigation_question_part_contracts
@@ -1684,7 +1695,11 @@ async def get_investigation(scope: EvidenceScope, iid: str) -> dict[str, Any]:
         _validate_v12_original(item)
         _validate_v13_original(item)
         _validate_v14_original(item)
-        await _validate_v15_current(db, scope, item)
+        from .investigation_reviewed_collection_v7 import CoverageError
+        try:
+            await _validate_v15_current(db, scope, item)
+        except CoverageError:
+            raise LookupError('Investigation unavailable: selected document coverage changed; scan and review sources before reuse') from None
         item.pop("unit_plan_contract", None)
         item.pop("question_part_contract", None)
         return item

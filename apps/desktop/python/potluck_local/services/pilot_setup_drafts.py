@@ -29,6 +29,8 @@ def question_parts(question: str) -> dict[str, Any]:
 
 async def source_drafts(scope: evidence.EvidenceScope, question: str, *,
                         suggestion_version: str = 'legacy') -> dict[str, Any]:
+    if suggestion_version == 'all-selected-documents-v1':
+        return await _complete_drafts(scope, question)
     if suggestion_version in ('document-topics-v1', 'document-topics-v2', 'document-topics-v3', 'document-topics-v4'):
         return await _topic_drafts(scope, question, suggestion_version)
     if suggestion_version != 'legacy':
@@ -178,3 +180,23 @@ async def _topic_drafts(scope: evidence.EvidenceScope, question: str, version: s
                 *(['Suggestion search was bounded; some documents or indexed text were not considered.']
                   if ranked['incomplete'] else []),
             ]}
+
+
+async def _complete_drafts(scope: evidence.EvidenceScope, question: str) -> dict[str, Any]:
+    from . import investigation_reviewed_collection_v7 as complete
+    parts = question_parts(question)
+    async with aiosqlite.connect(get_memory_db_path()) as db:
+        await db.execute('BEGIN')
+        _, documents = await complete.inventory_in_transaction(db, scope)
+    drafts = [await document_draft(scope, d['collection_id'], d['relative_path']) for d in documents]
+    async with aiosqlite.connect(get_memory_db_path()) as db:
+        await db.execute('BEGIN')
+        _, current = await complete.inventory_in_transaction(db, scope)
+    if current != documents:
+        raise ValueError('Selected documents changed during source preparation')
+    return {'version': 'pilot-complete-document-drafts-v1', 'question': question,
+            'question_parts': parts, 'query_trace': {'effective_query': question, 'omitted_terms': []},
+            'candidates': drafts, 'matching_documents_seen': len(documents),
+            'documents_considered': len(documents), 'truncated': False,
+            'limitations': ['Every current indexed document in the selected folders is listed, under the configured include/exclude rules.',
+                            'Read and approve complete sources before asking. Preparation does not approve statements or verify facts.']}

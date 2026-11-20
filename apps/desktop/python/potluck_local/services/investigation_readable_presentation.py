@@ -312,6 +312,12 @@ def export(item: dict[str, Any], escape: Callable[[str], str]) -> str | None:
              'Readable view of the original answer. Source selections and original output are retained.', '',
              'Investigation: ' + escape(item.get('id', '')), 'Model: ' + escape(item.get('model_slug', '')),
              'Model SHA256: ' + escape(item.get('model_sha', '')), 'Created: ' + escape(item.get('created_at', '')), '']
+    coverage = (item.get('provenance') or {}).get('document_coverage')
+    if coverage:
+        lines += ['## Selected document input',
+                  str(coverage['supplied_documents']) + ' of ' + str(coverage['selected_documents']) + ' selected indexed documents supplied in full from reviewed statements.',
+                  'Folder exclusions apply. Input coverage does not verify model interpretation or company-wide absence.']
+        lines += ['- ' + escape(doc['relative_path']) + ': ' + escape(doc['claim_citation_id']) for doc in coverage['documents']]
     for answer, value in zip(answers, projections):
         outline = organized.get(answer['question_id'])
         if outline:

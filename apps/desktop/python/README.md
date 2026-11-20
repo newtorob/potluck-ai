@@ -259,3 +259,21 @@ This deterministic display does not run a model, summarize a policy or change th
 stored original answer, provenance, review or original-layout export. The readable
 response/export records the original source hash and reconstruction spans. Earlier
 answer contracts and the ordinary defaults keep their existing presentation.
+
+### Complete selected-document input (opt-in)
+
+The internal `reviewed-collection-v7` path supplies every current indexed document
+in the selected collections as an exact, complete, approved source statement,
+independently of query-word ranking. Source preparation can list this complete
+bounded set with `all-selected-documents-v1`. Preparation does not approve it.
+Unreviewed/partial/edited/missing documents, disk/index drift and any whole-set
+budget overflow refuse before inference, without a clipped prefix or raw fallback.
+Current include/exclude and symlink rules still define the indexed corpus.
+
+A separately stored coverage digest binds the selected document/revision/chunk
+inventory and exact statements through save, reopen, review, export and outcome.
+Live source bytes and parsed text are checked read-only; an unchanged rescan may
+renew freshness. Earlier contracts and defaults stay unchanged. Supplying all
+selected documents does not verify model interpretation or establish absence in
+unselected company knowledge. Content, input coverage and readability need
+separate evaluation.

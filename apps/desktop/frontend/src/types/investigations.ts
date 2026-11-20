@@ -133,6 +133,15 @@ export interface Investigation {
     model_sha256?: string;
     template_version?: string;
     retrieval_version?: string;
+    document_coverage?: {
+      version: 'complete-selected-documents-v1';
+      selected_documents: number;
+      supplied_documents: number;
+      omitted_documents: 0;
+      documents: Array<{ collection_id: string; id: string; revision_id: string; relative_path: string; claim_citation_id: string }>;
+      scope: string;
+      assessment: string;
+    };
     reviewed_selection?: {
       version: 'whole-claim-snippet-budget-v1';
       selected_claims: number;

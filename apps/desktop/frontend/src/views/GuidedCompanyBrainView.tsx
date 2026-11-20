@@ -95,6 +95,8 @@ function failure(error: unknown): string {
     return 'The local model could not finish this answer. No answer was saved. Your question is kept. Refresh Local model setup and prepare the model again if it stopped.';
   if (/Multiple reviewed/.test(message))
     return 'Several reviewed statements depend on this document. Open Advanced investigations to review their replacement together.';
+  if (/Review every selected document in full/i.test(message))
+    return 'Every selected document needs a complete, current source review. Scan changed folders, review all listed documents, or select fewer documents to fit. No partial answer was saved.';
   if (/404|unavailable|stale/i.test(message))
     return 'This source or answer is no longer current. Scan your folders and review the changed documents, then try again.';
   if (/collections_unavailable|ready and recent/i.test(message))
@@ -112,7 +114,7 @@ export function GuidedCompanyBrainView({
 }: {
   onAdvanced: (question: string, answerId?: string) => void;
   initialQuestion?: string;
-  reviewedEvidenceVersion?: 'v5' | 'v6';
+  reviewedEvidenceVersion?: 'v5' | 'v6' | 'v7';
   reviewedAnswerVersion?:
     | 'v32'
     | 'v33'
@@ -400,7 +402,8 @@ export function GuidedCompanyBrainView({
         localApi.pilotSetupDrafts({
           ...scope,
           question: question.trim(),
-          suggestion_version: 'document-topics-v4',
+          suggestion_version:
+            reviewedEvidenceVersion === 'v7' ? 'all-selected-documents-v1' : 'document-topics-v4',
         }),
         claims(),
       ]);
@@ -531,7 +534,9 @@ export function GuidedCompanyBrainView({
           pilot_confirmed: true,
           question_parts: parts,
           question_parts_confirmed: true,
-          ...(reviewedEvidenceVersion === 'v6' ? { reviewed_evidence_version: 'v6' as const } : {}),
+          ...(reviewedEvidenceVersion !== 'v5'
+            ? { reviewed_evidence_version: reviewedEvidenceVersion }
+            : {}),
           ...(reviewedAnswerVersion !== 'v32'
             ? { reviewed_answer_version: reviewedAnswerVersion }
             : {}),
@@ -1390,6 +1395,27 @@ export function GuidedCompanyBrainView({
                   left out to stay within the evidence limit. It may not cover every relevant
                   source.
                 </p>
+              )}
+              {answer.provenance?.document_coverage && (
+                <details className="rounded-md border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {answer.provenance.document_coverage.supplied_documents} of{' '}
+                    {answer.provenance.document_coverage.selected_documents} selected documents
+                    supplied
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    All current indexed documents in the selected folders were supplied in full from
+                    reviewed source statements. Folder exclusions still apply. The model can still
+                    miss facts; this does not establish company-wide absence.
+                  </p>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    {answer.provenance.document_coverage.documents.map((document) => (
+                      <li key={`${document.collection_id}:${document.id}`}>
+                        {document.relative_path}: {sourceLink(document.claim_citation_id)}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
               <p className="text-sm font-medium">{answer.issue}</p>
               <p className="text-xs text-muted-foreground">
