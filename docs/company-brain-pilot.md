@@ -572,3 +572,13 @@ Recording feedback and preparing a proposal never approve knowledge, train a mod
 run an evaluation or call the answer model. Advanced retains its separate knowledge
 proposal and evaluation tools. Workspace labels and typed names remain local-owner
 scope, not multi-user authentication or authorization.
+
+## Turn references into explicit regression reviews
+
+The optional [rubric-bound regression harness](company-brain-regressions.md)
+freezes source-backed criteria against a saved reference, captures the original
+saved candidate and records explicit criterion judgments. It preserves failures
+and unknowns, rejects transplanted judgments and revalidates current sources.
+This developer workflow runs no model or automatic semantic judge. It assesses
+original saved briefs separately from the readable desktop view and recorded
+company outcomes.
