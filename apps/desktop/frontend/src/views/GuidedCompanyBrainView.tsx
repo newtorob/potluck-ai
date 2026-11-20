@@ -127,7 +127,8 @@ export function GuidedCompanyBrainView({
     | 'v40'
     | 'v41'
     | 'v42'
-    | 'v43';
+    | 'v43'
+    | 'v47';
 }) {
   const health = useHealth();
   const saved = useCompanyBrainWorkspaceStore((s) => s.saved);

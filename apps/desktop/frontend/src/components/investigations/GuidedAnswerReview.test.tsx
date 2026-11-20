@@ -63,36 +63,40 @@ describe('GuidedAnswerReview', () => {
       expect(review).toHaveBeenCalledWith({ decision, reviewer: 'Rob', reason: 'Reviewed' }),
     );
   });
-  it('requires a changed correction and preserves IDs and surrounding brief fields', async () => {
-    const i = fixture(),
-      { review } = setup(i);
-    fill('correct');
-    expect(screen.getByRole('button', { name: 'Save review' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Corrected answer'), {
-      target: { value: 'Corrected only if approved' },
-    });
-    fireEvent.change(screen.getByLabelText('Answer verdict'), { target: { value: 'unknown' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
-    await waitFor(() => expect(review).toHaveBeenCalledOnce());
-    const b = review.mock.calls[0]![0].corrected_brief;
-    expect(b.answers).toEqual([
-      {
-        question_id: 'q',
-        status: 'unknown',
-        text: 'Corrected only if approved',
-        snippet_ids: ['S1', 'S2'],
-      },
-    ]);
-    expect(b.questions).toEqual(i.brief.questions);
-    expect(b.model_uncertainties).toEqual(i.brief.model_uncertainties);
-    expect(i.brief.answers![0]!.text).toBe('Original');
-    b.questions[0].text = 'Changed payload';
-    b.answers[0].snippet_ids.push('S3');
-    b.model_uncertainties.push('new');
-    expect(i.brief.questions![0]!.text).toBe('Question?');
-    expect(i.brief.answers![0]!.snippet_ids).toEqual(['S1', 'S2']);
-    expect(i.brief.model_uncertainties).toEqual([]);
-  });
+  it.each(['fixed-part-selection-v33', 'fixed-part-selection-v43', 'fixed-part-selection-v47'])(
+    'requires a changed correction and preserves IDs in %s',
+    async (mode) => {
+      const i = fixture();
+      i.provenance = { presentation_mode: mode };
+      const { review } = setup(i);
+      fill('correct');
+      expect(screen.getByRole('button', { name: 'Save review' })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Corrected answer'), {
+        target: { value: 'Corrected only if approved' },
+      });
+      fireEvent.change(screen.getByLabelText('Answer verdict'), { target: { value: 'unknown' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+      await waitFor(() => expect(review).toHaveBeenCalledOnce());
+      const b = review.mock.calls[0]![0].corrected_brief;
+      expect(b.answers).toEqual([
+        {
+          question_id: 'q',
+          status: 'unknown',
+          text: 'Corrected only if approved',
+          snippet_ids: ['S1', 'S2'],
+        },
+      ]);
+      expect(b.questions).toEqual(i.brief.questions);
+      expect(b.model_uncertainties).toEqual(i.brief.model_uncertainties);
+      expect(i.brief.answers![0]!.text).toBe('Original');
+      b.questions[0].text = 'Changed payload';
+      b.answers[0].snippet_ids.push('S3');
+      b.model_uncertainties.push('new');
+      expect(i.brief.questions![0]!.text).toBe('Question?');
+      expect(i.brief.answers![0]!.snippet_ids).toEqual(['S1', 'S2']);
+      expect(i.brief.model_uncertainties).toEqual([]);
+    },
+  );
   it('rejects multi-answer, mismatched question and calculation cases', () => {
     const i = fixture();
     expect(canCorrectGuided(i)).toBe(true);

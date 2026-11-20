@@ -12,7 +12,7 @@ vi.mock('./GuidedCompanyBrainView', () => ({
     onAdvanced: (q: string, id: string) => void;
     initialQuestion: string;
     reviewedEvidenceVersion: 'v5' | 'v6' | 'v7';
-    reviewedAnswerVersion: 'v32' | 'v33';
+    reviewedAnswerVersion: 'v32' | 'v33' | 'v47';
   }) => (
     <div>
       <p>Guided question: {initialQuestion}</p>
@@ -67,5 +67,10 @@ it('opens complete document coverage only through the explicit pilot route', () 
     </MemoryRouter>,
   );
   expect(screen.getByText('Evidence version: v7')).toBeVisible();
-  expect(screen.getByText('Answer version: v43')).toBeVisible();
+  expect(screen.getByText('Answer version: v47')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Open review tools' }));
+  expect(screen.getByText('Advanced record: saved-answer · Keep my question')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to Company Brain' }));
+  expect(screen.getByText('Evidence version: v7')).toBeVisible();
+  expect(screen.getByText('Answer version: v47')).toBeVisible();
 });

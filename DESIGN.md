@@ -125,3 +125,13 @@ truth or permission check. Ambiguous wording and actual permission or event
 questions retain the unrestricted decision contract. Exact conditions,
 exceptions, citations and selected-statement scope remain visible. Defaults
 stay V33/V32; V43 requires native qualification before a matching pilot build.
+
+
+### Complete-document Company Brain preview
+
+The explicit complete-coverage preview reuses the existing guided answer, source
+links, original answer and complete evidence disclosures for V47. Literal
+connectives stay with their following requested property before model verdicts;
+this is neither conditional truth nor independent answer verification. No new
+visual tokens, controls or authority are introduced. Ordinary V6/V33 defaults
+and previous saved-answer rendering remain unchanged.

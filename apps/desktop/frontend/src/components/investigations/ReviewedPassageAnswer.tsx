@@ -139,7 +139,8 @@ export function ReviewedPassageAnswer({
       presentation.version === 'fixed-part-selection-v40' ||
       presentation.version === 'fixed-part-selection-v41' ||
       presentation.version === 'fixed-part-selection-v42' ||
-      presentation.version === 'fixed-part-selection-v43') &&
+      presentation.version === 'fixed-part-selection-v43' ||
+      presentation.version === 'fixed-part-selection-v47') &&
     (readable?.version === 'readable-source-groups-v1' ||
       readable?.version === 'readable-task-statements-v2' ||
       readable?.version === 'readable-task-statements-v3') &&

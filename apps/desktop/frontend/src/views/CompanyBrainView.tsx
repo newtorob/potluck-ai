@@ -21,7 +21,8 @@ export function CompanyBrainView({
     | 'v40'
     | 'v41'
     | 'v42'
-    | 'v43';
+    | 'v43'
+    | 'v47';
 } = {}) {
   const [params, setParams] = useSearchParams();
   const completeDocuments = params.get('coverage') === 'complete';
@@ -48,7 +49,7 @@ export function CompanyBrainView({
   return (
     <GuidedCompanyBrainView
       reviewedEvidenceVersion={completeDocuments ? 'v7' : reviewedEvidenceVersion}
-      reviewedAnswerVersion={completeDocuments ? 'v43' : reviewedAnswerVersion}
+      reviewedAnswerVersion={completeDocuments ? 'v47' : reviewedAnswerVersion}
       initialQuestion={handoff.question}
       onAdvanced={(question, answerId) => {
         setHandoff(answerId ? { question, answerId } : { question });

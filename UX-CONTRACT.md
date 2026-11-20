@@ -533,5 +533,11 @@ verification or company-wide absence. Older answer contracts and defaults remain
 unchanged until qualification. No new tokens, form or selection owners.
 
 The explicit `coverage=complete` Company Brain preview selects V7 evidence and
-V43 answers together, preserving that selection through Advanced navigation.
+V47 answers together, preserving that selection through Advanced navigation.
+V47 keeps literal connective prefixes attached to the following request before
+model verdicts, without evaluating their conditions. The preview disables extra
+model outlines and reuses the original/status/snippet binding, correction guards,
+full evidence and original-answer disclosures. Complete input is not verified
+interpretation. Previous saved versions keep their rendering; this explicit
+preview does not promote ordinary defaults.
 The ordinary route retains V6/V33 until qualification and promotion.
