@@ -331,3 +331,20 @@ context hashes. The native output schemas, three-call limits, total output,
 are unchanged. Context reconstruction tests do not establish model quality or a
 speed improvement; the same-case owned-runtime check and separately frozen
 questions remain required.
+
+
+### Literal question context (opt-in)
+
+Internal `fixed-part-selection-v47` retains V46's exact shared context and V7
+complete selected-document input. Before asking the model for factual verdicts,
+it joins a standalone connective such as `If not,` to the following literal
+request. Every original character, native partition, index and Unicode offset
+is retained for replay. A dangling connective refuses instead of inventing a
+request. Conditions are neither evaluated nor discarded.
+
+This syntax step cannot establish a fact or change an existing model verdict.
+The proposal and audit schemas are built from the resulting actual requests,
+with the same six-clause cap and source, scope, citation and generation limits.
+Qualification separately checks real missing facts, requested actual events,
+readability and unwanted extra unknowns. Older answers and ordinary/UI defaults
+remain unchanged; source completeness still does not prove interpretation.
