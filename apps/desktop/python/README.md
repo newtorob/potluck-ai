@@ -293,3 +293,23 @@ the original, conditions and citations. Earlier contracts, UI preview selections
 and ordinary defaults are unchanged. This internal API candidate needs separate
 source-aware fact, verdict, coverage and readability qualification; structural
 validity and supplying full documents do not prove semantic correctness.
+
+### Requested properties and decision scope (opt-in)
+
+Internal `fixed-part-selection-v45` requires complete V7 input and whole statement
+units. Conservative question-only syntax can refine a simple coordinated request
+for descriptions into exact literal fragments, retaining its original parent and
+every question character. The actual native partition is kept separately; the
+refined partition is replayed and the existing six-clause cap still applies.
+Description intent never establishes a fact, resolves an ambiguous actor, or
+proves actual execution. The model must interpret the original full question.
+
+Each literal source-availability decision has an independent all-supplied-statement
+scope basis. The model's narrower factual citations and polarity remain intact.
+The extra scope passages are labeled as supplied input, not verified interpretation
+or additional model-chosen evidence. Missing values, negative questions and actual
+events still need source-aware semantic review. Scope, original replies, refined
+mapping and displayed citations are replay-bound through save/reopen/review/export.
+The three call budgets, deadlines, source limits and ordinary/UI defaults remain
+unchanged. This API candidate needs separate fresh fact, verdict, scope and layout
+qualification before promotion.

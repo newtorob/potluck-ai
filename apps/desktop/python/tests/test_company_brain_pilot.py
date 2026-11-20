@@ -239,6 +239,9 @@ def test_reviewed_ask_http_confirmation_scope_and_fixed_contract(tmp_path, monke
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7', 'reviewed_answer_version': 'v44'}, headers=headers).status_code == 200
         assert calls[-1][1]['evidence_selection'] == 'reviewed-collection-v7'
         assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v44'
+        assert client.post(path, json={**body, 'reviewed_evidence_version': 'v7', 'reviewed_answer_version': 'v45'}, headers=headers).status_code == 200
+        assert calls[-1][1]['evidence_selection'] == 'reviewed-collection-v7'
+        assert calls[-1][1]['presentation_mode'] == 'fixed-part-selection-v45'
         assert client.post(path, json={**body, 'reviewed_evidence_version': 'v8'}, headers=headers).status_code == 422
 
 
