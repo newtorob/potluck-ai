@@ -313,3 +313,21 @@ mapping and displayed citations are replay-bound through save/reopen/review/expo
 The three call budgets, deadlines, source limits and ordinary/UI defaults remain
 unchanged. This API candidate needs separate fresh fact, verdict, scope and layout
 qualification before promotion.
+
+### Shared model context (opt-in)
+
+Internal `fixed-part-selection-v46` retains the V45 question-intent and explicit
+scope roles with reversible context packets. Repeated whole-question requests
+use an explicit reference; facts with the same literal parent share its text and
+subject marker. Full source text and order, question fragments, conditions,
+citation IDs and prior proposal data are retained. Expanding the packet must
+reconstruct the exact previous semantic payload; unknown metadata or invalid
+references refuse. Versioned system instructions still require source-aware
+semantic review, not truth inferred from syntax or complete input.
+
+Measured receipts bind both the actual compact messages and reconstructed
+context hashes. The native output schemas, three-call limits, total output,
+330-second generation deadline, selected-source checks and ordinary/UI defaults
+are unchanged. Context reconstruction tests do not establish model quality or a
+speed improvement; the same-case owned-runtime check and separately frozen
+questions remain required.
