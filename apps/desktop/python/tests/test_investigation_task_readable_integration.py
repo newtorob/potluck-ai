@@ -134,3 +134,14 @@ def test_mismatched_scoped_decisions_fall_back_losslessly(mutation):
     assert result['original_text'] == a['text']
     assert 'Before use, obtain approval.' in result['markdown']
     assert 'Exception: wait when approval is unavailable.' in result['markdown']
+
+
+def test_literal_property_candidate_keeps_the_same_complete_task_layout():
+    older = record()
+    candidate = deepcopy(older)
+    candidate['brief']['answers'][0]['passage_presentation']['version'] = 'fixed-part-selection-v44'
+    frozen = deepcopy(candidate)
+    result = view.decorate(candidate)['readable_answers']['R1']
+    assert result == view.decorate(older)['readable_answers']['R1']
+    assert candidate == frozen
+    assert result['original_text'] == candidate['brief']['answers'][0]['text']

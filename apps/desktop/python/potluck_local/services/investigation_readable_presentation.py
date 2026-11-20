@@ -178,7 +178,7 @@ def _task_layout(answer: dict[str, Any], groups: list[dict[str, Any]], prefix: s
     from .investigation_readable_task_statement import project_task_statement
 
     presentation = answer['passage_presentation']
-    if presentation.get('version') != 'fixed-part-selection-v43' or not question:
+    if presentation.get('version') not in ('fixed-part-selection-v43', 'fixed-part-selection-v44') or not question:
         return None
     intro = _task_intro(answer, groups, prefix, question)
     if intro is None:
@@ -225,7 +225,7 @@ def project(answer: dict[str, Any], evidence: list[dict[str, Any]], *,
             escape: Callable[[str], str] = lambda value: value,
             question: str | None = None, allow_task_layout: bool = True) -> dict[str, Any] | None:
     presentation = answer.get('passage_presentation') or {}
-    if presentation.get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43'):
+    if presentation.get('version') not in ('fixed-part-selection-v32', 'fixed-part-selection-v33', 'fixed-part-selection-v34', 'fixed-part-selection-v35', 'fixed-part-selection-v36', 'fixed-part-selection-v37', 'fixed-part-selection-v38', 'fixed-part-selection-v39', 'fixed-part-selection-v40', 'fixed-part-selection-v41', 'fixed-part-selection-v42', 'fixed-part-selection-v43', 'fixed-part-selection-v44'):
         return None
     text = answer['text']
     passages = presentation.get('passages', [])

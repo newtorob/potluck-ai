@@ -277,3 +277,19 @@ renew freshness. Earlier contracts and defaults stay unchanged. Supplying all
 selected documents does not verify model interpretation or establish absence in
 unselected company knowledge. Content, input coverage and readability need
 separate evaluation.
+
+### Question-compatible decisions (opt-in)
+
+Internal `fixed-part-selection-v44` uses the same three bounded native stages and
+complete V7 source-input guard. The literal partition asks the model to separate
+independent requested properties, including conditional follow-ups. Known
+requirements can remain established beside an unknown actual event or value.
+A conservative question-only recognizer restricts clear textual-availability
+questions to direct Yes/No, conflict or mapping refusal. It never chooses truth
+or polarity, and ambiguous permission/service questions remain unrestricted.
+Final model decisions, source IDs and the exact literal partition are replayed
+and bound through persistence, review and export. The readable layout retains
+the original, conditions and citations. Earlier contracts, UI preview selections
+and ordinary defaults are unchanged. This internal API candidate needs separate
+source-aware fact, verdict, coverage and readability qualification; structural
+validity and supplying full documents do not prove semantic correctness.
